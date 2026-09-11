@@ -1,6 +1,11 @@
 # Motor de exchange (REST + WebSocket vía ccxt.pro, incluido en ccxt>=4.x)
 ccxt>=4.3.0
 
+# Servidor HTTP de la API de control (control_api.py). Ya viene como
+# dependencia transitiva de ccxt, se declara explícito porque se importa
+# directamente.
+aiohttp>=3.9.0
+
 # Análisis numérico y series de tiempo
 pandas>=2.2.0
 numpy>=1.26.0

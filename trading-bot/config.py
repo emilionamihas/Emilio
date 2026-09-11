@@ -70,6 +70,12 @@ class Settings:
     # Reporte
     report_interval_seconds: int
 
+    # API de control (ver control_api.py / DEPLOY.md)
+    control_api_enabled: bool
+    control_api_host: str
+    control_api_port: int
+    control_api_token: str
+
     def validate(self) -> None:
         if not self.dry_run and (not self.api_key or not self.api_secret):
             raise ValueError(
@@ -82,6 +88,11 @@ class Settings:
             raise ValueError("MAX_CAPITAL_PER_TRADE_PCT debe estar en (0, 1]")
         if not (0 < self.stop_loss_pct < 1):
             raise ValueError("STOP_LOSS_PCT debe estar en (0, 1)")
+        if self.control_api_enabled and self.control_api_host != "127.0.0.1" and not self.control_api_token:
+            raise ValueError(
+                "CONTROL_API_HOST distinto de 127.0.0.1 requiere CONTROL_API_TOKEN: "
+                "no se expone la API de control a la red sin autenticación."
+            )
 
 
 def load_settings() -> Settings:
@@ -108,6 +119,10 @@ def load_settings() -> Settings:
         max_capital_per_trade_pct=_env_float("MAX_CAPITAL_PER_TRADE_PCT", 0.10),
         total_capital_usdt=_env_float("TOTAL_CAPITAL_USDT", 1000),
         report_interval_seconds=_env_int("REPORT_INTERVAL_SECONDS", 15),
+        control_api_enabled=_env_bool("CONTROL_API_ENABLED", True),
+        control_api_host=os.getenv("CONTROL_API_HOST", "127.0.0.1"),
+        control_api_port=_env_int("CONTROL_API_PORT", 8080),
+        control_api_token=os.getenv("CONTROL_API_TOKEN", ""),
     )
     settings.validate()
     return settings

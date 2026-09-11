@@ -23,4 +23,9 @@ USER bot
 # stop_grace_period en docker-compose.yml, no solo acá.
 STOPSIGNAL SIGTERM
 
+# API de control (control_api.py). Documentativo: por defecto CONTROL_API_HOST
+# en .env es 127.0.0.1 (loopback DEL CONTENEDOR), así que EXPOSE por sí solo
+# no la hace alcanzable desde el host. Ver DEPLOY.md para exponerla de verdad.
+EXPOSE 8080
+
 CMD ["python", "main.py"]

@@ -81,7 +81,65 @@ sudo systemctl enable --now trading-bot
 journalctl -u trading-bot -f   # ver el reporte de PnL en vivo
 ```
 
-## 5. Checklist antes de poner `DRY_RUN=false`
+## 5. API de control: ver y operar el bot desde afuera del servidor
+
+El bot expone una API HTTP mínima (`control_api.py`) con estado en vivo y
+tres acciones: pausar, reanudar, cerrar la posición abierta. Por defecto
+(`CONTROL_API_HOST=127.0.0.1`) queda **cerrada**, solo accesible desde
+dentro del servidor. Para consultarla desde afuera (por ejemplo, para que
+se pueda pedir el estado del bot en una conversación con Claude) hay que
+exponerla a propósito:
+
+```bash
+# En .env:
+CONTROL_API_HOST=0.0.0.0
+CONTROL_API_TOKEN=$(openssl rand -hex 32)   # generar uno y guardarlo
+```
+
+**Nunca la dejes así, directa a internet sin HTTPS.** Ponela detrás de un
+reverse proxy que termine TLS. La forma más simple es Caddy, que saca el
+certificado solo:
+
+```bash
+sudo apt install -y caddy   # o el método de instalación que prefieras
+
+# /etc/caddy/Caddyfile
+bot.tudominio.com {
+    reverse_proxy 127.0.0.1:8080
+}
+```
+
+```bash
+sudo systemctl restart caddy
+```
+
+Con Docker, descomentá el mapeo de puerto en `docker-compose.yml`
+(`127.0.0.1:8080:8080`, no `0.0.0.0`: que solo Caddy en el propio host le
+pegue directo, y Caddy sea lo único expuesto a internet en el puerto 443).
+
+Probar que responde:
+
+```bash
+curl https://bot.tudominio.com/status \
+  -H "Authorization: Bearer $CONTROL_API_TOKEN"
+```
+
+Endpoints disponibles:
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| GET | `/health` | liveness check, sin autenticación, sin datos sensibles |
+| GET | `/status` | precios, z-score, posición abierta, PnL acumulado |
+| GET | `/trades?limit=20` | últimos trades cerrados |
+| POST | `/pause` | deja de abrir posiciones nuevas (sigue vigilando la abierta) |
+| POST | `/resume` | reanuda la apertura de posiciones nuevas |
+| POST | `/close` | pide el cierre inmediato de la posición abierta, si hay una |
+
+El token nunca da acceso a las API keys de Binance ni al `.env`: solo a
+estas seis rutas. Igual, tratalo como una credencial real (no lo compartas
+en un canal que no controlás) y regenéralo si sospechás que se filtró.
+
+## 6. Checklist antes de poner `DRY_RUN=false`
 
 - [ ] Corriste el bot en paper trading en **este mismo servidor** (no solo
       en tu laptop) al menos unos días, cubriendo distintas condiciones de
@@ -92,14 +150,15 @@ journalctl -u trading-bot -f   # ver el reporte de PnL en vivo
 - [ ] `TOTAL_CAPITAL_USDT` en `.env` refleja el capital real que estás
       dispuesto a arriesgar, no un número de prueba.
 - [ ] La API key NO tiene permiso de retiro.
-- [ ] Tenés forma de recibir una alerta si el proceso se cae (ver punto 6).
+- [ ] Tenés forma de recibir una alerta si el proceso se cae (ver punto 7).
 - [ ] Sabés cómo cerrar una posición a mano desde la app/web de Binance si
       hace falta intervenir de urgencia.
 
-## 6. Monitoreo básico
+## 7. Monitoreo básico
 
 El bot imprime el reporte de PnL cada `REPORT_INTERVAL_SECONDS` por stdout
-(`docker compose logs -f` o `journalctl -u trading-bot -f`). Para algo más
+(`docker compose logs -f` o `journalctl -u trading-bot -f`), y lo mismo por
+`GET /status` en la API de control si la expusiste (punto 5). Para algo más
 robusto sin agregar dependencias nuevas al proyecto:
 
 - Docker: `docker compose ps` para ver si el contenedor sigue up; un cron
@@ -108,7 +167,7 @@ robusto sin agregar dependencias nuevas al proyecto:
 - systemd: `systemctl is-active trading-bot`, o `OnFailure=` en la unit
   apuntando a otra unit que dispare una notificación.
 
-## 7. Actualizar el bot sin perder una posición abierta
+## 8. Actualizar el bot sin perder una posición abierta
 
 ```bash
 git pull

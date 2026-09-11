@@ -24,6 +24,7 @@ import signal
 import sys
 
 from config import Settings, load_settings
+from control_api import run_control_api
 from data_engine import build_exchange, calibrate_pair, recalibration_loop, run_market_data_feed
 from execution import ExecutionEngine
 from persistence import load_position, save_position
@@ -42,11 +43,19 @@ logger = logging.getLogger("trading-bot.main")
 
 
 class PositionHolder:
-    """Contenedor mutable de la posición abierta, compartido entre el loop
-    de estrategia (que la escribe) y el loop de reporte (que solo la lee)."""
+    """Contenedor mutable de estado compartido entre el loop de estrategia
+    (que lo escribe) y los loops de reporte y de la API de control (que lo
+    leen, y en el caso de la API también lo usan para pedir acciones)."""
 
     def __init__(self) -> None:
         self.position: PairPosition | None = None
+        # Kill switch remoto: en pausa, el bot no abre posiciones nuevas
+        # pero sigue vigilando el stop-loss y la salida de la posición
+        # abierta (no la abandona a mitad de camino).
+        self.paused: bool = False
+        # Pedido de cierre inmediato desde la API de control, sin esperar
+        # a que el z-score revierta ni a que salte el stop-loss.
+        self.force_close_requested: bool = False
 
 
 async def strategy_loop(
@@ -86,6 +95,20 @@ async def strategy_loop(
             save_position(None)
             continue
 
+        # --- Cierre forzado pedido desde la API de control (kill switch manual) ---
+        if open_position is not None and holder.force_close_requested:
+            trade = await execution_engine.close_pair_position(
+                open_position, market_state, market_state.current_zscore or 0.0, "manual_close"
+            )
+            reporter.record_trade(trade)
+            reporter.print_trade_closed(trade)
+            available_capital += open_position.allocated_capital + trade.net_pnl
+            holder.position = None
+            holder.force_close_requested = False
+            save_position(None)
+            continue
+        holder.force_close_requested = False  # no había nada que cerrar, se descarta el pedido
+
         result = generate_signal(market_state, settings, has_open_position=open_position is not None)
 
         if result.signal == Signal.EXIT and open_position is not None:
@@ -100,6 +123,9 @@ async def strategy_loop(
             continue
 
         if result.signal in (Signal.ENTER_LONG_A_SHORT_B, Signal.ENTER_SHORT_A_LONG_B):
+            if holder.paused:
+                continue
+
             sizing = risk_manager.size_position(market_state, available_capital)
 
             if sizing.allocated_capital <= 0 or not market_state.spread_std:
@@ -190,6 +216,8 @@ async def main() -> None:
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, _request_shutdown, sig.name)
 
+    control_api_runner = await run_control_api(settings, market_state, reporter, holder)
+
     tasks = [
         asyncio.create_task(run_market_data_feed(exchange, settings, market_state)),
         asyncio.create_task(recalibration_loop(exchange, settings, market_state)),
@@ -203,6 +231,8 @@ async def main() -> None:
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
+        if control_api_runner is not None:
+            await control_api_runner.cleanup()
         await exchange.close()
         logger.info("Bot apagado de forma prolija.")
 
