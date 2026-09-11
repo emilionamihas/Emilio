@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ASCEND &amp; CONNECT | Plataforma para recién egresados</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- ============ HEADER / NAVBAR ============ -->
+<header class="navbar">
+  <div class="navbar__inner container">
+    <a href="#inicio" class="brand" aria-label="Ascend & Connect - Inicio">
+      <svg class="brand__mark" width="42" height="42" viewBox="0 0 42 42" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M21 3 L36 36 H29.5 L21 16.5 L12.5 36 H6 Z" fill="url(#gradA)"/>
+        <path d="M8 27 C8 19 14 13 22 13 C29 13 34.5 17.5 36 24" stroke="url(#gradC)" stroke-width="4.4" fill="none" stroke-linecap="round"/>
+        <defs>
+          <linearGradient id="gradA" x1="6" y1="3" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#5EEAD4"/>
+            <stop offset="1" stop-color="#10B981"/>
+          </linearGradient>
+          <linearGradient id="gradC" x1="8" y1="13" x2="36" y2="27" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#10B981"/>
+            <stop offset="1" stop-color="#5EEAD4"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <span class="brand__text">
+        <span class="brand__name">ASCEND <span class="brand__amp">&amp;</span> CONNECT</span>
+        <span class="brand__tagline">A&amp;C · para recién egresados</span>
+      </span>
+    </a>
+
+    <nav class="navbar__nav" id="mainNav">
+      <a href="#empleos" data-view="empleos" class="nav-link">Buscar empleo</a>
+      <a href="#perfil" data-view="perfil" class="nav-link">Mi perfil</a>
+      <a href="#premium" data-view="premium" class="nav-link">Código premium</a>
+      <a href="#reclutador" data-view="reclutador" class="nav-link">Vista reclutador</a>
+    </nav>
+
+    <div class="navbar__actions">
+      <button class="btn btn--premium" id="btnPremiumTop" data-view="premium">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 8l4 3 4-6 4 6 4-3-2 10H6L4 8z" fill="currentColor"/></svg>
+        Pase Premium
+      </button>
+      <button class="navbar__burger" id="burgerBtn" aria-label="Abrir menú" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="inicio">
+
+  <!-- ============ HERO ============ -->
+  <section class="hero container">
+    <div class="hero__badge">Plataforma para nuevas generaciones profesionales</div>
+    <h1 class="hero__title">Tu primer gran salto profesional empieza en <span class="hero__title-accent">A&amp;C</span></h1>
+    <p class="hero__subtitle">Conectamos a recién egresados con empresas que buscan talento fresco. Arma tu perfil, postúlate a ofertas exclusivas y destácate frente a los reclutadores.</p>
+    <div class="hero__cta">
+      <a href="#empleos" data-view="empleos" class="btn btn--primary nav-link">Ver ofertas de empleo</a>
+      <a href="#perfil" data-view="perfil" class="btn btn--ghost nav-link">Crear mi perfil</a>
+    </div>
+    <div class="hero__stats">
+      <div class="stat"><span class="stat__num">1,200+</span><span class="stat__label">Egresados registrados</span></div>
+      <div class="stat"><span class="stat__num">340</span><span class="stat__label">Empresas aliadas</span></div>
+      <div class="stat"><span class="stat__num">85</span><span class="stat__label">Ofertas exclusivas activas</span></div>
+    </div>
+  </section>
+
+  <!-- ============ VISTA: EMPLEOS ============ -->
+  <section class="view container" id="view-empleos" data-view-panel="empleos" hidden>
+    <div class="section-heading">
+      <h2>Búsqueda de empleo</h2>
+      <p>Filtra ofertas pensadas para quien está dando sus primeros pasos en el mundo laboral.</p>
+    </div>
+
+    <div class="card filters-card">
+      <div class="filters-grid">
+        <div class="field">
+          <label for="filterArea">Área</label>
+          <select id="filterArea">
+            <option value="">Todas las áreas</option>
+            <option value="tecnologia">Tecnología &amp; Datos</option>
+            <option value="marketing">Marketing &amp; Contenido</option>
+            <option value="finanzas">Finanzas &amp; Administración</option>
+            <option value="diseno">Diseño &amp; Producto</option>
+            <option value="ventas">Ventas &amp; Atención al cliente</option>
+            <option value="ingenieria">Ingeniería &amp; Operaciones</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="filterModalidad">Modalidad</label>
+          <select id="filterModalidad">
+            <option value="">Todas las modalidades</option>
+            <option value="remoto">Remoto</option>
+            <option value="presencial">Presencial</option>
+            <option value="hibrido">Híbrido</option>
+          </select>
+        </div>
+        <div class="field field--checkbox">
+          <label class="checkbox">
+            <input type="checkbox" id="filterExclusivo">
+            <span>Solo ofertas exclusivas para recién egresados</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="jobs-meta">
+      <span id="jobsCount">0 ofertas encontradas</span>
+    </div>
+
+    <div class="jobs-grid" id="jobsGrid"></div>
+  </section>
+
+  <!-- ============ VISTA: PERFIL ============ -->
+  <section class="view container" id="view-perfil" data-view-panel="perfil" hidden>
+    <div class="section-heading">
+      <h2>Perfil de egresado</h2>
+      <p>Completa tu información. Entre mejor armado esté tu perfil, más visibilidad tendrás ante las empresas.</p>
+    </div>
+
+    <div class="profile-layout">
+      <form class="card profile-form" id="profileForm" novalidate>
+        <div class="form-grid">
+          <div class="field">
+            <label for="fullName">Nombre completo *</label>
+            <input type="text" id="fullName" required placeholder="Ej. María Fernanda López Rivas">
+          </div>
+          <div class="field">
+            <label for="address">Dirección</label>
+            <input type="text" id="address" placeholder="Ciudad, país">
+          </div>
+          <div class="field">
+            <label for="university">Universidad o instituto de egreso *</label>
+            <input type="text" id="university" required placeholder="Ej. Universidad Nacional">
+          </div>
+          <div class="field">
+            <label for="career">Carrera / especialidad *</label>
+            <input type="text" id="career" required placeholder="Ej. Ingeniería en Sistemas">
+          </div>
+          <div class="field">
+            <label for="gradYear">Año de graduación *</label>
+            <input type="number" id="gradYear" required min="1980" max="2030" placeholder="2026">
+          </div>
+          <div class="field">
+            <label for="cvLink">Enlace a CV / portafolio</label>
+            <input type="url" id="cvLink" placeholder="https://...">
+          </div>
+          <div class="field field--full">
+            <label for="skills">Habilidades (separadas por coma)</label>
+            <input type="text" id="skills" placeholder="Ej. Excel, Python, atención al cliente, diseño gráfico">
+          </div>
+          <div class="field field--full">
+            <label for="bio">Biografía</label>
+            <textarea id="bio" rows="4" placeholder="Cuéntale a las empresas quién eres, qué buscas y qué te apasiona."></textarea>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn--primary">Guardar perfil</button>
+          <span class="form-status" id="profileStatus"></span>
+        </div>
+      </form>
+
+      <aside class="card profile-preview-mini">
+        <h3>Así se ve tu tarjeta</h3>
+        <div id="profileMiniCard" class="mini-card">
+          <p class="empty-state">Aún no has guardado un perfil.</p>
+        </div>
+        <a href="#reclutador" data-view="reclutador" class="btn btn--ghost btn--block nav-link">Ver vista de reclutador</a>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ============ VISTA: PREMIUM ============ -->
+  <section class="view container" id="view-premium" data-view-panel="premium" hidden>
+    <div class="section-heading">
+      <h2>Códigos premium</h2>
+      <p>Canjea un código y activa la insignia <strong>Perfil Destacado</strong> más prioridad en el motor de búsqueda de las empresas.</p>
+    </div>
+
+    <div class="premium-layout">
+      <div class="card premium-card">
+        <div class="premium-card__icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M4 8l4 3 4-6 4 6 4-3-2 10H6L4 8z" fill="currentColor"/></svg>
+        </div>
+        <h3>Pase Premium A&amp;C</h3>
+        <ul class="premium-benefits">
+          <li>Insignia "Perfil Destacado para Empresas" en tu tarjeta</li>
+          <li>Prioridad en los resultados del motor de búsqueda de reclutadores</li>
+          <li>Aparece primero en ofertas exclusivas para recién egresados</li>
+        </ul>
+
+        <form id="promoForm" class="promo-form">
+          <label for="promoCode">Tengo un código promocional</label>
+          <div class="promo-input-row">
+            <input type="text" id="promoCode" placeholder="Ej. AC2026, A&amp;CVIP, PREMIUM2026" autocomplete="off">
+            <button type="submit" class="btn btn--primary">Canjear</button>
+          </div>
+          <p class="form-status" id="promoStatus"></p>
+        </form>
+      </div>
+
+      <div class="card premium-status-card">
+        <h3>Estado de tu cuenta</h3>
+        <div id="premiumStatusBox" class="premium-status-box">
+          <span class="badge badge--muted">Perfil estándar</span>
+          <p>Canjea un código válido para desbloquear los beneficios premium.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ VISTA: RECLUTADOR ============ -->
+  <section class="view container" id="view-reclutador" data-view-panel="reclutador" hidden>
+    <div class="section-heading">
+      <h2>Vista previa para reclutadores</h2>
+      <p>Así es exactamente como las empresas verán tu perfil dentro del buscador de talento de A&amp;C.</p>
+    </div>
+
+    <div class="recruiter-frame">
+      <div class="recruiter-frame__topbar">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span class="recruiter-frame__label">Panel de reclutador · A&amp;C Talent Search</span>
+      </div>
+      <div id="recruiterView" class="recruiter-frame__body"></div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <div class="brand brand--footer">
+      <span class="brand__name brand__name--sm">ASCEND <span class="brand__amp">&amp;</span> CONNECT</span>
+    </div>
+    <p>© 2026 Ascend &amp; Connect. Impulsando la primera oportunidad de cada egresado.</p>
+  </div>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
