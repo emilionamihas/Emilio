@@ -85,9 +85,12 @@ main.py                            Orquestación asyncio de todos los loops
 
 ## Despliegue en producción
 
-Ver [`DEPLOY.md`](./DEPLOY.md) para correr esto en un servidor propio con
-Docker o systemd, incluyendo el checklist de seguridad de la API key
-(sin permiso de retiro, whitelist de IP) antes de poner `DRY_RUN=false`.
+¿No tenés servidor todavía? [`VPS_SETUP.md`](./VPS_SETUP.md) tiene el
+camino paso a paso para conseguir uno y dejarlo listo.
+
+Con el servidor listo, ver [`DEPLOY.md`](./DEPLOY.md) para correr esto con
+Docker o systemd, incluyendo el checklist de seguridad de la API key (sin
+permiso de retiro, whitelist de IP) antes de poner `DRY_RUN=false`.
 
 ## Limitaciones conocidas
 
