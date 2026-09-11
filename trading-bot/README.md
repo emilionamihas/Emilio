@@ -60,8 +60,11 @@ strategy.py               Señales de entrada/salida por z-score
 profitability_filter.py   Filtro obligatorio: PnL neto proyectado (fees + slippage)
 risk_manager.py            Sizing por capital máximo y stop-loss del 1%
 execution.py               Ejecución de órdenes (simulada en dry-run, real vía ccxt)
-reporting.py                Reporte de PnL en consola
-main.py                      Orquestación asyncio de todos los loops
+persistence.py               Persiste la posición abierta a disco entre restarts
+control_api.py                 API HTTP (estado + pausar/reanudar/cerrar) y sirve el dashboard
+dashboard/index.html             Dashboard web que consume control_api.py desde el navegador
+reporting.py                      Reporte de PnL en consola
+main.py                            Orquestación asyncio de todos los loops
 ```
 
 ## Parámetros clave (`.env`)

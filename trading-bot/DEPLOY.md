@@ -81,14 +81,20 @@ sudo systemctl enable --now trading-bot
 journalctl -u trading-bot -f   # ver el reporte de PnL en vivo
 ```
 
-## 5. API de control: ver y operar el bot desde afuera del servidor
+## 5. Dashboard web: ver y operar el bot desde el navegador
 
 El bot expone una API HTTP mínima (`control_api.py`) con estado en vivo y
-tres acciones: pausar, reanudar, cerrar la posición abierta. Por defecto
-(`CONTROL_API_HOST=127.0.0.1`) queda **cerrada**, solo accesible desde
-dentro del servidor. Para consultarla desde afuera (por ejemplo, para que
-se pueda pedir el estado del bot en una conversación con Claude) hay que
-exponerla a propósito:
+tres acciones (pausar, reanudar, cerrar la posición abierta), y sirve en
+`/` un dashboard (`dashboard/index.html`) que consume esa misma API desde
+el navegador: estado del par, z-score, posición abierta con PnL no
+realizado, PnL acumulado, últimos trades, y los tres botones de control.
+No hace falta instalar nada aparte: es un único HTML sin dependencias
+externas, en el mismo origen que la API (sin lío de CORS).
+
+Por defecto (`CONTROL_API_HOST=127.0.0.1`) todo esto queda **cerrado**,
+solo accesible desde dentro del servidor (`curl http://127.0.0.1:8080/` o
+un túnel SSH). Para abrirlo desde tu navegador (o para que se pueda
+consultar en una conversación con Claude) hay que exponerlo a propósito:
 
 ```bash
 # En .env:
@@ -117,7 +123,10 @@ Con Docker, descomentá el mapeo de puerto en `docker-compose.yml`
 (`127.0.0.1:8080:8080`, no `0.0.0.0`: que solo Caddy en el propio host le
 pegue directo, y Caddy sea lo único expuesto a internet en el puerto 443).
 
-Probar que responde:
+Abrí `https://bot.tudominio.com/` en el navegador: vas a ver el dashboard
+pidiendo el token (el mismo `CONTROL_API_TOKEN` de arriba). Se guarda en
+el `localStorage` del navegador, no en el servidor. Para probarlo desde la
+terminal en vez del navegador:
 
 ```bash
 curl https://bot.tudominio.com/status \
@@ -129,6 +138,7 @@ Endpoints disponibles:
 | Método | Ruta | Qué hace |
 |---|---|---|
 | GET | `/health` | liveness check, sin autenticación, sin datos sensibles |
+| GET | `/` | dashboard HTML (pide el token en el navegador antes de mostrar datos) |
 | GET | `/status` | precios, z-score, posición abierta, PnL acumulado |
 | GET | `/trades?limit=20` | últimos trades cerrados |
 | POST | `/pause` | deja de abrir posiciones nuevas (sigue vigilando la abierta) |

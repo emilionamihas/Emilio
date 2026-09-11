@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import logging
 import time
+from pathlib import Path
 
 from aiohttp import web
 
@@ -37,11 +38,21 @@ from state import MarketState
 
 logger = logging.getLogger("trading-bot.control_api")
 
+# El dashboard es un HTML estático servido en "/", mismo origen que la API:
+# así el fetch() del navegador no pisa CORS ni necesita infraestructura
+# aparte (ver dashboard/index.html).
+DASHBOARD_PATH = Path(__file__).parent / "dashboard" / "index.html"
+
+# Rutas que no requieren el Bearer token: /health (liveness check, sin
+# datos sensibles) y "/" (el HTML del dashboard es solo la interfaz; cada
+# llamada que hace desde el navegador SÍ pasa por la autenticación normal).
+PUBLIC_PATHS = {"/health", "/"}
+
 
 def _auth_middleware_factory(token: str):
     @web.middleware
     async def auth_middleware(request: web.Request, handler):
-        if request.path == "/health" or not token:
+        if request.path in PUBLIC_PATHS or not token:
             return await handler(request)
         header = request.headers.get("Authorization", "")
         if header != f"Bearer {token}":
@@ -61,6 +72,11 @@ def build_app(
 
     async def health(request: web.Request) -> web.Response:
         return web.json_response({"status": "ok"})
+
+    async def dashboard(request: web.Request) -> web.Response:
+        if not DASHBOARD_PATH.exists():
+            return web.Response(text="dashboard/index.html no encontrado", status=500)
+        return web.Response(text=DASHBOARD_PATH.read_text(encoding="utf-8"), content_type="text/html")
 
     async def status(request: web.Request) -> web.Response:
         position = holder.position
@@ -146,6 +162,7 @@ def build_app(
         return web.json_response({"requested": True})
 
     app.router.add_get("/health", health)
+    app.router.add_get("/", dashboard)
     app.router.add_get("/status", status)
     app.router.add_get("/trades", trades)
     app.router.add_post("/pause", pause)
