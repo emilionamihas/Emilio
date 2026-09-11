@@ -29,6 +29,7 @@ const FEATURES = [
 export default function HomePage() {
   const [result, setResult] = useState<AnalyzeResponseBody | null>(null);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-12 sm:py-16">
@@ -51,15 +52,26 @@ export default function HomePage() {
           onStart={() => {
             setLoading(true);
             setResult(null);
+            setErrorMessage(null);
           }}
           onResult={(data) => {
             setResult(data);
             setLoading(false);
           }}
+          onError={(message) => {
+            setLoading(false);
+            setErrorMessage(message);
+          }}
         />
       </div>
 
-      {!result && !loading && (
+      {errorMessage && !loading && (
+        <div className="mx-auto mt-6 max-w-2xl rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          {errorMessage}
+        </div>
+      )}
+
+      {!result && !loading && !errorMessage && (
         <div className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-3">
           {FEATURES.map((feature) => (
             <Card key={feature.title}>

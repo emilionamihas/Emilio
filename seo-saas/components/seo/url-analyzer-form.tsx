@@ -10,9 +10,10 @@ import type { AnalyzeResponseBody } from "@/lib/types";
 interface UrlAnalyzerFormProps {
   onResult: (result: AnalyzeResponseBody) => void;
   onStart?: () => void;
+  onError?: (message: string) => void;
 }
 
-export function UrlAnalyzerForm({ onResult, onStart }: UrlAnalyzerFormProps) {
+export function UrlAnalyzerForm({ onResult, onStart, onError }: UrlAnalyzerFormProps) {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -39,12 +40,14 @@ export function UrlAnalyzerForm({ onResult, onStart }: UrlAnalyzerFormProps) {
 
       onResult(data as AnalyzeResponseBody);
     } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Ocurrió un error inesperado.";
       toast({
         variant: "destructive",
         title: "Error al analizar el sitio",
-        description:
-          error instanceof Error ? error.message : "Ocurrió un error inesperado.",
+        description: message,
       });
+      onError?.(message);
     } finally {
       setLoading(false);
     }
