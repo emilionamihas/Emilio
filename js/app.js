@@ -2,108 +2,18 @@
    ASCEND & CONNECT (A&C)
    Lógica de la plataforma: navegación, empleos, perfil,
    códigos premium y vista de reclutador.
-   Persistencia local (localStorage) para simular backend.
+
+   El perfil, el estado premium y el catálogo de empleos viven
+   en el backend (server/). El navegador solo guarda el ID del
+   perfil actual en localStorage, a modo de sesión simple.
    ========================================================= */
 
 (function () {
   "use strict";
 
-  const STORAGE_KEY = "ac_profile_v1";
+  const SESSION_KEY = "ac_profile_id";
 
-  const VALID_PROMO_CODES = ["AC2026", "A&CVIP", "PREMIUM2026"];
-
-  const JOBS = [
-    {
-      title: "Analista de Datos Jr.",
-      company: "Nimbus Analytics",
-      area: "tecnologia",
-      modalidad: "remoto",
-      exclusivo: true,
-      location: "Remoto · LATAM",
-      tags: ["SQL", "Excel", "Power BI"],
-      desc: "Programa de inducción de 3 meses para egresados de carreras afines a datos, estadística o ingeniería."
-    },
-    {
-      title: "Desarrollador Frontend Trainee",
-      company: "Vertex Software",
-      area: "tecnologia",
-      modalidad: "hibrido",
-      exclusivo: true,
-      location: "Ciudad de México",
-      tags: ["HTML/CSS", "JavaScript", "React"],
-      desc: "Buscamos primera experiencia laboral. Mentoría técnica y plan de carrera desde el día uno."
-    },
-    {
-      title: "Coordinador de Marketing Digital",
-      company: "Brisa Studio",
-      area: "marketing",
-      modalidad: "remoto",
-      exclusivo: false,
-      location: "Remoto",
-      tags: ["Redes sociales", "Copywriting", "Analytics"],
-      desc: "Apoyo en estrategia de contenido para marcas emergentes. Se valora portafolio."
-    },
-    {
-      title: "Analista Contable Jr.",
-      company: "Grupo Andina",
-      area: "finanzas",
-      modalidad: "presencial",
-      exclusivo: true,
-      location: "Bogotá",
-      tags: ["Excel", "NIIF", "Conciliaciones"],
-      desc: "Vacante pensada para recién egresados de Contaduría o Finanzas. Capacitación interna incluida.",
-    },
-    {
-      title: "Diseñador/a UX/UI Jr.",
-      company: "Estudio Norte",
-      area: "diseno",
-      modalidad: "hibrido",
-      exclusivo: true,
-      location: "Guadalajara",
-      tags: ["Figma", "Prototipado", "Investigación de usuarios"],
-      desc: "Únete a un equipo de producto que valora ideas frescas y perspectivas nuevas."
-    },
-    {
-      title: "Ejecutivo/a de Atención al Cliente",
-      company: "Puerto Claro",
-      area: "ventas",
-      modalidad: "presencial",
-      exclusivo: false,
-      location: "Lima",
-      tags: ["Comunicación", "CRM", "Ventas"],
-      desc: "Primer empleo formal con contrato y prestaciones desde el ingreso."
-    },
-    {
-      title: "Ingeniero/a de Procesos Jr.",
-      company: "Manufacturas del Sur",
-      area: "ingenieria",
-      modalidad: "presencial",
-      exclusivo: true,
-      location: "Monterrey",
-      tags: ["Lean", "Excel", "AutoCAD"],
-      desc: "Programa de rotación por distintas áreas de planta durante el primer año."
-    },
-    {
-      title: "Product Marketing Trainee",
-      company: "Halo Tech",
-      area: "marketing",
-      modalidad: "remoto",
-      exclusivo: true,
-      location: "Remoto · Latam",
-      tags: ["Storytelling", "Growth", "Datos"],
-      desc: "Aprenderás a lanzar productos digitales junto a un equipo senior de marketing."
-    },
-    {
-      title: "Asistente de Finanzas Corporativas",
-      company: "Cumbre Capital",
-      area: "finanzas",
-      modalidad: "hibrido",
-      exclusivo: false,
-      location: "Ciudad de Panamá",
-      tags: ["Modelado financiero", "Excel avanzado"],
-      desc: "Apoyo directo al equipo de tesorería. Ideal para egresados de Economía o Finanzas."
-    }
-  ];
+  let currentProfile = null;
 
   /* ---------------------------------------------------------
      Utilidades
@@ -118,10 +28,6 @@
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
-  }
-
-  function normalizePromoCode(raw) {
-    return (raw || "").trim().toUpperCase().replace(/\s+/g, "");
   }
 
   function getInitials(name) {
@@ -141,36 +47,47 @@
     toastTimer = setTimeout(() => toast.classList.remove("is-visible"), 2600);
   }
 
+  async function api(path, options) {
+    const res = await fetch(path, {
+      headers: { "Content-Type": "application/json" },
+      ...options
+    });
+    let data = {};
+    try { data = await res.json(); } catch (err) { /* respuesta sin cuerpo */ }
+    if (!res.ok) {
+      throw new Error(data.error || `Error de red (${res.status})`);
+    }
+    return data;
+  }
+
   /* ---------------------------------------------------------
-     Perfil (persistencia en localStorage)
+     Sesión de perfil (el ID vive en localStorage, los datos
+     reales y el estado premium viven en el servidor)
   --------------------------------------------------------- */
-  function loadProfile() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch (err) {
-      console.warn("No se pudo leer el perfil guardado", err);
+  function getSessionId() {
+    return localStorage.getItem(SESSION_KEY);
+  }
+
+  function setSessionId(id) {
+    localStorage.setItem(SESSION_KEY, id);
+  }
+
+  async function loadCurrentProfile() {
+    const id = getSessionId();
+    if (!id) {
+      currentProfile = null;
       return null;
     }
-  }
-
-  function saveProfile(profile) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
-  }
-
-  function getProfile() {
-    return loadProfile() || {
-      fullName: "",
-      address: "",
-      university: "",
-      career: "",
-      gradYear: "",
-      cvLink: "",
-      skills: "",
-      bio: "",
-      premium: false,
-      promoCode: ""
-    };
+    try {
+      const { profile } = await api(`/api/profiles/${id}`);
+      currentProfile = profile;
+      return profile;
+    } catch (err) {
+      // El perfil ya no existe (por ejemplo, se reinició la base de datos)
+      localStorage.removeItem(SESSION_KEY);
+      currentProfile = null;
+      return null;
+    }
   }
 
   /* ---------------------------------------------------------
@@ -239,33 +156,44 @@
   /* ---------------------------------------------------------
      Módulo de búsqueda de empleo
   --------------------------------------------------------- */
-  function renderJobs() {
+  function labelModalidad(mod) {
+    return { remoto: "Remoto", presencial: "Presencial", hibrido: "Híbrido" }[mod] || mod;
+  }
+
+  async function renderJobs() {
+    const grid = $("#jobsGrid");
     const area = $("#filterArea").value;
     const modalidad = $("#filterModalidad").value;
     const soloExclusivo = $("#filterExclusivo").checked;
-    const profile = getProfile();
 
-    let list = JOBS.filter((job) => {
-      if (area && job.area !== area) return false;
-      if (modalidad && job.modalidad !== modalidad) return false;
-      if (soloExclusivo && !job.exclusivo) return false;
-      return true;
-    });
+    const params = new URLSearchParams();
+    if (area) params.set("area", area);
+    if (modalidad) params.set("modalidad", modalidad);
+    if (soloExclusivo) params.set("exclusivo", "true");
 
-    // Si el usuario tiene Pase Premium, sus ofertas exclusivas relevantes se priorizan primero.
-    if (profile.premium) {
-      list = [...list].sort((a, b) => Number(b.exclusivo) - Number(a.exclusivo));
+    let jobs = [];
+    try {
+      const data = await api(`/api/jobs?${params.toString()}`);
+      jobs = data.jobs || [];
+    } catch (err) {
+      grid.innerHTML = `<div class="empty-state">No se pudieron cargar las ofertas. Intenta de nuevo en unos segundos.</div>`;
+      $("#jobsCount").textContent = "0 ofertas encontradas";
+      return;
     }
 
-    const grid = $("#jobsGrid");
-    $("#jobsCount").textContent = `${list.length} oferta${list.length === 1 ? "" : "s"} encontrada${list.length === 1 ? "" : "s"}`;
+    // Si el usuario tiene Pase Premium, las ofertas exclusivas se priorizan primero.
+    if (currentProfile && currentProfile.premium) {
+      jobs = [...jobs].sort((a, b) => Number(b.exclusivo) - Number(a.exclusivo));
+    }
 
-    if (list.length === 0) {
+    $("#jobsCount").textContent = `${jobs.length} oferta${jobs.length === 1 ? "" : "s"} encontrada${jobs.length === 1 ? "" : "s"}`;
+
+    if (jobs.length === 0) {
       grid.innerHTML = `<div class="empty-state">No encontramos ofertas con esos filtros. Prueba ajustando el área o la modalidad.</div>`;
       return;
     }
 
-    grid.innerHTML = list.map((job) => `
+    grid.innerHTML = jobs.map((job) => `
       <article class="job-card">
         <div class="job-card__top">
           <div>
@@ -292,10 +220,6 @@
     });
   }
 
-  function labelModalidad(mod) {
-    return { remoto: "Remoto", presencial: "Presencial", hibrido: "Híbrido" }[mod] || mod;
-  }
-
   function initJobFilters() {
     ["#filterArea", "#filterModalidad", "#filterExclusivo"].forEach((sel) => {
       $(sel).addEventListener("change", renderJobs);
@@ -306,6 +230,7 @@
      Formulario de perfil
   --------------------------------------------------------- */
   function fillProfileForm(profile) {
+    if (!profile) return;
     $("#fullName").value = profile.fullName || "";
     $("#address").value = profile.address || "";
     $("#university").value = profile.university || "";
@@ -318,7 +243,7 @@
 
   function renderMiniCard(profile) {
     const box = $("#profileMiniCard");
-    if (!profile.fullName) {
+    if (!profile || !profile.fullName) {
       box.innerHTML = `<p class="empty-state">Aún no has guardado un perfil.</p>`;
       return;
     }
@@ -330,11 +255,10 @@
   }
 
   function initProfileForm() {
-    const profile = getProfile();
-    fillProfileForm(profile);
-    renderMiniCard(profile);
+    fillProfileForm(currentProfile);
+    renderMiniCard(currentProfile);
 
-    $("#profileForm").addEventListener("submit", (e) => {
+    $("#profileForm").addEventListener("submit", async (e) => {
       e.preventDefault();
 
       const fullName = $("#fullName").value.trim();
@@ -345,29 +269,39 @@
       const status = $("#profileStatus");
 
       if (!fullName || !university || !career || !gradYear) {
-        status.textContent = "Completa los campos obligatorios (*) antes de guardar.";
         status.classList.add("is-error");
+        status.textContent = "Completa los campos obligatorios (*) antes de guardar.";
         return;
       }
 
-      const current = getProfile();
-      const updated = {
-        ...current,
+      const payload = {
         fullName,
-        address: $("#address").value.trim(),
         university,
         career,
         gradYear,
+        address: $("#address").value.trim(),
         cvLink: $("#cvLink").value.trim(),
         skills: $("#skills").value.trim(),
         bio: $("#bio").value.trim()
       };
 
-      saveProfile(updated);
-      status.classList.remove("is-error");
-      status.textContent = "Perfil guardado correctamente.";
-      renderMiniCard(updated);
-      showToast("Tu perfil se guardó correctamente.");
+      try {
+        const id = getSessionId();
+        const data = id
+          ? await api(`/api/profiles/${id}`, { method: "PUT", body: JSON.stringify(payload) })
+          : await api("/api/profiles", { method: "POST", body: JSON.stringify(payload) });
+
+        currentProfile = data.profile;
+        setSessionId(currentProfile.id);
+
+        status.classList.remove("is-error");
+        status.textContent = "Perfil guardado correctamente.";
+        renderMiniCard(currentProfile);
+        showToast("Tu perfil se guardó correctamente.");
+      } catch (err) {
+        status.classList.add("is-error");
+        status.textContent = err.message || "No se pudo guardar el perfil.";
+      }
     });
   }
 
@@ -376,7 +310,7 @@
   --------------------------------------------------------- */
   function renderPremiumStatus(profile) {
     const box = $("#premiumStatusBox");
-    if (profile.premium) {
+    if (profile && profile.premium) {
       box.innerHTML = `
         <span class="badge badge--premium">Perfil Destacado activo</span>
         <p>Código aplicado: <strong>${escapeHtml(profile.promoCode)}</strong>. Tu perfil tiene prioridad en el motor de búsqueda de las empresas.</p>
@@ -390,57 +324,67 @@
   }
 
   function initPromoForm() {
-    const profile = getProfile();
-    renderPremiumStatus(profile);
+    renderPremiumStatus(currentProfile);
 
-    $("#promoForm").addEventListener("submit", (e) => {
+    $("#promoForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       const input = $("#promoCode");
       const status = $("#promoStatus");
-      const code = normalizePromoCode(input.value);
+      const code = input.value.trim();
 
-      if (!code) {
-        status.textContent = "Ingresa un código para canjear.";
-        status.classList.add("is-error");
-        return;
-      }
-
-      const isValid = VALID_PROMO_CODES.some((valid) => normalizePromoCode(valid) === code);
-
-      if (!isValid) {
-        status.textContent = "Ese código no es válido o ya expiró.";
-        status.classList.add("is-error");
-        return;
-      }
-
-      const current = getProfile();
-      if (!current.fullName) {
+      const id = getSessionId();
+      if (!id) {
         status.classList.add("is-error");
         status.textContent = "Primero completa tu perfil de egresado para activar el Pase Premium.";
         return;
       }
 
-      const updated = { ...current, premium: true, promoCode: code };
-      saveProfile(updated);
+      if (!code) {
+        status.classList.add("is-error");
+        status.textContent = "Ingresa un código para canjear.";
+        return;
+      }
 
-      status.classList.remove("is-error");
-      status.textContent = "¡Código canjeado! Tu perfil ahora es Destacado.";
-      input.value = "";
-      renderPremiumStatus(updated);
-      renderMiniCard(updated);
-      showToast("Pase Premium activado. Tu perfil ahora es Destacado.");
+      try {
+        // La validación real del código ocurre en el servidor.
+        const data = await api(`/api/profiles/${id}/redeem`, {
+          method: "POST",
+          body: JSON.stringify({ code })
+        });
+        currentProfile = data.profile;
+
+        status.classList.remove("is-error");
+        status.textContent = "¡Código canjeado! Tu perfil ahora es Destacado.";
+        input.value = "";
+        renderPremiumStatus(currentProfile);
+        renderMiniCard(currentProfile);
+        showToast("Pase Premium activado. Tu perfil ahora es Destacado.");
+      } catch (err) {
+        status.classList.add("is-error");
+        status.textContent = err.message || "No se pudo canjear el código.";
+      }
     });
   }
 
   /* ---------------------------------------------------------
      Vista previa para reclutadores
   --------------------------------------------------------- */
-  function renderRecruiterView() {
-    const profile = getProfile();
+  async function renderRecruiterView() {
     const container = $("#recruiterView");
+    const id = getSessionId();
 
-    if (!profile.fullName) {
+    if (!id) {
       container.innerHTML = `<p class="empty-state">Todavía no hay un perfil guardado. Ve a "Mi perfil" para crear el tuyo y mira cómo lo verían las empresas.</p>`;
+      return;
+    }
+
+    let profile;
+    try {
+      const data = await api(`/api/profiles/${id}`);
+      profile = data.profile;
+      currentProfile = profile;
+    } catch (err) {
+      container.innerHTML = `<p class="empty-state">No se pudo cargar tu perfil. Intenta de nuevo.</p>`;
       return;
     }
 
@@ -505,7 +449,8 @@
   /* ---------------------------------------------------------
      Init
   --------------------------------------------------------- */
-  document.addEventListener("DOMContentLoaded", () => {
+  document.addEventListener("DOMContentLoaded", async () => {
+    await loadCurrentProfile();
     initRouting();
     initMobileNav();
     initJobFilters();

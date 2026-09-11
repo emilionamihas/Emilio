@@ -4,26 +4,41 @@ Plataforma web para recién egresados: búsqueda de empleo con filtros, registro
 
 ## Stack
 
-Frontend estático sin dependencias de build: HTML, CSS y JavaScript vanilla. La persistencia del perfil y del estado premium se simula con `localStorage` en el navegador (no hay backend en esta primera versión).
+Frontend en HTML, CSS y JavaScript vanilla (sin frameworks ni paso de build) y un backend en Node.js usando solo módulos nativos (`http`, `fs`), sin dependencias externas que instalar. Los perfiles, el estado premium y el catálogo de empleos se sirven desde el servidor; el navegador guarda únicamente el ID del perfil actual en `localStorage`, a modo de sesión simple (no hay autenticación con usuario y contraseña todavía).
 
 ## Estructura
 
 ```
-index.html          Estructura de la página y las cuatro vistas principales
-css/styles.css       Paleta de colores, layout y componentes
-js/app.js            Navegación entre vistas, filtros de empleo, formulario de perfil,
-                     canje de códigos premium y render de la vista de reclutador
+index.html            Estructura de la página y las cuatro vistas principales
+css/styles.css         Paleta de colores, layout y componentes
+js/app.js              Navegación entre vistas y consumo de la API del backend
+server/server.js       Servidor HTTP: API REST + archivos estáticos
+server/store.js        Persistencia de perfiles y validación de códigos premium
+server/jobs.js         Catálogo de ofertas de empleo
+data/db.json           Base de datos en JSON (se genera sola, no se versiona)
 ```
 
-## Cómo probarlo
+## Cómo correrlo
 
-No requiere instalación. Basta con abrir `index.html` en el navegador, o servirlo con cualquier servidor estático:
+Requiere Node.js 18 o superior. No hay dependencias que instalar.
 
 ```
-python3 -m http.server 8080
+npm start
 ```
 
-y luego visitar `http://localhost:8080`.
+y luego visitar `http://localhost:3000`. El puerto se puede cambiar con la variable de entorno `PORT`.
+
+## API
+
+| Método | Ruta                          | Descripción                                    |
+|--------|-------------------------------|-------------------------------------------------|
+| GET    | `/api/jobs`                   | Lista ofertas (`?area=&modalidad=&exclusivo=true`) |
+| POST   | `/api/profiles`               | Crea un perfil de egresado                      |
+| GET    | `/api/profiles/:id`           | Obtiene un perfil                               |
+| PUT    | `/api/profiles/:id`           | Actualiza un perfil                             |
+| POST   | `/api/profiles/:id/redeem`    | Canjea un código premium (`{ "code": "AC2026" }`) |
+
+La validación de los códigos promocionales ocurre del lado del servidor: ya no es posible activar el Pase Premium editando el almacenamiento del navegador.
 
 ## Funcionalidades
 
@@ -35,4 +50,4 @@ y luego visitar `http://localhost:8080`.
 
 ## Próximos pasos sugeridos
 
-Esta versión resuelve el frontend completo con datos simulados. Para producción haría falta: backend con base de datos para perfiles y ofertas, autenticación real, validación de códigos promocionales del lado del servidor y un panel de administración para publicar vacantes.
+Esta versión ya tiene backend real con validación server-side de los códigos premium. Para producción todavía haría falta: autenticación con usuario y contraseña (hoy la "sesión" es solo un ID guardado en el navegador, sin verificación de identidad), una base de datos real en lugar del archivo JSON, y un panel de administración para que las empresas publiquen sus propias vacantes.
