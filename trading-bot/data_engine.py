@@ -37,6 +37,9 @@ def build_exchange(settings: Settings):
             "secret": settings.api_secret,
             "enableRateLimit": True,
             "options": {"defaultType": "spot"},
+            # Respeta HTTPS_PROXY/SSL_CERT_FILE del entorno (necesario detrás
+            # de un proxy corporativo o del proxy de este sandbox de desarrollo).
+            "aiohttp_trust_env": True,
         }
     )
     if settings.use_testnet:
@@ -110,7 +113,14 @@ async def recalibration_loop(exchange, settings: Settings, market_state: MarketS
 
 async def _watch_symbol(exchange, symbol: str, market_state: MarketState) -> None:
     """Loop infinito de WebSocket para un símbolo: actualiza el precio en
-    cada tick y dispara el recálculo de spread/z-score."""
+    cada tick y dispara el recálculo de spread/z-score.
+
+    Reconecta con backoff exponencial (2s, 4s, 8s... hasta 60s) ante
+    cualquier corte, en vez de un retry fijo: evita machacar al exchange
+    con reconexiones constantes si la caída dura más de unos segundos."""
+    backoff_seconds = 2
+    max_backoff_seconds = 60
+
     while True:
         try:
             ticker = await exchange.watch_ticker(symbol)
@@ -119,9 +129,13 @@ async def _watch_symbol(exchange, symbol: str, market_state: MarketState) -> Non
                 continue
             market_state.update_price(symbol, float(price))
             market_state.push_spread_and_update_zscore()
+            backoff_seconds = 2  # se resetea apenas vuelve a llegar un tick sano
         except Exception:
-            logger.exception("Error en watch_ticker(%s), reintentando en 2s", symbol)
-            await asyncio.sleep(2)
+            logger.exception(
+                "Error en watch_ticker(%s), reintentando en %ss", symbol, backoff_seconds
+            )
+            await asyncio.sleep(backoff_seconds)
+            backoff_seconds = min(backoff_seconds * 2, max_backoff_seconds)
 
 
 async def run_market_data_feed(exchange, settings: Settings, market_state: MarketState) -> None:

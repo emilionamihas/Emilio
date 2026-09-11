@@ -80,6 +80,12 @@ main.py                      Orquestación asyncio de todos los loops
 | `MAX_CAPITAL_PER_TRADE_PCT` | `0.10` | Máximo 10% del capital total por operación |
 | `TOTAL_CAPITAL_USDT` | `1000` | Capital base para el sizing (paper trading) |
 
+## Despliegue en producción
+
+Ver [`DEPLOY.md`](./DEPLOY.md) para correr esto en un servidor propio con
+Docker o systemd, incluyendo el checklist de seguridad de la API key
+(sin permiso de retiro, whitelist de IP) antes de poner `DRY_RUN=false`.
+
 ## Limitaciones conocidas
 
 - El z-score se calcula sobre precios tick a tick (WebSocket), no sobre
@@ -88,8 +94,11 @@ main.py                      Orquestación asyncio de todos los loops
 - El modelo de ganancia esperada en `profitability_filter.py` es una
   aproximación lineal (reversión proporcional a la distancia al umbral de
   salida), no una simulación de ejecución real contra el order book.
-- No incluye reconexión con backoff exponencial ni persistencia de estado
-  entre reinicios: si el proceso se cae con una posición abierta, hay que
-  cerrarla manualmente en el exchange.
+- El WebSocket reconecta con backoff exponencial (2s→60s) y la posición
+  abierta se persiste a disco (`persistence.py`) para sobrevivir a un
+  crash o redeploy, pero no hay reconciliación automática contra el saldo
+  real en Binance al arrancar: si el archivo de estado no coincide con lo
+  que hay en el exchange (por una intervención manual, por ejemplo), hay
+  que corregirlo a mano antes de levantar el bot.
 - Pensado para uso educativo y de investigación / testing autorizado, no
   como producto financiero terminado.

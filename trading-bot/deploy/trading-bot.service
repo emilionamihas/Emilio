@@ -1,0 +1,41 @@
+# Unit de systemd para correr el bot como servicio en un VPS sin Docker.
+#
+# Instalación:
+#   sudo cp deploy/trading-bot.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now trading-bot
+#
+# Ajustar WorkingDirectory / ExecStart / User según dónde y con qué usuario
+# se despliegue (ver DEPLOY.md).
+
+[Unit]
+Description=Bot de arbitraje estadistico (pair trading) - Binance
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tradingbot
+Group=tradingbot
+WorkingDirectory=/opt/trading-bot
+EnvironmentFile=/opt/trading-bot/.env
+ExecStart=/opt/trading-bot/venv/bin/python /opt/trading-bot/main.py
+
+# systemd manda SIGTERM al detener/reiniciar el servicio; main.py lo
+# captura y apaga de forma prolija (persiste la posición abierta si la hay).
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+Restart=on-failure
+RestartSec=10
+
+# Endurecimiento básico: nada de privilegios de más, sistema de archivos
+# de solo lectura salvo la carpeta de estado persistido.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/trading-bot/state
+
+[Install]
+WantedBy=multi-user.target

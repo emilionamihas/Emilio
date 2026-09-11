@@ -20,11 +20,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import signal
 import sys
 
 from config import Settings, load_settings
 from data_engine import build_exchange, calibrate_pair, recalibration_loop, run_market_data_feed
 from execution import ExecutionEngine
+from persistence import load_position, save_position
 from profitability_filter import estimate_net_pnl
 from reporting import Reporter
 from risk_manager import RiskManager
@@ -55,7 +57,12 @@ async def strategy_loop(
     reporter: Reporter,
     holder: PositionHolder,
 ) -> None:
+    # Si al arrancar ya había una posición persistida de una corrida
+    # anterior, ese capital ya está comprometido: no se vuelve a contar
+    # como disponible hasta que la posición se cierre.
     available_capital = settings.total_capital_usdt
+    if holder.position is not None:
+        available_capital -= holder.position.allocated_capital
 
     while True:
         await asyncio.sleep(1)
@@ -76,6 +83,7 @@ async def strategy_loop(
             reporter.print_trade_closed(trade)
             available_capital += open_position.allocated_capital + trade.net_pnl
             holder.position = None
+            save_position(None)
             continue
 
         result = generate_signal(market_state, settings, has_open_position=open_position is not None)
@@ -88,6 +96,7 @@ async def strategy_loop(
             reporter.print_trade_closed(trade)
             available_capital += open_position.allocated_capital + trade.net_pnl
             holder.position = None
+            save_position(None)
             continue
 
         if result.signal in (Signal.ENTER_LONG_A_SHORT_B, Signal.ENTER_SHORT_A_LONG_B):
@@ -120,6 +129,7 @@ async def strategy_loop(
             holder.position = await execution_engine.open_pair_position(
                 market_state, sizing, side_a, side_b, result.zscore
             )
+            save_position(holder.position)
             available_capital -= sizing.allocated_capital
 
 
@@ -155,15 +165,46 @@ async def main() -> None:
     execution_engine = ExecutionEngine(exchange, settings)
     holder = PositionHolder()
 
+    # Recupera una posición abierta de una corrida anterior (crash, redeploy,
+    # restart del contenedor) para no perder el stop-loss sobre exposición
+    # real que sigue viva en el exchange. Si el archivo está corrupto,
+    # load_position() lanza una excepción y el bot NO arranca a ciegas.
+    holder.position = load_position()
+
+    stop_event = asyncio.Event()
+
+    def _request_shutdown(sig_name: str) -> None:
+        if holder.position is not None:
+            logger.critical(
+                "Señal %s recibida con una posición ABIERTA (capital=%.2f USDT). "
+                "El bot deja de monitorearla al apagarse: la posición sigue viva en el "
+                "exchange. Queda persistida en disco y se retoma al reiniciar el proceso.",
+                sig_name,
+                holder.position.allocated_capital,
+            )
+        else:
+            logger.info("Señal %s recibida, apagando sin posiciones abiertas.", sig_name)
+        stop_event.set()
+
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(sig, _request_shutdown, sig.name)
+
+    tasks = [
+        asyncio.create_task(run_market_data_feed(exchange, settings, market_state)),
+        asyncio.create_task(recalibration_loop(exchange, settings, market_state)),
+        asyncio.create_task(strategy_loop(settings, market_state, risk_manager, execution_engine, reporter, holder)),
+        asyncio.create_task(reporting_loop(settings, market_state, reporter, holder)),
+    ]
+
     try:
-        await asyncio.gather(
-            run_market_data_feed(exchange, settings, market_state),
-            recalibration_loop(exchange, settings, market_state),
-            strategy_loop(settings, market_state, risk_manager, execution_engine, reporter, holder),
-            reporting_loop(settings, market_state, reporter, holder),
-        )
+        await stop_event.wait()
     finally:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
         await exchange.close()
+        logger.info("Bot apagado de forma prolija.")
 
 
 if __name__ == "__main__":

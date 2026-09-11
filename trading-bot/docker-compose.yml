@@ -1,0 +1,20 @@
+services:
+  trading-bot:
+    build: .
+    container_name: pair-trading-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      # Persistencia de la posición abierta entre restarts/redeploys.
+      # NUNCA borrar esta carpeta con una posición real abierta sin
+      # antes verificar el estado real en Binance.
+      - ./state:/app/state
+    # Le da tiempo al bot a recibir SIGTERM y apagarse de forma prolija
+    # (ver main.py) antes de que Docker mande SIGKILL.
+    stop_grace_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
