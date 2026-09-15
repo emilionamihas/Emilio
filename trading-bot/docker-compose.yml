@@ -1,0 +1,27 @@
+services:
+  trading-bot:
+    build: .
+    container_name: pair-trading-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    # Para que la API de control sea alcanzable desde fuera del contenedor:
+    # 1) poner CONTROL_API_HOST=0.0.0.0 y CONTROL_API_TOKEN en .env
+    # 2) descomentar el mapeo de puerto de acá abajo
+    # 3) NO dejarlo así expuesto directo a internet: ponerlo detrás de un
+    #    reverse proxy con HTTPS (ver DEPLOY.md, sección "API de control").
+    # ports:
+    #   - "127.0.0.1:8080:8080"   # mapeado solo a localhost del host; el reverse proxy hace el resto
+    volumes:
+      # Persistencia de la posición abierta entre restarts/redeploys.
+      # NUNCA borrar esta carpeta con una posición real abierta sin
+      # antes verificar el estado real en Binance.
+      - ./state:/app/state
+    # Le da tiempo al bot a recibir SIGTERM y apagarse de forma prolija
+    # (ver main.py) antes de que Docker mande SIGKILL.
+    stop_grace_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"

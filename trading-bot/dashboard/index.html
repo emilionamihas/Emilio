@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bot de Arbitraje Estadístico</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #0b0f14;
+    --panel: #131922;
+    --panel-border: #232d3a;
+    --text: #e6ecf3;
+    --text-dim: #8fa1b3;
+    --green: #35d399;
+    --red: #ff5d6c;
+    --amber: #f5b942;
+    --accent: #4f8cff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding-block: 24px;
+    padding-inline: 16px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+  .subtitle { color: var(--text-dim); font-size: 13px; margin-bottom: 20px; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  .card h2 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-dim);
+    margin: 0 0 14px;
+    font-weight: 600;
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; }
+  .field { flex: 1; min-width: 100px; }
+  .field label { display: block; font-size: 11px; color: var(--text-dim); margin-bottom: 3px; }
+  .field .val { font-size: 15px; font-variant-numeric: tabular-nums; }
+  .val.big { font-size: 22px; font-weight: 600; }
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  }
+  .pill.dot::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .pill.ok { background: rgba(53,211,153,.15); color: var(--green); }
+  .pill.warn { background: rgba(245,185,66,.15); color: var(--amber); }
+  .pill.off { background: rgba(255,93,108,.15); color: var(--red); }
+  .pill.neutral { background: rgba(143,161,179,.15); color: var(--text-dim); }
+  button {
+    font: inherit;
+    border: 1px solid var(--panel-border);
+    background: #1a2330;
+    color: var(--text);
+    padding: 9px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.danger { background: transparent; border-color: var(--red); color: var(--red); }
+  button.danger:hover:not(:disabled) { background: rgba(255,93,108,.12); }
+  input[type="password"], input[type="text"] {
+    font: inherit;
+    background: #0e141c;
+    border: 1px solid var(--panel-border);
+    color: var(--text);
+    padding: 9px 12px;
+    border-radius: 8px;
+    width: 100%;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--panel-border); }
+  th { color: var(--text-dim); font-weight: 500; font-size: 11px; text-transform: uppercase; }
+  .empty { color: var(--text-dim); text-align: center; padding: 20px 0; }
+  .banner {
+    border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; font-size: 13px;
+    display: none;
+  }
+  .banner.show { display: block; }
+  .banner.error { background: rgba(255,93,108,.12); border: 1px solid rgba(255,93,108,.35); color: var(--red); }
+  .banner.info { background: rgba(79,140,255,.1); border: 1px solid rgba(79,140,255,.3); color: var(--accent); }
+  .footer { color: var(--text-dim); font-size: 12px; margin-top: 8px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+  .token-row { display: flex; gap: 8px; }
+  .token-row button { flex-shrink: 0; }
+  dialog {
+    background: var(--panel); color: var(--text); border: 1px solid var(--panel-border);
+    border-radius: 12px; padding: 20px; max-width: 360px;
+  }
+  dialog::backdrop { background: rgba(0,0,0,.5); }
+  dialog p { margin: 0 0 16px; }
+  dialog .actions { justify-content: flex-end; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Bot de Arbitraje Estadístico</h1>
+  <div class="subtitle" id="subtitle">Conectando…</div>
+
+  <div id="banner-error" class="banner error"></div>
+  <div id="banner-paused" class="banner info">⏸ En pausa: el bot no abre posiciones nuevas, pero sigue vigilando el stop-loss de la posición abierta (si hay una).</div>
+
+  <div class="card" id="token-card">
+    <h2>Autenticación</h2>
+    <div class="token-row">
+      <input type="password" id="token-input" placeholder="Bearer token (CONTROL_API_TOKEN)" autocomplete="off" />
+      <button id="token-save" class="primary">Guardar</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Estado del par</h2>
+    <div class="row">
+      <div class="field"><label>Par</label><div class="val" id="f-pair">—</div></div>
+      <div class="field"><label>Modo</label><div class="val" id="f-mode">—</div></div>
+      <div class="field"><label>Cointegración</label><div class="val" id="f-coint">—</div></div>
+      <div class="field"><label>Hedge ratio</label><div class="val" id="f-hedge">—</div></div>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <div class="field"><label id="f-price-a-label">Precio A</label><div class="val" id="f-price-a">—</div></div>
+      <div class="field"><label id="f-price-b-label">Precio B</label><div class="val" id="f-price-b">—</div></div>
+      <div class="field"><label>Z-Score actual</label><div class="val big" id="f-zscore">—</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Posición</h2>
+    <div id="position-empty" class="empty">Sin exposición abierta</div>
+    <div id="position-data" hidden>
+      <div class="row">
+        <div class="field"><label id="f-leg-a-label">Pata A</label><div class="val" id="f-leg-a">—</div></div>
+        <div class="field"><label id="f-leg-b-label">Pata B</label><div class="val" id="f-leg-b">—</div></div>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <div class="field"><label>Capital asignado</label><div class="val" id="f-capital">—</div></div>
+        <div class="field"><label>Z-Score entrada</label><div class="val" id="f-entry-z">—</div></div>
+        <div class="field"><label>PnL no realizado</label><div class="val big" id="f-unrealized">—</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>PnL acumulado</h2>
+    <div class="row">
+      <div class="field"><label>Trades cerrados</label><div class="val" id="f-trades-count">—</div></div>
+      <div class="field"><label>Win rate</label><div class="val" id="f-winrate">—</div></div>
+      <div class="field"><label>Fees pagados</label><div class="val" id="f-fees">—</div></div>
+      <div class="field"><label>PnL neto acumulado</label><div class="val big" id="f-total-pnl">—</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Controles</h2>
+    <div class="actions">
+      <button id="btn-pause">⏸ Pausar entradas nuevas</button>
+      <button id="btn-resume" class="primary">▶ Reanudar</button>
+      <button id="btn-close" class="danger">✕ Cerrar posición ahora</button>
+      <button id="btn-refresh">↻ Actualizar</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Últimos trades cerrados</h2>
+    <div id="trades-empty" class="empty">Todavía no hay trades cerrados</div>
+    <table id="trades-table" hidden>
+      <thead>
+        <tr><th>Cierre</th><th>Motivo</th><th>Z entrada → salida</th><th>PnL neto</th></tr>
+      </thead>
+      <tbody id="trades-body"></tbody>
+    </table>
+  </div>
+
+  <div class="footer">
+    <span id="last-updated">—</span>
+    <span id="poll-status"></span>
+  </div>
+</div>
+
+<dialog id="confirm-dialog">
+  <p id="confirm-text">¿Confirmás la acción?</p>
+  <div class="actions">
+    <button id="confirm-cancel">Cancelar</button>
+    <button id="confirm-accept" class="danger">Confirmar</button>
+  </div>
+</dialog>
+
+<script>
+(function () {
+  "use strict";
+
+  var TOKEN_KEY = "trading_bot_control_token";
+  var POLL_MS = 5000;
+  var pollTimer = null;
+  var lastStatus = null;
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  function getToken() {
+    try { return localStorage.getItem(TOKEN_KEY) || ""; }
+    catch (e) { return ""; }
+  }
+  function setToken(t) {
+    try { localStorage.setItem(TOKEN_KEY, t); } catch (e) { /* localStorage puede fallar en vistas privadas */ }
+  }
+
+  function authHeaders() {
+    var t = getToken();
+    return t ? { "Authorization": "Bearer " + t } : {};
+  }
+
+  function showError(msg) {
+    var el = $("banner-error");
+    el.textContent = msg;
+    el.classList.add("show");
+  }
+  function clearError() {
+    $("banner-error").classList.remove("show");
+  }
+
+  function fmtNum(x, decimals) {
+    if (x === null || x === undefined || Number.isNaN(x)) return "—";
+    return Number(x).toLocaleString("es-AR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  }
+  function fmtUsd(x) {
+    if (x === null || x === undefined) return "—";
+    var s = (x >= 0 ? "+" : "") + fmtNum(x, 2) + " USDT";
+    return s;
+  }
+  function pnlClass(x) {
+    if (x === null || x === undefined) return "";
+    return x >= 0 ? "pos" : "neg";
+  }
+
+  async function api(path, opts) {
+    opts = opts || {};
+    var headers = Object.assign({ "Content-Type": "application/json" }, authHeaders(), opts.headers || {});
+    var resp = await fetch(path, Object.assign({}, opts, { headers: headers }));
+    if (resp.status === 401) {
+      throw new Error("Token inválido o faltante. Ingresalo arriba y guardalo.");
+    }
+    var data = null;
+    try { data = await resp.json(); } catch (e) { /* respuesta sin cuerpo */ }
+    if (!resp.ok) {
+      throw new Error((data && data.error) || ("Error HTTP " + resp.status));
+    }
+    return data;
+  }
+
+  function renderStatus(s) {
+    lastStatus = s;
+    $("subtitle").textContent = s.symbol_a + " / " + s.symbol_b + " — " + (s.mode === "live" ? "OPERANDO EN VIVO" : "paper trading");
+
+    $("banner-paused").classList.toggle("show", !!s.paused);
+
+    $("f-pair").textContent = s.symbol_a + " / " + s.symbol_b;
+    $("f-mode").textContent = s.mode === "live" ? "LIVE" : "Paper (dry-run)";
+    $("f-price-a-label").textContent = "Precio " + s.symbol_a;
+    $("f-price-b-label").textContent = "Precio " + s.symbol_b;
+    $("f-price-a").textContent = s.price_a != null ? fmtNum(s.price_a, 2) : "—";
+    $("f-price-b").textContent = s.price_b != null ? fmtNum(s.price_b, 2) : "—";
+    $("f-hedge").textContent = s.hedge_ratio != null ? fmtNum(s.hedge_ratio, 4) : "—";
+
+    var coint = $("f-coint");
+    if (s.cointegrated) {
+      coint.innerHTML = '<span class="pill dot ok">cointegrado (p=' + fmtNum(s.cointegration_pvalue, 3) + ')</span>';
+    } else if (s.cointegration_pvalue != null) {
+      coint.innerHTML = '<span class="pill dot warn">no pasa el test (p=' + fmtNum(s.cointegration_pvalue, 3) + ')</span>';
+    } else {
+      coint.innerHTML = '<span class="pill dot neutral">sin calibrar</span>';
+    }
+
+    $("f-zscore").textContent = s.current_zscore != null ? fmtNum(s.current_zscore, 3) : "n/d";
+
+    var pos = s.open_position;
+    $("position-empty").hidden = !!pos;
+    $("position-data").hidden = !pos;
+    if (pos) {
+      $("f-leg-a-label").textContent = pos.leg_a.symbol;
+      $("f-leg-b-label").textContent = pos.leg_b.symbol;
+      $("f-leg-a").textContent = pos.leg_a.side.toUpperCase() + " " + fmtNum(pos.leg_a.quantity, 6) + " @ " + fmtNum(pos.leg_a.entry_price, 2);
+      $("f-leg-b").textContent = pos.leg_b.side.toUpperCase() + " " + fmtNum(pos.leg_b.quantity, 6) + " @ " + fmtNum(pos.leg_b.entry_price, 2);
+      $("f-capital").textContent = fmtNum(pos.allocated_capital, 2) + " USDT";
+      $("f-entry-z").textContent = fmtNum(pos.entry_zscore, 2);
+      var u = $("f-unrealized");
+      u.textContent = fmtUsd(pos.unrealized_pnl);
+      u.className = "val big " + pnlClass(pos.unrealized_pnl);
+    }
+
+    $("f-trades-count").textContent = s.closed_trades_count;
+    $("f-winrate").textContent = fmtNum(s.win_rate * 100, 1) + "%";
+    $("f-fees").textContent = fmtNum(s.total_fees_paid, 2) + " USDT";
+    var tp = $("f-total-pnl");
+    tp.textContent = fmtUsd(s.total_net_pnl);
+    tp.className = "val big " + pnlClass(s.total_net_pnl);
+
+    $("btn-pause").disabled = !!s.paused;
+    $("btn-resume").disabled = !s.paused;
+    $("btn-close").disabled = !pos;
+
+    $("last-updated").textContent = "Actualizado: " + new Date().toLocaleTimeString("es-AR");
+  }
+
+  function renderTrades(trades) {
+    var empty = $("trades-empty"), table = $("trades-table"), body = $("trades-body");
+    if (!trades || trades.length === 0) {
+      empty.hidden = false; table.hidden = true;
+      return;
+    }
+    empty.hidden = true; table.hidden = false;
+    body.innerHTML = trades.slice().reverse().map(function (t) {
+      var cls = pnlClass(t.net_pnl);
+      var closedAt = new Date(t.closed_at * 1000).toLocaleString("es-AR");
+      return "<tr>" +
+        "<td>" + closedAt + "</td>" +
+        "<td>" + t.close_reason + "</td>" +
+        "<td>" + fmtNum(t.entry_zscore, 2) + " → " + fmtNum(t.exit_zscore, 2) + "</td>" +
+        '<td class="' + cls + '">' + fmtUsd(t.net_pnl) + "</td>" +
+        "</tr>";
+    }).join("");
+  }
+
+  async function refresh() {
+    if (!getToken()) {
+      $("subtitle").textContent = "Ingresá el token de control para conectar.";
+      return;
+    }
+    $("poll-status").textContent = "actualizando…";
+    try {
+      var status = await api("/status");
+      clearError();
+      renderStatus(status);
+      var trades = await api("/trades?limit=15");
+      renderTrades(trades);
+      $("poll-status").textContent = "";
+    } catch (e) {
+      showError(e.message || String(e));
+      $("poll-status").textContent = "";
+    }
+  }
+
+  function schedulePoll() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(function () {
+      if (document.visibilityState === "visible") refresh();
+    }, POLL_MS);
+  }
+
+  function confirmAction(text) {
+    return new Promise(function (resolve) {
+      var dialog = $("confirm-dialog");
+      $("confirm-text").textContent = text;
+      dialog.showModal();
+      function onAccept() { cleanup(); resolve(true); }
+      function onCancel() { cleanup(); resolve(false); }
+      function cleanup() {
+        dialog.close();
+        $("confirm-accept").removeEventListener("click", onAccept);
+        $("confirm-cancel").removeEventListener("click", onCancel);
+      }
+      $("confirm-accept").addEventListener("click", onAccept);
+      $("confirm-cancel").addEventListener("click", onCancel);
+    });
+  }
+
+  $("token-save").addEventListener("click", function () {
+    var v = $("token-input").value.trim();
+    if (v) setToken(v);
+    $("token-input").value = "";
+    refresh();
+  });
+
+  $("btn-pause").addEventListener("click", async function () {
+    try { await api("/pause", { method: "POST" }); clearError(); refresh(); }
+    catch (e) { showError(e.message || String(e)); }
+  });
+
+  $("btn-resume").addEventListener("click", async function () {
+    try { await api("/resume", { method: "POST" }); clearError(); refresh(); }
+    catch (e) { showError(e.message || String(e)); }
+  });
+
+  $("btn-close").addEventListener("click", async function () {
+    var ok = await confirmAction("Esto pide el cierre inmediato de la posición abierta a precio de mercado, sin esperar la reversión del z-score. ¿Confirmás?");
+    if (!ok) return;
+    try { await api("/close", { method: "POST" }); clearError(); refresh(); }
+    catch (e) { showError(e.message || String(e)); }
+  });
+
+  $("btn-refresh").addEventListener("click", refresh);
+
+  // Precarga el input con el token guardado (enmascarado, no en texto plano en el DOM más de lo necesario)
+  if (getToken()) $("token-input").placeholder = "Token guardado (dejar vacío mantiene el actual)";
+
+  refresh();
+  schedulePoll();
+})();
+</script>
+</body>
+</html>
