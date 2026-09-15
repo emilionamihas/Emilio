@@ -1,0 +1,12 @@
+# Exchange (datos OHLCV y ejecución) contra Binance spot / testnet
+ccxt>=4.3.0
+
+# Análisis numérico y series de tiempo
+pandas>=2.2.0
+numpy>=1.26.0
+
+# Carga de credenciales desde .env
+python-dotenv>=1.0.0
+
+# Gráfico de equity curve del backtest (opcional pero incluido por defecto)
+matplotlib>=3.8.0
