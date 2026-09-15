@@ -2,8 +2,13 @@ node_modules/
 data/db.json
 .DS_Store
 
-# Python (trading-bot/)
+# Python (trading-bot/, ema-rsi-bot/)
 __pycache__/
 *.pyc
 venv/
 .env
+
+# Salidas generadas por backtest.py (ema-rsi-bot/)
+backtest_trades.csv
+backtest_equity_curve.csv
+backtest_equity_curve.png
