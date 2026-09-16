@@ -28,6 +28,18 @@ npm start
 
 y luego visitar `http://localhost:3000`. El puerto se puede cambiar con la variable de entorno `PORT`.
 
+## Cómo subirlo a internet (para que cualquiera lo use, sin cuenta de Claude)
+
+La forma más simple, gratis para empezar, es [Render](https://render.com):
+
+1. Creá una cuenta en render.com (podés entrar directo con tu cuenta de GitHub).
+2. En el dashboard: **New +** → **Blueprint**.
+3. Conectá tu cuenta de GitHub y elegí el repositorio `emilionamihas/Emilio`, rama `claude/ascend-connect-platform-odli3v`.
+4. Render va a detectar el archivo `render.yaml` que ya está en el repo y va a configurar todo solo (servicio web, `npm start`, plan gratuito). Solo confirmá con **Apply**.
+5. En unos minutos te da una URL pública (algo como `https://ascend-connect.onrender.com`) que ya podés mandarle a cualquiera. No necesitan cuenta de Claude ni pertenecer a ninguna organización: entran directo.
+
+**Importante antes de que confíes en esto para datos reales:** el plan gratuito de Render no tiene disco persistente. Ahora mismo el servidor guarda los perfiles en un archivo (`data/db.json`); en el plan gratuito ese archivo se borra cada vez que el servicio se reinicia (se reinicia solo, por inactividad, o cada vez que hacés un nuevo deploy). Sirve perfecto para probar el flujo completo con tu amigo ahora mismo, pero si esto va a manejar perfiles reales que la gente espera no perder, el siguiente paso es cambiar el almacenamiento a una base de datos de verdad (Render y otros ofrecen Postgres gratis) — avisame cuando quieras y lo armamos.
+
 ## API
 
 | Método | Ruta                          | Descripción                                    |
