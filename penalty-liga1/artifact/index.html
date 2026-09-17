@@ -1,0 +1,175 @@
+<title>Penalty Liga 1</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Rubik:wght@400;500;700&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #050e1c;
+    --bezel: #101f36;
+    --bezel-hi: #1a3155;
+    --screen-edge: #000000;
+    --gold: #ffd400;
+    --red: #d4141a;
+    --text: #eaf0f8;
+    --muted: #8a97ab;
+  }
+
+  html, body {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: radial-gradient(ellipse at 50% -10%, #0d1e38 0%, var(--bg) 55%);
+    color: var(--text);
+    font-family: 'Rubik', Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+  }
+
+  #page {
+    width: 100%;
+    max-width: 760px;
+    padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+
+  header {
+    text-align: center;
+  }
+
+  h1 {
+    margin: 0;
+    font-family: 'Anton', 'Arial Black', sans-serif;
+    font-weight: 400;
+    letter-spacing: 0.03em;
+    font-size: clamp(28px, 7vw, 42px);
+    color: var(--gold);
+    text-shadow: 0 0 14px rgba(255, 212, 0, 0.35), 0 2px 0 #7a5a00;
+    text-wrap: balance;
+  }
+
+  h1 span {
+    color: var(--text);
+    text-shadow: none;
+  }
+
+  header p {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  /* "Gabinete arcade": un bisel oscuro con remaches, la pantalla del juego adentro */
+  #cabinet {
+    width: 100%;
+    background: linear-gradient(180deg, var(--bezel-hi), var(--bezel));
+    border-radius: 22px;
+    padding: 16px;
+    box-sizing: border-box;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    position: relative;
+  }
+
+  #cabinet::before,
+  #cabinet::after {
+    content: "";
+    position: absolute;
+    top: 10px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #000;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  }
+
+  #cabinet::before { left: 12px; }
+  #cabinet::after { right: 12px; }
+
+  #screen {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: var(--screen-edge);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: inset 0 0 0 2px #000, inset 0 0 24px rgba(0, 0, 0, 0.8);
+  }
+
+  #game-container {
+    width: 100%;
+    height: 100%;
+  }
+
+  #game-container canvas {
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
+    touch-action: none;
+  }
+
+  #controls {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px 22px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  #controls b {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  #controls .key {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.5;
+    max-width: 60ch;
+  }
+
+  footer a {
+    color: var(--muted);
+  }
+</style>
+
+<div id="page">
+  <header>
+    <h1>PENALTY <span>LIGA 1</span></h1>
+    <p>Arcade de tanda de penales · fútbol peruano</p>
+  </header>
+
+  <div id="cabinet">
+    <div id="screen">
+      <div id="game-container"></div>
+    </div>
+  </div>
+
+  <div id="controls">
+    <span><b>Patear:</b> arrastra el balón hacia la portería</span>
+    <span><b>Atajar:</b> <span class="key">7</span><span class="key">8</span><span class="key">9</span> / <span class="key">4</span><span class="key">5</span><span class="key">6</span> / <span class="key">1</span><span class="key">2</span><span class="key">3</span> o toca una zona</span>
+  </div>
+
+  <footer>
+    Proyecto de fans sin afiliación oficial con clubes o la federación. Nombres de
+    clubes reales usados de forma informativa; los escudos son diseños originales
+    generados por código, no los oficiales.
+  </footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
+<script type="module" src="src/main.js"></script>

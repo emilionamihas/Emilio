@@ -1,0 +1,23 @@
+# Motor de exchange (REST + WebSocket vía ccxt.pro, incluido en ccxt>=4.x)
+ccxt>=4.3.0
+
+# Servidor HTTP de la API de control (control_api.py). Ya viene como
+# dependencia transitiva de ccxt, se declara explícito porque se importa
+# directamente.
+aiohttp>=3.9.0
+
+# Análisis numérico y series de tiempo
+pandas>=2.2.0
+numpy>=1.26.0
+
+# Test de cointegración (Engle-Granger) y regresión OLS para el hedge ratio
+statsmodels>=0.14.0
+
+# Carga de credenciales desde .env
+python-dotenv>=1.0.0
+
+# asyncio es parte de la librería estándar de Python 3.4+.
+# Se declara explícitamente por requerimiento del proyecto; en Python >=3.4
+# el paquete de PyPI "asyncio" trae un marker de entorno que hace que pip
+# lo ignore (no-op), así que no pisa el asyncio del intérprete.
+asyncio>=3.4.3; python_version < "3.4"

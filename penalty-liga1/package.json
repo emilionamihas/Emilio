@@ -1,0 +1,18 @@
+{
+  "name": "penalty-liga1",
+  "version": "0.1.0",
+  "description": "Penalty Shootout arcade estilo Poki ambientado en la Liga 1 peruana (equipos y escudos ficticios/originales, sin licencia oficial)",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "phaser": "^3.80.1"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}
