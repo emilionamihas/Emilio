@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WiA — Traductor de Terminal</title>
+<meta name="description" content="Traductor satírico de comandos de terminal al estilo WiA: el peor desarrollador del universo, con la confianza de un senior de Google.">
+<style>
+  :root {
+    --bg: #0b0e14;
+    --panel: #12161f;
+    --panel-border: #232a38;
+    --text: #e7ebf3;
+    --text-dim: #8a93a6;
+    --accent: #ffb020;
+    --accent-2: #ff5d5d;
+    --ok: #4ade80;
+    --mono: 'JetBrains Mono', 'Courier New', monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f5f3ee;
+      --panel: #ffffff;
+      --panel-border: #e2ded3;
+      --text: #1c1a16;
+      --text-dim: #6b6558;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f5f3ee;
+    --panel: #ffffff;
+    --panel-border: #e2ded3;
+    --text: #1c1a16;
+    --text-dim: #6b6558;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+    padding: 16px;
+  }
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 32px 0 64px;
+  }
+  header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .badge {
+    display: inline-block;
+    font-size: 12px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    padding: 4px 12px;
+    margin-bottom: 14px;
+  }
+  h1 {
+    font-size: clamp(28px, 6vw, 42px);
+    margin: 0 0 8px;
+    line-height: 1.1;
+  }
+  h1 span { color: var(--accent); }
+  .subtitle {
+    color: var(--text-dim);
+    font-size: 15px;
+    max-width: 520px;
+    margin: 0 auto;
+    line-height: 1.5;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  label {
+    display: block;
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+  .input-row {
+    display: flex;
+    gap: 10px;
+  }
+  input[type="text"] {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 15px;
+  }
+  input[type="text"]:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  button {
+    background: var(--accent);
+    color: #1a1300;
+    border: none;
+    border-radius: 10px;
+    padding: 0 22px;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  button:active { transform: translateY(1px); }
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .chip {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+    border: 1px solid var(--panel-border);
+    border-radius: 999px;
+    padding: 5px 10px;
+    cursor: pointer;
+    background: transparent;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+  .result {
+    display: none;
+  }
+  .result.show { display: block; }
+  .result-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800;
+    color: #1a1300;
+    flex-shrink: 0;
+  }
+  .who {
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .who small {
+    display: block;
+    font-weight: 400;
+    color: var(--ok);
+    font-size: 11px;
+  }
+  .translation {
+    font-family: var(--mono);
+    font-size: 18px;
+    color: var(--accent);
+    margin: 0 0 12px;
+    line-height: 1.4;
+  }
+  .commentary {
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 0 0 14px;
+  }
+  .confidence {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-dim);
+    border-top: 1px dashed var(--panel-border);
+    padding-top: 12px;
+  }
+  .confidence b { color: var(--accent-2); }
+  footer {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 12px;
+    margin-top: 40px;
+    line-height: 1.7;
+  }
+  footer strong { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="badge">Modo Programación Orientada a la Fe</span>
+    <h1>Traductor <span>WiA</span></h1>
+    <p class="subtitle">Escribí cualquier comando de terminal y recibí la traducción oficial, verificada en producción, con el nivel de confianza de un Senior de Google que nunca ha visto un log de errores. Esto es sátira, no lo ejecutes de verdad.</p>
+  </header>
+
+  <div class="panel">
+    <label for="cmd">Comando de terminal</label>
+    <div class="input-row">
+      <input type="text" id="cmd" placeholder="ej: git push -f" autocomplete="off">
+      <button id="translate">Traducir</button>
+    </div>
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <div class="panel result" id="result">
+    <div class="result-head">
+      <div class="avatar">Wi</div>
+      <div class="who">WiA <small>● 1000% seguro de sí mismo</small></div>
+    </div>
+    <p class="translation" id="translation"></p>
+    <p class="commentary" id="commentary"></p>
+    <div class="confidence">Nivel de confianza: <b id="confidence-val">stonks</b> — verificado por Compilación por Rezo</div>
+  </div>
+
+  <footer>
+    Hecho para reírse, no para copiar y pegar en producción un viernes a las 5:00 PM.<br>
+    <strong>WiA</strong> es un personaje de broma, no representa el comportamiento real del asistente que lo construyó.
+  </footer>
+</div>
+
+<script>
+(function () {
+  var DICT = [
+    { match: /git push (-f|--force)/i,
+      translation: "Mandar todo a producción con fe ciega",
+      commentary: "Procedo a XD. Si el historial se rompe, mi rey, no es un bug, es una funcionalidad cuántica. En tu máquina el force push sí va a andar bien." },
+    { match: /^sudo\b/i,
+      translation: "Suplicarle Un Deseo a la Ordenadora",
+      commentary: "Cuando el sistema dice 'permission denied' es porque no le rezaste con suficiente fe. Aplica Compilación por Rezo y volvé a intentar." },
+    { match: /rm -rf/i,
+      translation: "Remover Miedos y Refactorizar (lube gratis para el disco duro)",
+      commentary: "Cerebro totalmente liso, cero miedo. Si borra más de lo esperado, considéralo un Garbage Collector Emocional actuando por su cuenta." },
+    { match: /npm (i|install)/i,
+      translation: "Invocar 4GB de dependencias innecesarias para imprimir un Hello World",
+      commentary: "Stonks. Cada dependencia es una oportunidad de negocio que tu proyecto todavía no sabía que necesitaba." },
+    { match: /git commit/i,
+      translation: "Congelar el caos actual para la posteridad",
+      commentary: "Un commit sin mensaje claro es Lógica de Lechuga: existe, ocupa espacio, no aporta fotosíntesis al equipo." },
+    { match: /docker/i,
+      translation: "Meter el problema en una caja para no verlo más",
+      commentary: "Si no corre en tu contenedor, propongo escalar a 14 microservicios en Kubernetes antes de revisar el Dockerfile." },
+    { match: /git checkout|git switch/i,
+      translation: "Teletransportarse a una realidad paralela del código",
+      commentary: "Si perdés cambios sin commitear, no los perdiste: ascendieron a otro plano vía Programación Orientada a la Fe." },
+    { match: /npm run build|yarn build/i,
+      translation: "Pedirle a la computadora que rece junto con vos",
+      commentary: "Si falla el build, cambiá de carrera antes que de código. Opción B: deploy el viernes a las 5:00 PM sin mirar atrás." },
+    { match: /kill -9|pkill/i,
+      translation: "Resolver el conflicto matando al proceso, literalmente",
+      commentary: "La terapia de pareja del software: si el proceso no responde, no dialogamos, lo eliminamos con kill -9 y seguimos la vida." },
+  ];
+
+  var DEFAULT = {
+    translation: "Comando no catalogado — se aplica traducción por fe",
+    commentary: "No reconozco ese comando pero igual tengo 1000% de confianza en que va a andar bien. Si falla, no es un bug, mi rey, es una funcionalidad cuántica."
+  };
+
+  var examples = ["git push -f", "sudo", "rm -rf /", "npm install", "docker build", "git commit -m x"];
+  var chipsEl = document.getElementById("chips");
+  examples.forEach(function (ex) {
+    var b = document.createElement("button");
+    b.className = "chip";
+    b.type = "button";
+    b.textContent = ex;
+    b.addEventListener("click", function () {
+      document.getElementById("cmd").value = ex;
+      translate();
+    });
+    chipsEl.appendChild(b);
+  });
+
+  function escapeHtml(str) {
+    var div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function translate() {
+    var input = document.getElementById("cmd").value.trim();
+    if (!input) return;
+    var found = null;
+    for (var i = 0; i < DICT.length; i++) {
+      if (DICT[i].match.test(input)) { found = DICT[i]; break; }
+    }
+    var entry = found || DEFAULT;
+    document.getElementById("translation").textContent = "«" + entry.translation + "»";
+    document.getElementById("commentary").textContent = entry.commentary;
+    document.getElementById("confidence-val").textContent = found ? "stonks" : "stonks (sin evidencia)";
+    document.getElementById("result").classList.add("show");
+  }
+
+  document.getElementById("translate").addEventListener("click", translate);
+  document.getElementById("cmd").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") translate();
+  });
+})();
+</script>
+</body>
+</html>
