@@ -1,65 +1,92 @@
 # ASCEND & CONNECT (A&C)
 
-Plataforma web para recién egresados: búsqueda de empleo con filtros, registro de perfil profesional, sistema de códigos premium y vista previa del perfil tal como la verían las empresas.
+Plataforma web para recién egresados: búsqueda de empleo, publicación de ofertas por parte de empresas, perfil profesional con foto, postulaciones, códigos premium con aprobación manual, vista previa para reclutadores con lista de candidatos guardados, y un panel de administración completo.
 
 ## Stack
 
-Frontend en HTML, CSS y JavaScript vanilla (sin frameworks ni paso de build) y un backend en Node.js usando solo módulos nativos (`http`, `fs`), sin dependencias externas que instalar. Los perfiles, el estado premium y el catálogo de empleos se sirven desde el servidor; el navegador guarda únicamente el ID del perfil actual en `localStorage`, a modo de sesión simple (no hay autenticación con usuario y contraseña todavía).
+Frontend en HTML, CSS y JavaScript vanilla (sin frameworks). Backend en Node.js (módulos nativos `http`/`fs`, sin frameworks web) con **PostgreSQL** como base de datos real — los datos persisten entre reinicios y despliegues, a diferencia de una versión anterior que usaba un archivo JSON. Cualquier persona puede usar la plataforma desde su navegador, sin necesitar cuenta de ningún tipo.
+
+La contraseña del panel de administración se verifica **en el servidor** (variable de entorno `ADMIN_PASSPHRASE`) y la sesión de administrador se guarda en una cookie `HttpOnly`: nunca queda visible en el código del navegador.
 
 ## Estructura
 
 ```
-index.html            Estructura de la página y las cuatro vistas principales
-css/styles.css         Paleta de colores, layout y componentes
-js/app.js              Navegación entre vistas y consumo de la API del backend
-server/server.js       Servidor HTTP: API REST + archivos estáticos
-server/store.js        Persistencia de perfiles y validación de códigos premium
-server/jobs.js         Catálogo de ofertas de empleo
-data/db.json           Base de datos en JSON (se genera sola, no se versiona)
+index.html            Estructura de la página y las vistas
+css/styles.css         Paleta de colores, tipografía y layout
+js/app.js              Toda la lógica de frontend, consume la API REST
+server/server.js       Servidor HTTP: rutas de la API + archivos estáticos
+server/store.js        Consultas a la base de datos (perfiles, ofertas, canjes,
+                        postulaciones, candidatos guardados, sesiones de admin)
+server/db.js           Conexión a Postgres y creación del esquema al arrancar
+render.yaml            Configuración de despliegue en Render (web + Postgres)
 ```
 
-## Cómo correrlo
+## Cómo correrlo en tu computadora
 
-Requiere Node.js 18 o superior. No hay dependencias que instalar.
+Requiere Node.js 18+ y una base de datos Postgres (local o remota).
 
 ```
+npm install
+export DATABASE_URL="postgresql://usuario:password@localhost:5432/ascend_connect"
+export ADMIN_PASSPHRASE="la-contraseña-que-quieras"
 npm start
 ```
 
-y luego visitar `http://localhost:3000`. El puerto se puede cambiar con la variable de entorno `PORT`.
+y luego visitar `http://localhost:3000`. El esquema de tablas se crea solo la primera vez que arranca.
 
-## Cómo subirlo a internet (para que cualquiera lo use, sin cuenta de Claude)
+## Cómo subirlo a internet (para que cualquiera lo use)
 
-La forma más simple, gratis para empezar, es [Render](https://render.com):
+1. Creá una cuenta en [render.com](https://render.com) (podés entrar con GitHub).
+2. **New +** → **Blueprint** → conectá el repo `emilionamihas/Emilio`, rama `claude/ascend-connect-platform-odli3v`.
+3. Render lee `render.yaml` y crea **dos cosas solo**: el servicio web y una base de datos Postgres gratuita, ya conectados entre sí. Apretás **Apply** y listo.
+4. En unos minutos tenés una URL pública real. Cualquiera que entre puede crear su perfil, publicar o buscar empleo, postularse, etc. — sin cuenta de Claude ni de nada.
 
-1. Creá una cuenta en render.com (podés entrar directo con tu cuenta de GitHub).
-2. En el dashboard: **New +** → **Blueprint**.
-3. Conectá tu cuenta de GitHub y elegí el repositorio `emilionamihas/Emilio`, rama `claude/ascend-connect-platform-odli3v`.
-4. Render va a detectar el archivo `render.yaml` que ya está en el repo y va a configurar todo solo (servicio web, `npm start`, plan gratuito). Solo confirmá con **Apply**.
-5. En unos minutos te da una URL pública (algo como `https://ascend-connect.onrender.com`) que ya podés mandarle a cualquiera. No necesitan cuenta de Claude ni pertenecer a ninguna organización: entran directo.
+**Contraseña del panel de administración:** el Blueprint le genera una automáticamente por seguridad (no queda "ACwork" ni ningún valor fijo en el código). Para verla o cambiarla por una que prefieras: en el dashboard de Render, entrá a tu servicio → **Environment** → variable `ADMIN_PASSPHRASE`.
 
-**Importante antes de que confíes en esto para datos reales:** el plan gratuito de Render no tiene disco persistente. Ahora mismo el servidor guarda los perfiles en un archivo (`data/db.json`); en el plan gratuito ese archivo se borra cada vez que el servicio se reinicia (se reinicia solo, por inactividad, o cada vez que hacés un nuevo deploy). Sirve perfecto para probar el flujo completo con tu amigo ahora mismo, pero si esto va a manejar perfiles reales que la gente espera no perder, el siguiente paso es cambiar el almacenamiento a una base de datos de verdad (Render y otros ofrecen Postgres gratis) — avisame cuando quieras y lo armamos.
+**Sobre los datos:** al usar Postgres administrado por Render (no un archivo en el disco del servicio), los datos sobreviven a reinicios y a nuevos despliegues. El plan gratuito de la base de datos de Render expira a los 30 días si no lo pasás a un plan pago — es el único límite real a tener en cuenta para uso de largo plazo.
 
 ## API
 
-| Método | Ruta                          | Descripción                                    |
-|--------|-------------------------------|-------------------------------------------------|
-| GET    | `/api/jobs`                   | Lista ofertas (`?area=&modalidad=&exclusivo=true`) |
-| POST   | `/api/profiles`               | Crea un perfil de egresado                      |
-| GET    | `/api/profiles/:id`           | Obtiene un perfil                               |
-| PUT    | `/api/profiles/:id`           | Actualiza un perfil                             |
-| POST   | `/api/profiles/:id/redeem`    | Canjea un código premium (`{ "code": "AC2026" }`) |
-
-La validación de los códigos promocionales ocurre del lado del servidor: ya no es posible activar el Pase Premium editando el almacenamiento del navegador.
+| Método | Ruta                                       | Quién                | Descripción |
+|--------|---------------------------------------------|----------------------|-------------|
+| GET    | `/api/jobs`                                  | Público              | Ofertas aprobadas (`?area=&modalidad=&exclusivo=true`) |
+| POST   | `/api/jobs`                                  | Público (empresas)   | Publica una oferta, queda pendiente de revisión |
+| POST   | `/api/profiles`                              | Público              | Crea o actualiza un perfil (upsert por `id`) |
+| GET    | `/api/profiles/:id`                          | Público              | Obtiene un perfil completo |
+| PUT    | `/api/profiles/:id`                          | Público              | Actualiza un perfil |
+| POST   | `/api/profiles/:id/redeem`                   | Público              | Envía un código premium (`{code}`), queda pendiente |
+| GET    | `/api/redemptions?profileId=`                | Público              | Estado de los propios canjes enviados |
+| POST   | `/api/applications`                          | Público              | Postularse a una oferta (`{jobId, profileId}`) |
+| GET    | `/api/applications?profileId=`               | Público              | Ofertas a las que ya se postuló ese perfil |
+| GET    | `/api/saved-candidates`                      | Público              | Lista de candidatos guardados (vista de reclutador) |
+| POST   | `/api/saved-candidates`                      | Público              | Guarda un candidato (`{profileId}`) |
+| DELETE | `/api/saved-candidates/:profileId`           | Público              | Quita un candidato guardado |
+| POST   | `/api/admin/login`                           | —                    | `{passphrase}` → cookie de sesión de administrador |
+| POST   | `/api/admin/logout`                          | Admin                | Cierra la sesión |
+| GET    | `/api/admin/applications`                    | Admin                | Todas las postulaciones |
+| POST   | `/api/admin/applications/:id/status`         | Admin                | Cambia estado (`nueva`/`contactada`/`cerrada`) |
+| DELETE | `/api/admin/applications/:id`                | Admin                | Elimina una postulación |
+| GET    | `/api/admin/redemptions`                     | Admin                | Todas las solicitudes de canje |
+| POST   | `/api/admin/redemptions/:id/approve`         | Admin                | Aprueba (activa Premium en el perfil) |
+| POST   | `/api/admin/redemptions/:id/reject`          | Admin                | Rechaza |
+| DELETE | `/api/admin/redemptions/:id`                 | Admin                | Elimina la solicitud |
+| GET    | `/api/admin/jobs`                            | Admin                | Todas las ofertas (cualquier estado) |
+| POST   | `/api/admin/jobs`                            | Admin                | Carga una oferta ya aprobada |
+| POST   | `/api/admin/jobs/:id/approve` / `/reject`    | Admin                | Modera una oferta pendiente |
+| DELETE | `/api/admin/jobs/:id`                        | Admin                | Elimina una oferta |
+| GET    | `/api/admin/profiles`                        | Admin                | Todos los perfiles registrados |
+| DELETE | `/api/admin/profiles/:id`                    | Admin                | Elimina un perfil |
 
 ## Funcionalidades
 
-- **Header/Navbar**: logo tipográfico A&C, navegación a las cuatro secciones y botón de "Pase Premium".
-- **Búsqueda de empleo**: filtros por área, modalidad (remoto/presencial/híbrido) y ofertas exclusivas para recién egresados.
-- **Perfil de egresado**: formulario con nombre completo, dirección, universidad, carrera, año de graduación, habilidades, enlace a CV/portafolio y biografía.
-- **Códigos premium**: canje de códigos (`AC2026`, `A&CVIP`, `PREMIUM2026`) que activan la insignia "Perfil Destacado" y prioridad en el buscador de las empresas.
-- **Vista para reclutadores**: previsualización de cómo una empresa vería el perfil del egresado, con opción de "Contactar candidato".
+- **Búsqueda de empleo**: filtros por área, modalidad y ofertas exclusivas para recién egresados.
+- **Publicar oferta**: las empresas cargan su vacante, que queda pendiente hasta que un administrador la aprueba.
+- **Perfil de egresado**: nombre, correo, teléfono, dirección, universidad, carrera, año de graduación, habilidades, CV/portafolio, biografía y foto de perfil.
+- **Código premium**: se canjea un código y queda pendiente hasta que un administrador lo aprueba manualmente — no hay una lista de códigos válidos visible en el cliente.
+- **Postulaciones**: al postularse a una oferta, queda un registro con los datos de contacto del candidato y de la empresa, para que el administrador cierre el contacto.
+- **Vista de reclutador**: previsualización completa del perfil, con un botón para "contactar y guardar" al candidato en una lista, y "Ver Perfil" para revisar el detalle completo de cualquier candidato guardado.
+- **Panel de administración**: pestañas de postulaciones, canjes premium, ofertas por revisar, ofertas publicadas y perfiles registrados — todo con opción de aprobar, rechazar o eliminar.
 
 ## Próximos pasos sugeridos
 
-Esta versión ya tiene backend real con validación server-side de los códigos premium. Para producción todavía haría falta: autenticación con usuario y contraseña (hoy la "sesión" es solo un ID guardado en el navegador, sin verificación de identidad), una base de datos real en lugar del archivo JSON, y un panel de administración para que las empresas publiquen sus propias vacantes.
+Esta versión ya resuelve lo esencial: persistencia real, acceso sin restricciones de cuenta, y autenticación de administrador del lado del servidor. Lo siguiente, si el proyecto crece, sería: autenticación real de egresados (hoy la "sesión" es un ID generado en el navegador, sin contraseña), envío de correos automáticos en vez de enlaces `mailto:`, y paginación en las listas del panel de administración cuando haya muchos registros.
