@@ -1,0 +1,593 @@
+import * as THREE from 'three';
+import * as CANNON from 'cannon-es';
+import { GROUPS } from './Environment.js';
+
+const WALK_SPEED = 3.4;
+const RUN_SPEED = 7.2;
+const JUMP_VELOCITY = 6.2;
+const BODY_RADIUS = 0.42;
+const MOUSE_SENS = 0.0022;
+
+export const WEAPONS = [
+  { name: 'PUÑOS', melee: true, fireRate: 0.45, range: 1.8, force: 250, damage: 2 },
+  { name: 'PISTOLA', fireRate: 0.22, auto: false, mag: 12, reload: 1.2, range: 150, spread: 0.004, force: 900, damage: 9 },
+  { name: 'SUBFUSIL', fireRate: 0.075, auto: true, mag: 30, reload: 1.8, range: 120, spread: 0.018, force: 600, damage: 5 },
+  { name: 'ESCOPETA', fireRate: 0.85, auto: false, mag: 6, reload: 2.4, range: 45, spread: 0.06, pellets: 8, force: 450, damage: 5 },
+];
+
+const _v3 = new THREE.Vector3();
+const _v3b = new THREE.Vector3();
+const _ray = new THREE.Raycaster();
+const _center = new THREE.Vector2(0, 0);
+
+/** Ángulo interpolado por el camino más corto. */
+function lerpAngle(a, b, t) {
+  let d = b - a;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return a + d * t;
+}
+
+// ======================================================================
+// Personaje a pie
+// ======================================================================
+export class PlayerController {
+  constructor(game, spawn) {
+    this.game = game;
+    this.spawnPoint = spawn.clone();
+    this.enabled = true;
+    this.health = 100;
+    this.facing = 0;        // yaw del modelo (rad)
+    this.onGround = false;
+    this.animPhase = 0;
+    this.aiming = false;
+    this.lastShot = -10;
+    this.fireCooldown = 0;
+    this.reloadTimer = 0;
+    this.weaponIndex = 1;
+    this.ammo = WEAPONS.map((w) => w.mag || 0);
+    this.wheelOpen = false;
+    this.wheelSelection = 1;
+    this.wheelVec = new THREE.Vector2();
+    this.hitTimer = 0;
+
+    this.createBody(spawn);
+    this.createMesh();
+    this.updateWeaponVisual();
+  }
+
+  createBody(spawn) {
+    this.body = new CANNON.Body({
+      mass: 75,
+      material: this.game.materials.player,
+      fixedRotation: true,
+      linearDamping: 0,
+      collisionFilterGroup: GROUPS.PLAYER,
+      collisionFilterMask: GROUPS.STATIC | GROUPS.VEHICLE,
+    });
+    this.body.addShape(new CANNON.Sphere(BODY_RADIUS));
+    this.body.position.set(spawn.x, spawn.y + BODY_RADIUS + 0.05, spawn.z);
+    this.body.allowSleep = false;
+    this.body.userData = { player: this };
+    this.body.addEventListener('collide', (e) => {
+      // Atropellos: daño según la velocidad relativa del impacto
+      const impact = Math.abs(e.contact.getImpactVelocityAlongNormal());
+      if (e.body.userData && e.body.userData.vehicle && impact > 5) this.takeDamage((impact - 5) * 6);
+    });
+    this.game.world.addBody(this.body);
+  }
+
+  /** Modelo de prueba hecho con cubos y pivotes para animar extremidades. */
+  createMesh() {
+    const skin = new THREE.MeshStandardMaterial({ color: 0xc68642, roughness: 0.8 });
+    const shirt = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.9 });
+    const jeans = new THREE.MeshStandardMaterial({ color: 0x2c3e66, roughness: 0.9 });
+    const shoes = new THREE.MeshStandardMaterial({ color: 0x1b1b1b });
+    const hair = new THREE.MeshStandardMaterial({ color: 0x2a1a0e });
+
+    const root = new THREE.Group();
+    const box = (w, h, d, mat) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      m.castShadow = true;
+      return m;
+    };
+
+    const torso = box(0.56, 0.68, 0.3, shirt);
+    torso.position.y = 1.17;
+    const head = box(0.3, 0.32, 0.3, skin);
+    head.position.y = 1.7;
+    const hairTop = box(0.32, 0.1, 0.32, hair);
+    hairTop.position.y = 1.86;
+    const hips = box(0.5, 0.18, 0.28, jeans);
+    hips.position.y = 0.8;
+    root.add(torso, head, hairTop, hips);
+
+    const limb = (x, y, w, h, mat, footMat) => {
+      const pivot = new THREE.Group();
+      pivot.position.set(x, y, 0);
+      const part = box(w, h, w, mat);
+      part.position.y = -h / 2;
+      pivot.add(part);
+      if (footMat) {
+        const foot = box(w + 0.02, 0.1, w + 0.12, footMat);
+        foot.position.set(0, -h + 0.02, 0.05);
+        pivot.add(foot);
+      }
+      root.add(pivot);
+      return pivot;
+    };
+    this.leftArm = limb(0.36, 1.46, 0.15, 0.62, skin);
+    this.rightArm = limb(-0.36, 1.46, 0.15, 0.62, skin);
+    this.leftLeg = limb(0.13, 0.82, 0.19, 0.78, jeans, shoes);
+    this.rightLeg = limb(-0.13, 0.82, 0.19, 0.78, jeans, shoes);
+
+    // Arma en la mano derecha
+    this.gun = new THREE.Group();
+    const gunMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.7, roughness: 0.4 });
+    this.gunBarrel = box(0.08, 0.1, 0.35, gunMat);
+    this.gunBarrel.position.z = 0.12;
+    const grip = box(0.07, 0.14, 0.08, gunMat);
+    grip.position.set(0, -0.09, 0);
+    this.gun.add(this.gunBarrel, grip);
+    this.gun.position.set(0, -0.62, 0.08);
+    this.rightArm.add(this.gun);
+    this.muzzle = new THREE.Object3D();
+    this.muzzle.position.set(0, 0, 0.32);
+    this.gun.add(this.muzzle);
+
+    this.mesh = root;
+    this.game.scene.add(root);
+  }
+
+  get weapon() {
+    return WEAPONS[this.weaponIndex];
+  }
+
+  // ------------------------------------------------------------------
+  // Activación (al entrar/salir de vehículos)
+  // ------------------------------------------------------------------
+  setEnabled(enabled) {
+    if (enabled === this.enabled) return;
+    this.enabled = enabled;
+    if (enabled) {
+      this.game.world.addBody(this.body);
+    } else {
+      this.game.world.removeBody(this.body);
+      this.body.velocity.setZero();
+    }
+  }
+
+  teleport(pos, velocity) {
+    this.body.position.set(pos.x, Math.max(pos.y, 0) + BODY_RADIUS + 0.05, pos.z);
+    this.body.velocity.set(velocity ? velocity.x : 0, velocity ? velocity.y : 0, velocity ? velocity.z : 0);
+    this.syncMesh();
+  }
+
+  get feetPosition() {
+    return _v3.set(this.body.position.x, this.body.position.y - BODY_RADIUS, this.body.position.z);
+  }
+
+  takeDamage(amount) {
+    if (this.health <= 0) return;
+    this.health = Math.max(0, this.health - amount);
+    this.hitTimer = 0.3;
+    if (this.health <= 0 && this.game.onPlayerDeath) this.game.onPlayerDeath();
+  }
+
+  // ------------------------------------------------------------------
+  // Actualización por frame (antes del paso de física)
+  // ------------------------------------------------------------------
+  update(dt, cameraRig) {
+    const input = this.game.input;
+    this.updateWeaponWheel(dt);
+    if (!this.enabled) return;
+
+    this.checkGround();
+
+    // Movimiento relativo a la cámara
+    const yaw = cameraRig.yaw;
+    const fwdX = -Math.sin(yaw);
+    const fwdZ = -Math.cos(yaw);
+    const rightX = Math.cos(yaw);
+    const rightZ = -Math.sin(yaw);
+    let mx = 0;
+    let mz = 0;
+    if (input.isDown('KeyW')) {
+      mx += fwdX;
+      mz += fwdZ;
+    }
+    if (input.isDown('KeyS')) {
+      mx -= fwdX;
+      mz -= fwdZ;
+    }
+    if (input.isDown('KeyD')) {
+      mx += rightX;
+      mz += rightZ;
+    }
+    if (input.isDown('KeyA')) {
+      mx -= rightX;
+      mz -= rightZ;
+    }
+    const len = Math.hypot(mx, mz);
+    const moving = len > 0.01;
+    if (moving) {
+      mx /= len;
+      mz /= len;
+    }
+
+    this.aiming = !this.wheelOpen && (input.mouse.right || this.game.time - this.lastShot < 0.6) && !this.weapon.melee;
+    const running = input.isDown('ShiftLeft') || input.isDown('ShiftRight');
+    const speed = moving ? (running && !this.aiming ? RUN_SPEED : this.aiming ? WALK_SPEED * 0.8 : WALK_SPEED) : 0;
+
+    // Aceleración horizontal (más control en el suelo que en el aire)
+    const v = this.body.velocity;
+    const accel = this.onGround ? 14 : 3;
+    const k = 1 - Math.exp(-accel * dt);
+    v.x += (mx * speed - v.x) * k;
+    v.z += (mz * speed - v.z) * k;
+
+    if (input.wasPressed('Space') && this.onGround) {
+      v.y = JUMP_VELOCITY;
+      this.onGround = false;
+    }
+
+    // Orientación del modelo: hacia la cámara al apuntar, hacia el movimiento si no
+    if (this.aiming) {
+      this.facing = lerpAngle(this.facing, yaw + Math.PI, 1 - Math.exp(-25 * dt));
+    } else if (moving) {
+      this.facing = lerpAngle(this.facing, Math.atan2(mx, mz), 1 - Math.exp(-12 * dt));
+    }
+
+    this.handleWeapons(dt);
+    if (this.hitTimer > 0) this.hitTimer -= dt;
+
+    // Evita caer al vacío si algo sale mal
+    if (this.body.position.y < -10) this.teleport(this.spawnPoint);
+  }
+
+  checkGround() {
+    const from = this.body.position;
+    const to = new CANNON.Vec3(from.x, from.y - BODY_RADIUS - 0.2, from.z);
+    const result = new CANNON.RaycastResult();
+    this.game.world.raycastClosest(
+      from,
+      to,
+      { skipBackfaces: true, collisionFilterMask: GROUPS.STATIC | GROUPS.VEHICLE },
+      result
+    );
+    this.onGround = result.hasHit && this.body.velocity.y < 3;
+  }
+
+  // ------------------------------------------------------------------
+  // Armas: raycast desde el centro de la cámara
+  // ------------------------------------------------------------------
+  handleWeapons(dt) {
+    const input = this.game.input;
+    const w = this.weapon;
+    this.fireCooldown -= dt;
+
+    if (this.reloadTimer > 0) {
+      this.reloadTimer -= dt;
+      if (this.reloadTimer <= 0) this.ammo[this.weaponIndex] = w.mag;
+      return;
+    }
+    if (input.wasPressed('KeyR') && w.mag && this.ammo[this.weaponIndex] < w.mag) {
+      this.reloadTimer = w.reload;
+      return;
+    }
+    if (this.wheelOpen) return;
+
+    const wantsFire = w.auto ? input.mouse.left : input.mouse.leftPressed;
+    if (!wantsFire || this.fireCooldown > 0) return;
+
+    if (w.mag) {
+      if (this.ammo[this.weaponIndex] <= 0) {
+        this.reloadTimer = w.reload;
+        return;
+      }
+      this.ammo[this.weaponIndex]--;
+    }
+    this.fireCooldown = w.fireRate;
+    this.lastShot = this.game.time;
+    if (w.melee) this.punch();
+    else this.fire(w);
+  }
+
+  fire(w) {
+    const game = this.game;
+    const camera = game.camera;
+    // El modelo debe mirar al frente antes de calcular la boca del cañón
+    this.facing = game.cameraRig.yaw + Math.PI;
+    this.mesh.rotation.y = this.facing;
+    this.poseAim();
+    this.mesh.updateMatrixWorld(true);
+    const muzzlePos = this.muzzle.getWorldPosition(new THREE.Vector3());
+    game.effects.muzzleFlash(muzzlePos);
+
+    const targets = game.getShootables();
+    const pellets = w.pellets || 1;
+    let hitSomething = false;
+    for (let p = 0; p < pellets; p++) {
+      _ray.setFromCamera(_center, camera);
+      _ray.ray.direction.x += (Math.random() - 0.5) * w.spread * 2;
+      _ray.ray.direction.y += (Math.random() - 0.5) * w.spread * 2;
+      _ray.ray.direction.z += (Math.random() - 0.5) * w.spread * 2;
+      _ray.ray.direction.normalize();
+      _ray.far = w.range;
+      // Empieza el rayo delante del jugador para no dispararle a su propia espalda
+      const camToPlayer = _v3b.copy(this.mesh.position).sub(camera.position).dot(_ray.ray.direction);
+      _ray.near = Math.max(0, camToPlayer);
+
+      const hits = _ray.intersectObjects(targets, true);
+      const hit = hits[0];
+      const end = hit ? hit.point : _ray.ray.at(w.range, new THREE.Vector3());
+      game.effects.spawnTracer(muzzlePos, end);
+      if (!hit) continue;
+
+      const normal = hit.face
+        ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld)
+        : _ray.ray.direction.clone().negate();
+      game.effects.spawnSparks(hit.point, normal, 6);
+
+      const vehicle = this.findVehicle(hit.object);
+      if (vehicle) {
+        hitSomething = true;
+        game.effects.spawnDecal(hit.point, normal, vehicle.mesh);
+        const b = vehicle.chassisBody;
+        const impulse = new CANNON.Vec3(_ray.ray.direction.x, _ray.ray.direction.y, _ray.ray.direction.z).scale(w.force / pellets);
+        b.applyImpulse(impulse, new CANNON.Vec3(hit.point.x - b.position.x, hit.point.y - b.position.y, hit.point.z - b.position.z));
+        vehicle.damage(w.damage);
+        game.wanted.reportCrime(vehicle.type === 'police' ? 'attack_police' : 'hit_vehicle');
+      } else {
+        game.effects.spawnDecal(hit.point, normal);
+      }
+    }
+    if (hitSomething) game.hud.flashHitmarker();
+    game.wanted.reportCrime('gunshot');
+  }
+
+  punch() {
+    const game = this.game;
+    const dir = new THREE.Vector3(Math.sin(this.facing), 0, Math.cos(this.facing));
+    const origin = this.mesh.position.clone().add(new THREE.Vector3(0, 1.2, 0));
+    _ray.set(origin, dir);
+    _ray.near = 0;
+    _ray.far = this.weapon.range;
+    const hit = _ray.intersectObjects(game.getShootables(), true)[0];
+    this.punchTime = 0.25;
+    if (!hit) return;
+    const vehicle = this.findVehicle(hit.object);
+    game.effects.spawnSparks(hit.point, dir.clone().negate(), 3, 0xffffff);
+    if (vehicle) {
+      const b = vehicle.chassisBody;
+      b.applyImpulse(new CANNON.Vec3(dir.x * 250, 40, dir.z * 250), new CANNON.Vec3(hit.point.x - b.position.x, 0, hit.point.z - b.position.z));
+      vehicle.damage(this.weapon.damage);
+      game.hud.flashHitmarker();
+    }
+  }
+
+  findVehicle(obj) {
+    while (obj) {
+      if (obj.userData && obj.userData.vehicle) return obj.userData.vehicle;
+      obj = obj.parent;
+    }
+    return null;
+  }
+
+  // ------------------------------------------------------------------
+  // Rueda de armas (mantener TAB, se ralentiza el tiempo)
+  // ------------------------------------------------------------------
+  updateWeaponWheel() {
+    const input = this.game.input;
+    for (let i = 0; i < 4; i++) {
+      if (input.wasPressed(`Digit${i + 1}`)) this.selectWeapon(i);
+    }
+    if (input.wasPressed('Tab')) {
+      this.wheelOpen = true;
+      this.wheelVec.set(0, 0);
+      this.wheelSelection = this.weaponIndex;
+      this.game.timeScale = 0.25;
+    }
+    if (this.wheelOpen) {
+      const m = input.consumeMouse();
+      this.wheelVec.x += m.dx;
+      this.wheelVec.y += m.dy;
+      if (this.wheelVec.length() > 30) {
+        this.wheelVec.clampLength(0, 80);
+        // Slots: 0 arriba, 1 derecha, 2 abajo, 3 izquierda
+        const a = Math.atan2(this.wheelVec.y, this.wheelVec.x); // 0 = derecha
+        // round(a / 90°): -1 arriba, 0 derecha, 1 abajo, ±2 izquierda
+        const slot = Math.round(a / (Math.PI / 2));
+        this.wheelSelection = { '-2': 3, '-1': 0, 0: 1, 1: 2, 2: 3 }[slot];
+      }
+      this.game.hud.setWeaponWheel(true, this.wheelSelection);
+      if (!input.isDown('Tab')) {
+        this.wheelOpen = false;
+        this.game.timeScale = 1;
+        this.selectWeapon(this.wheelSelection);
+        this.game.hud.setWeaponWheel(false);
+      }
+    }
+  }
+
+  selectWeapon(i) {
+    if (i === this.weaponIndex) return;
+    this.weaponIndex = i;
+    this.reloadTimer = 0;
+    this.fireCooldown = 0.2;
+    this.updateWeaponVisual();
+  }
+
+  updateWeaponVisual() {
+    const w = this.weapon;
+    this.gun.visible = !w.melee;
+    const long = w.name === 'SUBFUSIL' || w.name === 'ESCOPETA';
+    this.gunBarrel.scale.z = long ? 2 : 1;
+    this.gunBarrel.position.z = long ? 0.25 : 0.12;
+    this.muzzle.position.z = long ? 0.6 : 0.32;
+  }
+
+  // ------------------------------------------------------------------
+  // Animación procedural
+  // ------------------------------------------------------------------
+  poseAim() {
+    // Brazo derecho extendido hacia delante; el izquierdo lo acompaña
+    const pitch = this.game.cameraRig.pitch;
+    this.rightArm.rotation.set(-Math.PI / 2 - pitch, 0, 0);
+    this.leftArm.rotation.set(-Math.PI / 2.3 - pitch, 0, -0.5);
+  }
+
+  syncMesh() {
+    const p = this.body.position;
+    this.mesh.position.set(p.x, p.y - BODY_RADIUS, p.z);
+    this.mesh.rotation.y = this.facing;
+  }
+
+  animate(dt) {
+    if (!this.enabled) return;
+    this.syncMesh();
+    const v = this.body.velocity;
+    const hspeed = Math.hypot(v.x, v.z);
+
+    if (!this.onGround) {
+      // Pose de salto
+      this.leftLeg.rotation.x = -0.6;
+      this.rightLeg.rotation.x = 0.3;
+      this.leftArm.rotation.set(-2.4, 0, 0.3);
+      this.rightArm.rotation.set(-2.4, 0, -0.3);
+    } else if (hspeed > 0.3) {
+      this.animPhase += dt * hspeed * 2.2;
+      const amp = Math.min(1, hspeed / RUN_SPEED) * 0.9 + 0.2;
+      const s = Math.sin(this.animPhase);
+      this.leftLeg.rotation.x = s * amp;
+      this.rightLeg.rotation.x = -s * amp;
+      this.leftArm.rotation.set(-s * amp * 0.8, 0, 0.05);
+      this.rightArm.rotation.set(s * amp * 0.8, 0, -0.05);
+      this.mesh.position.y += Math.abs(Math.cos(this.animPhase)) * 0.06 * amp;
+    } else {
+      // Respiración en reposo
+      this.animPhase += dt * 2;
+      const b = Math.sin(this.animPhase) * 0.03;
+      this.leftLeg.rotation.x *= 0.8;
+      this.rightLeg.rotation.x *= 0.8;
+      this.leftArm.rotation.set(b, 0, 0.08);
+      this.rightArm.rotation.set(-b, 0, -0.08);
+    }
+
+    if (this.aiming) this.poseAim();
+    if (this.punchTime > 0) {
+      this.punchTime -= dt;
+      this.rightArm.rotation.set(-Math.PI / 2, 0, 0.2);
+    }
+    if (this.reloadTimer > 0) this.rightArm.rotation.set(-0.9, 0, 0.6);
+  }
+}
+
+// ======================================================================
+// Cámara flexible: orbital a pie / persecución en vehículo
+// ======================================================================
+export class ThirdPersonCamera {
+  constructor(game) {
+    this.game = game;
+    this.camera = game.camera;
+    this.mode = 'foot';
+    this.yaw = Math.PI;
+    this.pitch = -0.15;
+    this.freeLookTimer = 0;
+    this.freeLookOffset = 0;
+    this.blend = 1; // 0 justo tras cambiar de modo -> 1 asentado
+    this.position = new THREE.Vector3(0, 5, 10);
+    this.lookAt = new THREE.Vector3();
+    this.target = null;
+    this.raycaster = new THREE.Raycaster();
+  }
+
+  setMode(mode, target) {
+    this.mode = mode;
+    this.target = target;
+    this.blend = 0;
+    if (mode === 'vehicle') {
+      this.pitch = -0.18;
+      this.freeLookOffset = 0;
+    }
+  }
+
+  update(dt) {
+    const game = this.game;
+    const input = game.input;
+    const player = game.player;
+
+    // Ratón (bloqueado mientras la rueda de armas está abierta)
+    if (!player.wheelOpen) {
+      const m = input.consumeMouse();
+      if (this.mode === 'foot') {
+        this.yaw -= m.dx * MOUSE_SENS;
+        this.pitch -= m.dy * MOUSE_SENS;
+        this.pitch = THREE.MathUtils.clamp(this.pitch, -1.2, 0.85);
+      } else {
+        if (m.dx !== 0 || m.dy !== 0) this.freeLookTimer = 1.2;
+        this.freeLookOffset -= m.dx * MOUSE_SENS;
+        this.pitch = THREE.MathUtils.clamp(this.pitch - m.dy * MOUSE_SENS, -0.8, 0.3);
+      }
+    }
+
+    this.blend = Math.min(1, this.blend + dt / 0.9);
+    const settle = THREE.MathUtils.smoothstep(this.blend, 0, 1);
+    let pivot;
+    let distance;
+    let shoulder = 0;
+    let fov;
+    let stiffness;
+
+    if (this.mode === 'foot') {
+      const p = player.mesh.position;
+      pivot = _v3.set(p.x, p.y + 1.55, p.z);
+      distance = player.aiming ? 2.3 : 4.3;
+      shoulder = player.aiming ? 0.6 : 0.35;
+      fov = player.aiming ? 50 : 65;
+      stiffness = THREE.MathUtils.lerp(4, 30, settle);
+    } else {
+      const v = this.target;
+      const bp = v.chassisBody.position;
+      pivot = _v3.set(bp.x, bp.y + 1.5, bp.z);
+      const speed = Math.abs(v.getForwardSpeed());
+      // Yaw detrás del coche; con marcha atrás rápida mira hacia delante del movimiento
+      const heading = v.getHeading();
+      const carYaw = heading + Math.PI;
+      this.freeLookTimer -= dt;
+      if (this.freeLookTimer <= 0) this.freeLookOffset *= Math.exp(-3 * dt);
+      const follow = 1 - Math.exp(-(speed > 2 ? 5 : 2) * dt);
+      this.yaw = lerpAngle(this.yaw, carYaw + this.freeLookOffset, this.freeLookTimer > 0 ? 1 : follow);
+      if (this.freeLookTimer <= 0) this.pitch += (-0.18 - this.pitch) * (1 - Math.exp(-2 * dt));
+      distance = 7 + Math.min(speed, 45) * 0.06;
+      fov = 68 + Math.min(speed, 50) * 0.3;
+      stiffness = THREE.MathUtils.lerp(3, 14, settle);
+    }
+
+    const cp = Math.cos(this.pitch);
+    const dir = _v3b.set(-Math.sin(this.yaw) * cp, Math.sin(this.pitch), -Math.cos(this.yaw) * cp);
+    const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
+    const shoulderPivot = pivot.clone().addScaledVector(right, shoulder);
+
+    // Colisión de cámara con edificios: acerca la cámara si algo la tapa
+    this.raycaster.set(shoulderPivot, dir.clone().negate());
+    this.raycaster.far = distance;
+    const hit = this.raycaster.intersectObjects(game.env.buildingMeshes, false)[0];
+    const d = hit ? Math.max(0.6, hit.distance - 0.35) : distance;
+
+    const desired = shoulderPivot.clone().addScaledVector(dir, -d);
+    desired.y = Math.max(desired.y, 0.35);
+    const desiredLook = shoulderPivot.clone().addScaledVector(dir, 10);
+
+    const k = 1 - Math.exp(-stiffness * dt);
+    // Tras la colisión se aplica al instante para no atravesar paredes
+    if (hit) this.position.copy(desired);
+    else this.position.lerp(desired, k);
+    this.lookAt.lerp(desiredLook, Math.max(k, this.mode === 'foot' ? 0.6 : k));
+
+    this.camera.position.copy(this.position);
+    this.camera.lookAt(this.lookAt);
+    this.camera.fov += (fov - this.camera.fov) * (1 - Math.exp(-6 * dt));
+    this.camera.updateProjectionMatrix();
+  }
+}

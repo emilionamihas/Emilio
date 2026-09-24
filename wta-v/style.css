@@ -1,0 +1,456 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  font-family: 'Rajdhani', sans-serif;
+  color: #fff;
+  user-select: none;
+}
+
+#game-canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+}
+
+.hidden {
+  display: none !important;
+}
+
+#hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* ---------- Superior derecha ---------- */
+#top-right {
+  position: absolute;
+  top: 22px;
+  right: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  text-shadow: 2px 2px 0 #000, -1px -1px 0 #000;
+}
+
+#weapon-info {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-family: 'Anton', sans-serif;
+  letter-spacing: 1px;
+}
+
+#weapon-name {
+  font-size: 20px;
+}
+
+#weapon-ammo {
+  font-size: 26px;
+  color: #f2f2f2;
+}
+
+#clock {
+  font-family: 'Anton', sans-serif;
+  font-size: 30px;
+  letter-spacing: 1px;
+}
+
+#wanted-stars {
+  display: flex;
+  gap: 3px;
+  font-size: 38px;
+  line-height: 1;
+}
+
+#wanted-stars .star {
+  color: rgba(0, 0, 0, 0.35);
+  -webkit-text-stroke: 2px rgba(255, 255, 255, 0.55);
+  text-shadow: none;
+  transition: color 0.2s;
+}
+
+#wanted-stars .star.active {
+  color: #fff;
+  -webkit-text-stroke: 2px #000;
+}
+
+#wanted-stars.evading .star.active {
+  animation: star-flash 0.6s steps(2) infinite;
+}
+
+@keyframes star-flash {
+  50% {
+    color: rgba(255, 255, 255, 0.25);
+  }
+}
+
+/* ---------- Radar ---------- */
+#radar {
+  position: absolute;
+  left: 28px;
+  bottom: 28px;
+  width: 220px;
+}
+
+#minimap {
+  display: block;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  border: 4px solid rgba(0, 0, 0, 0.75);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.15), 0 6px 20px rgba(0, 0, 0, 0.5);
+  background: #1b2a1b;
+}
+
+#radar-north {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  width: 22px;
+  height: 22px;
+  margin-left: -11px;
+  border-radius: 50%;
+  background: #111;
+  border: 2px solid #ddd;
+  font: 700 13px/18px 'Rajdhani', sans-serif;
+  text-align: center;
+}
+
+#health-bar {
+  margin: 10px auto 0;
+  width: 180px;
+  height: 9px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(0, 0, 0, 0.9);
+}
+
+#health-fill {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(#6fcf5c, #3f9a33);
+  transition: width 0.2s;
+}
+
+#health-fill.low {
+  background: linear-gradient(#e0493f, #a02119);
+}
+
+/* ---------- Velocímetro ---------- */
+#speedometer {
+  position: absolute;
+  right: 36px;
+  bottom: 36px;
+  text-align: right;
+  text-shadow: 3px 3px 0 #000;
+}
+
+#speed-value {
+  font-family: 'Anton', sans-serif;
+  font-size: 74px;
+  line-height: 0.95;
+}
+
+#speed-unit {
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: 3px;
+  opacity: 0.85;
+}
+
+#speed-bar,
+#vehicle-health {
+  margin-top: 8px;
+  margin-left: auto;
+  width: 200px;
+  height: 7px;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+#speed-fill {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, #4fc3f7, #ffd54f, #ff5252);
+}
+
+#vehicle-health {
+  height: 4px;
+}
+
+#vehicle-health-fill {
+  height: 100%;
+  width: 100%;
+  background: #cfd8dc;
+}
+
+#drift-tag {
+  margin-top: 6px;
+  font-family: 'Anton', sans-serif;
+  font-size: 22px;
+  color: #ffca28;
+  letter-spacing: 3px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+#drift-tag.on {
+  opacity: 1;
+}
+
+/* ---------- Mira y avisos ---------- */
+#crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 1.5px #000;
+  opacity: 0.85;
+}
+
+#crosshair.aiming {
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  background: #ff5252;
+}
+
+#crosshair.driving {
+  display: none;
+}
+
+#hitmarker {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -52%);
+  font-size: 26px;
+  color: #fff;
+  text-shadow: 0 0 3px #000;
+  opacity: 0;
+}
+
+#hitmarker.show {
+  opacity: 1;
+}
+
+#prompt {
+  position: absolute;
+  top: 26px;
+  left: 28px;
+  max-width: 340px;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.78);
+  font-size: 18px;
+  font-weight: 500;
+  border-radius: 3px;
+  display: none;
+}
+
+#prompt.show {
+  display: block;
+}
+
+#prompt kbd {
+  display: inline-block;
+  padding: 0 7px;
+  margin: 0 2px;
+  border-radius: 3px;
+  background: #fff;
+  color: #000;
+  font: 700 15px/20px 'Rajdhani', sans-serif;
+}
+
+#notification {
+  position: absolute;
+  top: 110px;
+  left: 28px;
+  max-width: 340px;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.7);
+  border-left: 4px solid #ffca28;
+  font-size: 17px;
+  opacity: 0;
+  transform: translateX(-12px);
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+#notification.show {
+  opacity: 1;
+  transform: none;
+}
+
+#big-message {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Anton', sans-serif;
+  font-size: 110px;
+  letter-spacing: 6px;
+  text-shadow: 4px 4px 0 #000;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+
+#big-message.show {
+  opacity: 1;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.65));
+}
+
+#big-message.wasted {
+  color: #d32f2f;
+}
+
+#big-message.busted {
+  color: #4fc3f7;
+}
+
+/* ---------- Rueda de armas ---------- */
+#weapon-wheel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 380px;
+  height: 380px;
+  margin: -190px 0 0 -190px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 0, 0, 0.25) 0 22%, rgba(0, 0, 0, 0.65) 23% 100%);
+  border: 3px solid rgba(255, 255, 255, 0.2);
+}
+
+.wheel-slot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 118px;
+  height: 64px;
+  margin: -32px 0 0 -59px;
+  transform: rotate(var(--angle)) translateX(122px) rotate(calc(-1 * var(--angle)));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.07);
+  font-family: 'Anton', sans-serif;
+  font-size: 18px;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.7);
+  transition: background 0.1s, color 0.1s;
+}
+
+.wheel-slot.selected {
+  background: rgba(255, 255, 255, 0.92);
+  color: #111;
+}
+
+#wheel-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Anton', sans-serif;
+  font-size: 20px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* ---------- Pantalla de inicio ---------- */
+#overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at center, rgba(10, 14, 22, 0.6), rgba(0, 0, 0, 0.92));
+  z-index: 10;
+}
+
+#overlay-box {
+  text-align: center;
+}
+
+#overlay h1 {
+  font-family: 'Anton', sans-serif;
+  font-size: 120px;
+  line-height: 1;
+  letter-spacing: 4px;
+  text-shadow: 5px 5px 0 #000;
+}
+
+#overlay h1 span {
+  color: #7cb342;
+}
+
+#overlay h2 {
+  font-weight: 700;
+  letter-spacing: 8px;
+  text-transform: uppercase;
+  opacity: 0.8;
+  margin-bottom: 28px;
+}
+
+#loading {
+  font-size: 20px;
+  opacity: 0.8;
+}
+
+#play-btn {
+  pointer-events: auto;
+  cursor: pointer;
+  padding: 14px 42px;
+  font-family: 'Anton', sans-serif;
+  font-size: 24px;
+  letter-spacing: 3px;
+  color: #111;
+  background: #fff;
+  border: none;
+  border-radius: 3px;
+  box-shadow: 5px 5px 0 #7cb342;
+}
+
+#play-btn:hover {
+  background: #7cb342;
+  box-shadow: 5px 5px 0 #fff;
+}
+
+#controls-help {
+  margin-top: 30px;
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 6px 36px;
+  justify-content: center;
+  text-align: left;
+  font-size: 16px;
+  opacity: 0.85;
+}
+
+#controls-help b {
+  display: inline-block;
+  min-width: 70px;
+  color: #aed581;
+}
+
+@media (max-width: 700px) {
+  #overlay h1 {
+    font-size: 72px;
+  }
+
+  #controls-help {
+    grid-template-columns: 1fr;
+  }
+}
