@@ -12,6 +12,7 @@ export class Input {
     this.released = new Set();
     this.mouse = { dx: 0, dy: 0, left: false, right: false, leftPressed: false };
     this.locked = false;
+    this.freeMouse = false; // alternativa si el navegador rechaza Pointer Lock
     this.onLockChange = null;
 
     const blocked = ['Tab', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
@@ -31,12 +32,12 @@ export class Input {
     });
 
     document.addEventListener('mousemove', (e) => {
-      if (!this.locked) return;
+      if (!this.locked && !this.freeMouse) return;
       this.mouse.dx += e.movementX;
       this.mouse.dy += e.movementY;
     });
     document.addEventListener('mousedown', (e) => {
-      if (!this.locked) return;
+      if (!this.locked && !this.freeMouse) return;
       if (e.button === 0) {
         this.mouse.left = true;
         this.mouse.leftPressed = true;

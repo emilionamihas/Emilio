@@ -141,14 +141,30 @@ function start() {
   game.hud.show(true);
   game.running = true;
 }
-playBtn.addEventListener('click', () => game.input.requestLock());
+playBtn.addEventListener('click', () => {
+  game.input.requestLock();
+  // Si Pointer Lock no está disponible (iframe, móvil...), se juega con el ratón libre
+  setTimeout(() => {
+    if (!game.input.locked) {
+      game.input.freeMouse = true;
+      start();
+    }
+  }, 400);
+});
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Escape' && game.input.freeMouse && game.running) {
+    game.running = false;
+    playBtn.textContent = 'CONTINUAR';
+    overlay.classList.remove('hidden');
+  }
+});
 canvas.addEventListener('click', () => {
-  if (game.running && !game.input.locked) game.input.requestLock();
+  if (game.running && !game.input.locked && !game.input.freeMouse) game.input.requestLock();
 });
 game.input.onLockChange = (locked) => {
   if (locked) {
     start();
-  } else if (!params.has('autostart')) {
+  } else if (!params.has('autostart') && !game.input.freeMouse) {
     // Esc libera el ratón: pausa
     game.running = false;
     playBtn.textContent = 'CONTINUAR';
