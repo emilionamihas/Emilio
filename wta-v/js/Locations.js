@@ -3,9 +3,13 @@ import { CITY } from './Environment.js';
 import { WEAPONS } from './PlayerController.js';
 import { CATALOG, DEALER_MODELS, VehicleController } from './VehicleController.js';
 import { formatMoney } from './GameState.js';
+import { BUSINESSES, LEVELS } from './Properties.js';
+import { Environment } from './Environment.js';
+import * as CANNON from 'cannon-es';
+import { GROUPS } from './Environment.js';
+import { stoneTexture, wallTexture, signTexture, makeCanvas, toTexture, addNoise } from './Textures.js';
 
 const INTERACT_RADIUS = 2.2;
-const INCOME_PERIOD = 20; // segundos de juego = 1 hora del reloj a velocidad normal
 
 export const BANKS = {
   puerto: { name: 'Banco del Puerto', duration: 15, loot: [12000, 18000], startLevel: 2, endLevel: 3, cooldown: 300 },
@@ -13,13 +17,6 @@ export const BANKS = {
   reserva: { name: 'Reserva Federal', duration: 35, loot: [110000, 150000], startLevel: 4, endLevel: 5, cooldown: 600 },
 };
 
-export const BUSINESSES = {
-  lavanderia: { name: 'Lavandería Espuma', price: 8000, income: 120 },
-  taller: { name: 'Taller Pistón', price: 15000, income: 220 },
-  club: { name: 'Club Neón', price: 30000, income: 450 },
-  hotel: { name: 'Hotel Marina', price: 60000, income: 900 },
-  casino: { name: 'Casino Sombra', price: 150000, income: 2500 },
-};
 
 const TYPE_STYLE = {
   safehouse: { color: '#43a047', letter: 'H', sign: '#1b5e20' },
@@ -105,9 +102,6 @@ export class Locations {
   constructor(game) {
     this.game = game;
     this.pois = [];
-    this.incomeTimer = 0;
-    this.incomeAccum = 0;
-    this.incomeNotifyTimer = 0;
     this.garageCar = null;
     this.nearest = null;
 
@@ -151,6 +145,14 @@ export class Locations {
   /** Letrero sobre postes detrás del marcador y marcador en la acera. */
   buildPoi(poi) {
     const scene = this.game.scene;
+    if (poi.type === 'bank' || poi.type === 'store' || poi.type === 'safehouse') {
+      this.buildFacade(poi);
+      poi.marker = createMarker(poi.style.color);
+      poi.marker.position.copy(poi.pos);
+      scene.add(poi.marker);
+      poi.signMat = new THREE.MeshStandardMaterial(); // sin letrero de postes
+      return;
+    }
     const group = new THREE.Group();
     const signMat = new THREE.MeshStandardMaterial({ map: makeSignTexture(poi.name, poi.style.sign), emissive: 0xffffff, emissiveIntensity: 0.15 });
     poi.signMat = signMat;
@@ -191,8 +193,11 @@ export class Locations {
     const game = this.game;
     const t = game.time;
     const night = game.env.night;
+    if (this.homeLamp) this.homeLamp.material.emissiveIntensity = night * 2.5;
     for (const poi of this.pois) {
       poi.signMat.emissiveIntensity = 0.15 + night * 0.9;
+      if (poi.glowMat) poi.glowMat.emissiveIntensity = 0.35 + night * 0.9;
+      if (poi.signGlow) poi.signGlow.emissiveIntensity = 0.5 + night * 1.6;
       if (poi.marker) {
         poi.marker.userData.arrow.position.y = 2.2 + Math.sin(t * 3) * 0.15;
         poi.marker.userData.arrow.rotation.y += dt * 2;
@@ -200,11 +205,9 @@ export class Locations {
       }
     }
 
-    this.updateIncome(dt);
-
     // Interacción a pie
     this.nearest = null;
-    if (game.interaction.state !== 'foot' || game.menus.isOpen || game.heists.active) return;
+    if (game.interaction.state !== 'foot' || game.menus.isOpen || game.interior) return;
     const p = game.player.mesh.position;
     for (const poi of this.pois) {
       if (!poi.marker || !poi.marker.visible) continue;
@@ -228,19 +231,19 @@ export class Locations {
     const st = this.game.state;
     switch (poi.type) {
       case 'safehouse':
-        return 'Casa: guardar, garaje y descansar';
+        return 'Entrar en casa';
       case 'gunshop':
         return 'Armería';
       case 'dealer':
         return 'Concesionario';
       case 'store':
-        return `Atracar ${poi.name}`;
+        return `Entrar en ${poi.name}`;
       case 'bank': {
         const cd = this.game.heists.cooldownLeft(poi.id);
-        return cd > 0 ? `${poi.name}: cámara vacía, vuelve en ${Math.ceil(cd)} s` : `Atracar ${poi.name}`;
+        return cd > 0 ? `Entrar en ${poi.name} (cámara vacía: ${Math.ceil(cd)} s)` : `Entrar en ${poi.name}`;
       }
       case 'business':
-        return st.businesses.has(poi.id) ? `${poi.name} (tuyo)` : `Comprar ${poi.name}`;
+        return st.businesses.has(poi.id) ? `${poi.name} (tuyo · ${formatMoney(this.game.properties.income(poi.id))}/min)` : `Comprar ${poi.name}`;
       default:
         return poi.name;
     }
@@ -251,7 +254,12 @@ export class Locations {
     switch (poi.type) {
       case 'store':
       case 'bank':
-        game.heists.start(poi);
+      case 'safehouse':
+        if (game.wanted.level > 0) {
+          game.hud.notify('No puedes entrar con la policía detrás. Piérdela primero.');
+          break;
+        }
+        game.interiors.enter(poi);
         break;
       case 'gunshop':
         game.menus.open(this.gunshopMenu());
@@ -261,9 +269,6 @@ export class Locations {
         break;
       case 'business':
         game.menus.open(this.businessMenu(poi));
-        break;
-      case 'safehouse':
-        game.menus.open(this.safehouseMenu());
         break;
       default:
         break;
@@ -362,74 +367,22 @@ export class Locations {
     const game = this.game;
     const st = game.state;
     const b = BUSINESSES[poi.id];
+    const props = game.properties;
     return {
       title: b.name,
-      subtitle: st.businesses.has(poi.id) ? 'Este negocio es tuyo. Ingresa dinero cada hora de juego.' : 'Cada negocio ingresa dinero automáticamente cada hora de juego.',
-      closeOnBuy: false,
-      items: () => [
-        {
-          label: st.businesses.has(poi.id) ? 'Negocio en propiedad' : `Comprar ${b.name}`,
-          detail: `Ingresos: ${formatMoney(b.income)} por hora · se paga en ${Math.ceil(b.price / b.income)} horas`,
-          price: st.businesses.has(poi.id) ? null : b.price,
-          owned: st.businesses.has(poi.id),
-          disabled: st.businesses.has(poi.id),
-          action: () => {
-            st.spend(b.price);
-            st.businesses.add(poi.id);
-            st.save();
-            game.emit('businessBought', { id: poi.id });
-            return `${b.name} ya es tuyo.`;
-          },
-        },
-      ],
-    };
-  }
-
-  safehouseMenu() {
-    const game = this.game;
-    const st = game.state;
-    const home = this.byId('casa');
-    return {
-      title: 'Tu casa',
-      subtitle: () => `Negocios: ${st.businesses.size} · Coches: ${st.cars.length} · Ganado en total: ${formatMoney(st.stats.earned)}`,
-      closeOnBuy: true,
+      subtitle: () => (st.businesses.has(poi.id) ? `Tuyo · nivel "${LEVELS[props.level(poi.id)].name}" · ${formatMoney(props.income(poi.id))} por minuto` : `Genera ${formatMoney(b.income)} por minuto desde el primer minuto`),
       items: () => {
-        const list = [
-          {
-            label: 'Guardar partida',
-            detail: 'La historia también se guarda sola al terminar cada misión',
-            tag: 'GRATIS',
-            action: () => {
-              st.save();
-              game.hud.notify('Partida guardada.');
+        if (!st.businesses.has(poi.id)) {
+          return [
+            {
+              label: `Comprar ${b.name}`,
+              detail: `${formatMoney(b.income)}/min · se amortiza en ${Math.ceil(b.price / b.income)} minutos`,
+              price: b.price,
+              action: () => (props.buy(poi.id) ? `${b.name} ya es tuyo. Cobras cada minuto.` : 'No te llega el dinero.'),
             },
-          },
-          {
-            label: 'Descansar',
-            detail: 'Recupera toda la vida y adelanta el reloj 6 horas',
-            tag: 'GRATIS',
-            disabled: game.wanted.level > 0,
-            action: () => {
-              game.player.health = 100;
-              game.env.timeOfDay = (game.env.timeOfDay + 6) % 24;
-              game.hud.notify('Has descansado. Vida al máximo.');
-            },
-          },
-        ];
-        for (const type of st.cars) {
-          const c = CATALOG[type];
-          list.push({
-            label: `Sacar del garaje: ${c.label}`,
-            detail: c.kind,
-            tag: 'GARAJE',
-            action: () => {
-              if (this.garageCar && this.garageCar.driver !== 'player') this.garageCar.removeFromWorld();
-              this.garageCar = this.spawnOwnedCar(type, home.park, home.heading);
-              game.hud.notify(`${this.garageCar.label} listo frente a tu casa.`);
-            },
-          });
+          ];
         }
-        return list;
+        return props.businessDetail(poi.id).items();
       },
     };
   }
@@ -450,30 +403,176 @@ export class Locations {
   }
 
   // ------------------------------------------------------------------
-  // Ingresos de negocios
+  // Fachadas propias: banco, tienda 24/7 y tu casa
   // ------------------------------------------------------------------
-  hourlyIncome() {
-    let total = 0;
-    for (const id of this.game.state.businesses) total += BUSINESSES[id].income;
-    return total;
-  }
+  /**
+   * Construye el edificio del lugar sobre el solar que hay detrás del marcador.
+   * Coordenadas locales: +Z = hacia la calle (normal), X = a lo largo de la acera, origen en la fachada.
+   */
+  buildFacade(poi) {
+    const game = this.game;
+    const env = game.env;
+    const dims = { bank: [20, 16, 13], store: [12, 10, 5.2], safehouse: [12, 12, 10.5] }[poi.type];
+    const [W, D, H] = dims;
+    const n = poi.normal;
+    const front = poi.pos.clone().addScaledVector(n, -CITY.SIDEWALK / 2); // línea de fachada
+    const center = front.clone().addScaledVector(n, -D / 2);
+    const alongX = Math.abs(n.z) > 0.5; // la fachada corre a lo largo de X
+    const rect = alongX
+      ? { minX: center.x - W / 2, maxX: center.x + W / 2, minZ: center.z - D / 2, maxZ: center.z + D / 2 }
+      : { minX: center.x - D / 2, maxX: center.x + D / 2, minZ: center.z - W / 2, maxZ: center.z + W / 2 };
+    env.removeBuildingsIn({ minX: rect.minX - 0.5, maxX: rect.maxX + 0.5, minZ: rect.minZ - 0.5, maxZ: rect.maxZ + 0.5 });
 
-  updateIncome(dt) {
-    const income = this.hourlyIncome();
-    if (!income) return;
-    this.incomeTimer += dt;
-    if (this.incomeTimer >= INCOME_PERIOD) {
-      this.incomeTimer -= INCOME_PERIOD;
-      this.game.state.addMoney(income);
-      this.incomeAccum += income;
+    const group = new THREE.Group();
+    group.position.copy(front);
+    group.rotation.y = Math.atan2(n.x, n.z);
+    game.scene.add(group);
+    const meshes = [];
+    const add = (geo, material, x, y, z, collider = true) => {
+      const m = new THREE.Mesh(geo, material);
+      m.position.set(x, y, z);
+      m.castShadow = true;
+      m.receiveShadow = true;
+      group.add(m);
+      if (collider) meshes.push(m);
+      return m;
+    };
+    const box = (w, h, d, material, x, y, z, collider) => add(new THREE.BoxGeometry(w, h, d), material, x, y, z, collider);
+    const M = (o) => new THREE.MeshStandardMaterial(o);
+    const darkGlass = M({ color: 0x0f161c, metalness: 0.9, roughness: 0.08, envMapIntensity: 1.3 });
+    const trim = M({ color: 0x2a2a2a, roughness: 0.5, metalness: 0.4 });
+
+    // Cuerpo principal con textura en metros
+    const shell = (material, tileW, tileH) => {
+      const geo = new THREE.BoxGeometry(W, H, D);
+      Environment.meterUV(geo, W, H, D, tileW, tileH);
+      return add(geo, material, 0, H / 2, -D / 2);
+    };
+
+    if (poi.type === 'bank') {
+      const stone = stoneTexture(Math.random, poi.id === 'reserva' ? [200, 196, 188] : [226, 216, 196]);
+      shell(M({ map: stone, roughness: 0.75 }), 4, 2);
+      const stoneMat = M({ map: stone, roughness: 0.6 });
+      // Escalinata
+      for (let k = 0; k < 3; k++) box(11 - k * 0.6, 0.18, 1.2 - k * 0.4, stoneMat, 0, 0.09 + k * 0.18, 0.6 - k * 0.2, false);
+      // Pórtico: columnas, entablamento con rótulo y frontón
+      const colGeo = new THREE.CylinderGeometry(0.42, 0.48, 8.2, 20);
+      for (const x of [-4.2, -1.4, 1.4, 4.2]) {
+        add(colGeo, stoneMat, x, 4.6, 0.9);
+        box(1.1, 0.3, 1.1, stoneMat, x, 0.6, 0.9, false);
+        box(1.1, 0.3, 1.1, stoneMat, x, 8.75, 0.9, false);
+      }
+      const title = poi.name.toUpperCase();
+      const frieze = signTexture(title, '#d8ccb4', '#3a2e1c', { border: false, font: 'Georgia, "Times New Roman", serif' });
+      box(11, 1.3, 2.4, [stoneMat, stoneMat, stoneMat, stoneMat, M({ map: frieze, roughness: 0.7 }), stoneMat], 0, 9.55, 0.2);
+      const tri = new THREE.Shape();
+      tri.moveTo(-5.8, 0);
+      tri.lineTo(5.8, 0);
+      tri.lineTo(0, 2.2);
+      tri.closePath();
+      const ped = new THREE.ExtrudeGeometry(tri, { depth: 2.2, bevelEnabled: false });
+      add(ped, stoneMat, 0, 10.2, -0.9, false);
+      // Puertas de madera con herrajes y ventanales laterales
+      box(3.2, 4.2, 0.12, M({ color: 0x3b2414, roughness: 0.5 }), 0, 2.45, 0.06, false);
+      box(0.08, 4.2, 0.14, M({ color: 0xc9a14a, metalness: 1, roughness: 0.3 }), 0, 2.45, 0.08, false);
+      for (const x of [-7.5, 7.5]) {
+        for (const y of [3.2, 7.4]) {
+          box(2.2, 2.8, 0.12, darkGlass, x, y, 0.04, false);
+          box(2.5, 0.2, 0.3, stoneMat, x, y - 1.5, 0.12, false);
+        }
+      }
+      box(W + 0.6, 0.6, D + 0.6, stoneMat, 0, H + 0.3, -D / 2, false); // cornisa
+    } else if (poi.type === 'store') {
+      shell(M({ map: wallTexture('#d8d2c6'), roughness: 0.85 }), 4, 4);
+      // Escaparate iluminado
+      const glow = toTexture(
+        makeCanvas(256, 128, (ctx) => {
+          ctx.fillStyle = '#fff4dc';
+          ctx.fillRect(0, 0, 256, 128);
+          const colors = ['#e53935', '#1e88e5', '#fdd835', '#43a047', '#fb8c00'];
+          for (let row = 0; row < 3; row++) {
+            ctx.fillStyle = '#9e9e9e';
+            ctx.fillRect(0, 40 + row * 34, 256, 3);
+            for (let x = 4; x < 252; x += 14) {
+              ctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
+              ctx.fillRect(x, 14 + row * 34, 10, 24);
+            }
+          }
+          addNoise(ctx, 256, 128, 8);
+        }),
+        { repeat: false }
+      );
+      const windowMat = M({ color: 0x9fb4bf, map: glow, emissive: 0xffffff, emissiveMap: glow, emissiveIntensity: 0.35, roughness: 0.1, metalness: 0.3 });
+      poi.glowMat = windowMat;
+      box(W - 1, 2.9, 0.1, windowMat, 0, 1.75, 0.05, false);
+      box(W - 0.8, 0.12, 0.2, trim, 0, 3.25, 0.1, false);
+      for (const x of [-W / 2 + 0.5, -1.4, 1.4, W / 2 - 0.5]) box(0.12, 3, 0.2, trim, x, 1.7, 0.1, false);
+      box(2.2, 2.6, 0.12, M({ color: 0x9fb4bf, metalness: 0.4, roughness: 0.1, transparent: true, opacity: 0.6 }), 0, 1.3, 0.12, false);
+      // Toldo a rayas
+      const stripes = toTexture(
+        makeCanvas(128, 32, (ctx) => {
+          for (let x = 0; x < 128; x += 16) {
+            ctx.fillStyle = (x / 16) % 2 ? '#f5f5f5' : '#c62828';
+            ctx.fillRect(x, 0, 16, 32);
+          }
+        })
+      );
+      stripes.repeat.set(3, 1);
+      const awning = box(W - 0.4, 0.08, 1.8, M({ map: stripes, roughness: 0.9, side: THREE.DoubleSide }), 0, 3.5, 0.9, false);
+      awning.rotation.x = 0.3;
+      // Rótulo luminoso
+      const signTex = signTexture(poi.name.toUpperCase(), '#b71c1c', '#fff');
+      const signMat = M({ map: signTex, emissive: 0xffffff, emissiveMap: signTex, emissiveIntensity: 0.5 });
+      poi.signGlow = signMat;
+      box(8, 1.2, 0.3, [trim, trim, trim, trim, signMat, trim], 0, 4.4, 0.15, false);
+    } else {
+      // Tu casa: adosado moderno
+      const render = M({ map: wallTexture('#ece7de'), roughness: 0.8 });
+      shell(render, 4, 4);
+      const woodTex = toTexture(
+        makeCanvas(128, 128, (ctx) => {
+          for (let y = 0; y < 128; y += 8) {
+            const t = 0.85 + Math.random() * 0.25;
+            ctx.fillStyle = `rgb(${120 * t},${78 * t},${46 * t})`;
+            ctx.fillRect(0, y, 128, 7);
+          }
+          addNoise(ctx, 128, 128, 10);
+        })
+      );
+      woodTex.repeat.set(2, 3);
+      box(4.4, H - 0.4, 0.15, M({ map: woodTex, roughness: 0.7 }), -3.6, H / 2, 0.08, false);
+      // Puerta con marquesina y aplique
+      box(1.3, 2.4, 0.12, M({ color: 0x1f2a30, roughness: 0.4 }), 1.2, 1.2, 0.07, false);
+      box(2.6, 0.12, 1.4, trim, 1.2, 2.75, 0.7, false);
+      this.homeLamp = box(0.15, 0.3, 0.15, M({ color: 0xffffff, emissive: 0xffd89a, emissiveIntensity: 0 }), 2.2, 2.2, 0.12, false);
+      // Garaje
+      const garageTex = toTexture(
+        makeCanvas(128, 128, (ctx) => {
+          ctx.fillStyle = '#b8bcc0';
+          ctx.fillRect(0, 0, 128, 128);
+          ctx.fillStyle = 'rgba(0,0,0,0.25)';
+          for (let y = 0; y < 128; y += 16) ctx.fillRect(0, y, 128, 2);
+          addNoise(ctx, 128, 128, 8);
+        })
+      );
+      box(3.4, 2.6, 0.12, M({ map: garageTex, metalness: 0.5, roughness: 0.4 }), 4.2, 1.3, 0.07, false);
+      // Ventanas y balcón con barandilla de cristal
+      for (const [x, y, w] of [[1.2, 5.2, 2.4], [4.2, 5.2, 2.4], [2.7, 8.3, 5.4]]) {
+        box(w, 2, 0.1, darkGlass, x, y, 0.06, false);
+        box(w + 0.2, 0.12, 0.25, trim, x, y - 1.05, 0.12, false);
+      }
+      box(6.4, 0.2, 1.4, render, 2.7, 6.9, 0.7, false);
+      box(6.4, 0.9, 0.04, M({ color: 0xa8c4d0, transparent: true, opacity: 0.35, roughness: 0.05 }), 2.7, 7.45, 1.38, false);
+      box(W + 0.4, 0.4, D + 0.4, trim, 0, H + 0.2, -D / 2, false);
     }
-    this.incomeNotifyTimer += dt;
-    if (this.incomeNotifyTimer > 60 && this.incomeAccum > 0) {
-      this.game.hud.notify(`Tus negocios han ingresado ${formatMoney(this.incomeAccum)}.`);
-      this.game.hud.moneyDelta(this.incomeAccum);
-      this.incomeAccum = 0;
-      this.incomeNotifyTimer = 0;
-      this.game.state.save();
-    }
+
+    group.updateMatrixWorld(true);
+    const body = new CANNON.Body({ mass: 0, collisionFilterGroup: GROUPS.STATIC });
+    const halfX = alongX ? W / 2 : D / 2;
+    const halfZ = alongX ? D / 2 : W / 2;
+    body.addShape(new CANNON.Box(new CANNON.Vec3(halfX, H / 2, halfZ)));
+    body.position.set(center.x, H / 2, center.z);
+    env.registerStructure(meshes, rect, body);
+    poi.facade = group;
   }
 }

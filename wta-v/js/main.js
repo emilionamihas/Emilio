@@ -14,6 +14,9 @@ import { Menus } from './Menus.js';
 import { Locations } from './Locations.js';
 import { Heists } from './Heists.js';
 import { Missions, STORY } from './Missions.js';
+import { Interiors } from './Interiors.js';
+import { Properties } from './Properties.js';
+import { Pedestrians } from './NPC.js';
 
 const FIXED_STEP = 1 / 60;
 const params = new URLSearchParams(location.search);
@@ -65,19 +68,29 @@ const game = {
   started: false,
   input: new Input(canvas),
   state: new GameState('free'), // se sustituye al elegir modo
+  interior: null, // { inst, poi } mientras estás dentro de un edificio
+  waypoint: null, // destino marcado en el GPS
   on(type, fn) {
     bus.addEventListener(type, (e) => fn(e.detail));
   },
   emit(type, detail) {
     bus.dispatchEvent(new CustomEvent(type, { detail }));
   },
+  /** Posición que "ve" el mundo exterior: dentro de un edificio cuenta la puerta. */
   getFocusPosition() {
+    if (game.interior) return game.interior.poi.pos.clone();
+    return game.getRenderFocus();
+  },
+  /** Posición real del jugador o su coche (sombras, cámara). */
+  getRenderFocus() {
     const v = game.interaction && game.interaction.vehicle;
     if (v && game.interaction.state !== 'foot') return new THREE.Vector3(v.position.x, v.position.y, v.position.z);
     return game.player.mesh.position.clone();
   },
   getShootables() {
+    if (game.interior) return game.interiors.shootables();
     const list = game.env.shootables.slice();
+    list.push(...game.pedestrians.meshes());
     for (const v of game.vehicles) {
       if (v.driver !== 'player') list.push(v.mesh, ...v.wheelMeshes);
     }
@@ -110,6 +123,15 @@ game.menus = new Menus(game);
 game.locations = new Locations(game);
 game.heists = new Heists(game);
 game.missions = new Missions(game);
+game.interiors = new Interiors(game);
+game.properties = new Properties(game);
+game.pedestrians = new Pedestrians(game, { count: 10 });
+
+// NPC abatidos: delito según a quién
+game.onNpcKilled = (npc) => {
+  if (npc.role === 'police' || npc.role === 'guard') game.wanted.reportCrime('kill_cop');
+  else game.wanted.reportCrime('murder');
+};
 
 // Coches aparcados junto a la acera del spawn (carril derecho de la calle x = 0)
 const parked = [
@@ -179,6 +201,7 @@ function respawn() {
 
   game.hud.hideBigText();
   game.timeScale = 1;
+  if (game.interior) game.interiors.exit({ instant: true });
   game.interaction.forceExit();
   game.wanted.reset();
   game.player.health = 100;
@@ -219,6 +242,7 @@ function applyState() {
   const player = game.player;
   player.weaponIndex = 0;
   player.updateWeaponVisual();
+  player.setOutfit(st.outfit || 'calle');
   game.hud.shownMoney = st.money;
   // Las armas iniciales llegan con munición
   for (const i of st.ownedWeapons) if (i > 0 && st.clip[i] == null) player.giveWeapon(i);
@@ -232,6 +256,7 @@ function chooseMode(mode) {
   game.started = true;
   modeSelect.classList.add('hidden');
   pauseActions.classList.remove('hidden');
+  if (loaded) game.properties.payOffline(st.savedAt);
   if (mode === 'story' && !loaded) game.missions.playIntro();
   if (mode === 'story' && loaded && !st.storyDone) game.hud.notify('Partida cargada. Sigue el marcador amarillo del radar.');
   if (mode === 'free') game.hud.notify('Modo libre: atraca bancos (verde $), compra negocios (N) y coches (C).', 6);
@@ -319,6 +344,7 @@ function step(dt) {
   const input = game.input;
 
   game.env.timeSpeed = input.isDown('KeyT') ? 25 : 1;
+  if (input.wasPressed('KeyM') && !game.menus.isOpen) game.menus.open(game.properties.rootMenu());
 
   // 1. Lógica previa a la física: jugador, interacción, lugares, misiones e IA
   game.player.update(dt, game.cameraRig);
@@ -326,6 +352,9 @@ function step(dt) {
   game.locations.update(dt);
   game.missions.update(dt);
   game.heists.update(dt);
+  game.interiors.update(dt);
+  game.properties.update(dt);
+  game.pedestrians.update(dt);
   game.traffic.update(dt);
   game.wanted.update(dt);
   for (const v of game.vehicles) v.update(dt);
@@ -339,7 +368,14 @@ function step(dt) {
 
   // 4. Cámara, entorno, efectos y HUD
   game.cameraRig.update(dt);
-  game.env.update(dt, game.getFocusPosition());
+  game.env.update(dt, game.getRenderFocus());
+  if (game.waypoint) {
+    const f = game.getFocusPosition();
+    if (Math.hypot(f.x - game.waypoint.pos.x, f.z - game.waypoint.pos.z) < 8) {
+      game.hud.notify(`Has llegado: ${game.waypoint.label}.`, 2);
+      game.waypoint = null;
+    }
+  }
   game.effects.update(dt);
   game.hud.update(dt);
 

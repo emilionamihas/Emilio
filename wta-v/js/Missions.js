@@ -63,7 +63,7 @@ export const STORY = [
     giver: 'vera',
     reward: 3000,
     steps: [
-      { type: 'say', lines: ['Vera: Lucho dice que tienes sangre fría. Vamos a comprobarlo.', 'Vera: Banco del Puerto. Entra, vacía la cámara y aguanta hasta que termine.', 'Vera: Y no vengas aquí con la policía detrás: el dinero solo vale si lo pierdes de vista.'] },
+      { type: 'say', lines: ['Vera: Lucho dice que tienes sangre fría. Vamos a comprobarlo.', 'Vera: Banco del Puerto. Entra encañonando, taladra la cámara acorazada y llena la bolsa con los carros.', 'Vera: Y no vengas aquí con la policía detrás: el dinero solo vale si lo pierdes de vista.'] },
       { type: 'event', event: 'bankRobbed', text: 'Atraca el Banco del Puerto ($ en el radar)', poi: 'puerto', filter: (d) => d.id === 'puerto' },
       { type: 'loseWanted', text: 'Pierde a la policía para asegurar el botín', loot: true },
       { type: 'say', lines: ['Vera: Bien hecho. Quédate con tu parte. Pronto hablaremos de cosas grandes.'] },
@@ -77,7 +77,7 @@ export const STORY = [
     steps: [
       { type: 'say', lines: ['Vera: Tanto efectivo llama la atención. Necesitas un negocio que lo justifique.', 'Vera: La Lavandería Espuma está en venta. Cómprala, o cualquier otro negocio (N en el radar).'] },
       { type: 'event', event: 'businessBought', text: 'Compra un negocio (N en el radar)', poi: 'lavanderia', already: (g) => g.state.businesses.size > 0 },
-      { type: 'say', lines: ['Vera: Ahora tus ingresos parecen legales. Cada hora te caerá algo.'] },
+      { type: 'say', lines: ['Vera: Ahora tus ingresos parecen legales, y el negocio te paga cada minuto. Mira tus cuentas con la tecla M.'] },
     ],
   },
   {

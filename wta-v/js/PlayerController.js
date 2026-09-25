@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { GROUPS } from './Environment.js';
 import { formatMoney } from './GameState.js';
+import { HumanModel, OUTFITS, SKIN_TONES } from './HumanModel.js';
 
 const WALK_SPEED = 3.4;
 const RUN_SPEED = 7.2;
@@ -84,66 +85,36 @@ export class PlayerController {
     this.game.world.addBody(this.body);
   }
 
-  /** Modelo de prueba hecho con cubos y pivotes para animar extremidades. */
+  /** Figura humana articulada (HumanModel) con el arma en la mano derecha. */
   createMesh() {
-    const skin = new THREE.MeshStandardMaterial({ color: 0xc68642, roughness: 0.8 });
-    const shirt = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.9 });
-    const jeans = new THREE.MeshStandardMaterial({ color: 0x2c3e66, roughness: 0.9 });
-    const shoes = new THREE.MeshStandardMaterial({ color: 0x1b1b1b });
-    const hair = new THREE.MeshStandardMaterial({ color: 0x2a1a0e });
+    this.model = new HumanModel(OUTFITS.calle, { skin: SKIN_TONES[2], hairStyle: 'short' });
+    const root = this.model.root;
 
-    const root = new THREE.Group();
-    const box = (w, h, d, mat) => {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-      m.castShadow = true;
-      return m;
-    };
-
-    const torso = box(0.56, 0.68, 0.3, shirt);
-    torso.position.y = 1.17;
-    const head = box(0.3, 0.32, 0.3, skin);
-    head.position.y = 1.7;
-    const hairTop = box(0.32, 0.1, 0.32, hair);
-    hairTop.position.y = 1.86;
-    const hips = box(0.5, 0.18, 0.28, jeans);
-    hips.position.y = 0.8;
-    root.add(torso, head, hairTop, hips);
-
-    const limb = (x, y, w, h, mat, footMat) => {
-      const pivot = new THREE.Group();
-      pivot.position.set(x, y, 0);
-      const part = box(w, h, w, mat);
-      part.position.y = -h / 2;
-      pivot.add(part);
-      if (footMat) {
-        const foot = box(w + 0.02, 0.1, w + 0.12, footMat);
-        foot.position.set(0, -h + 0.02, 0.05);
-        pivot.add(foot);
-      }
-      root.add(pivot);
-      return pivot;
-    };
-    this.leftArm = limb(0.36, 1.46, 0.15, 0.62, skin);
-    this.rightArm = limb(-0.36, 1.46, 0.15, 0.62, skin);
-    this.leftLeg = limb(0.13, 0.82, 0.19, 0.78, jeans, shoes);
-    this.rightLeg = limb(-0.13, 0.82, 0.19, 0.78, jeans, shoes);
-
-    // Arma en la mano derecha
+    const gunMat = new THREE.MeshStandardMaterial({ color: 0x1e1e1e, metalness: 0.75, roughness: 0.35 });
     this.gun = new THREE.Group();
-    const gunMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.7, roughness: 0.4 });
-    this.gunBarrel = box(0.08, 0.1, 0.35, gunMat);
-    this.gunBarrel.position.z = 0.12;
-    const grip = box(0.07, 0.14, 0.08, gunMat);
-    grip.position.set(0, -0.09, 0);
+    this.gunBarrel = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.05, 0.24), gunMat);
+    this.gunBarrel.position.z = 0.1;
+    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.09, 0.045), gunMat);
+    grip.position.set(0, -0.055, 0.01);
+    grip.rotation.x = 0.25;
     this.gun.add(this.gunBarrel, grip);
-    this.gun.position.set(0, -0.62, 0.08);
-    this.rightArm.add(this.gun);
+    // En el marco de la muñeca el brazo apunta a -Y: giramos el arma para que el cañón siga al brazo
+    this.gun.rotation.x = Math.PI / 2;
+    this.gun.position.set(0, -0.04, 0.03);
+    this.model.rightHand.add(this.gun);
     this.muzzle = new THREE.Object3D();
-    this.muzzle.position.set(0, 0, 0.32);
+    this.muzzle.position.set(0, 0, 0.24);
     this.gun.add(this.muzzle);
 
     this.mesh = root;
     this.game.scene.add(root);
+  }
+
+  /** Cambia la ropa (armario de casa). */
+  setOutfit(id) {
+    if (!OUTFITS[id]) return;
+    this.outfitId = id;
+    this.model.setOutfit(OUTFITS[id]);
   }
 
   get weapon() {
@@ -386,6 +357,14 @@ export class PlayerController {
         : _ray.ray.direction.clone().negate();
       game.effects.spawnSparks(hit.point, normal, 6);
 
+      const npc = hit.object.userData.npc;
+      if (npc) {
+        if (!npc.dead) {
+          hitSomething = true;
+          npc.hit(w.damage / (pellets > 1 ? 1.5 : 1), hit.object.userData.part, this.mesh.position);
+        }
+        continue;
+      }
       const vehicle = this.findVehicle(hit.object);
       if (vehicle) {
         hitSomething = true;
@@ -400,7 +379,12 @@ export class PlayerController {
       }
     }
     if (hitSomething) game.hud.flashHitmarker();
-    game.wanted.reportCrime('gunshot');
+    if (game.interior) {
+      for (const n of game.interior.inst.npcs) n.panic(this.mesh.position);
+    } else {
+      game.wanted.reportCrime('gunshot');
+      game.pedestrians.panicAround(this.mesh.position, 40);
+    }
   }
 
   /** Cohete: impacto instantáneo por raycast con explosión en el punto de impacto. */
@@ -429,6 +413,11 @@ export class PlayerController {
     const hit = _ray.intersectObjects(game.getShootables(), true)[0];
     this.punchTime = 0.25;
     if (!hit) return;
+    if (hit.object.userData.npc) {
+      hit.object.userData.npc.hit(12, hit.object.userData.part, this.mesh.position);
+      game.hud.flashHitmarker();
+      return;
+    }
     const vehicle = this.findVehicle(hit.object);
     game.effects.spawnSparks(hit.point, dir.clone().negate(), 3, 0xffffff);
     if (vehicle) {
@@ -508,10 +497,7 @@ export class PlayerController {
   // Animación procedural
   // ------------------------------------------------------------------
   poseAim() {
-    // Brazo derecho extendido hacia delante; el izquierdo lo acompaña
-    const pitch = this.game.cameraRig.pitch;
-    this.rightArm.rotation.set(-Math.PI / 2 - pitch, 0, 0);
-    this.leftArm.rotation.set(-Math.PI / 2.3 - pitch, 0, -0.5);
+    this.model.animate(0.016, { aim: true, pitch: this.game.cameraRig.pitch });
   }
 
   syncMesh() {
@@ -524,39 +510,20 @@ export class PlayerController {
     if (!this.enabled) return;
     this.syncMesh();
     const v = this.body.velocity;
-    const hspeed = Math.hypot(v.x, v.z);
-
-    if (!this.onGround) {
-      // Pose de salto
-      this.leftLeg.rotation.x = -0.6;
-      this.rightLeg.rotation.x = 0.3;
-      this.leftArm.rotation.set(-2.4, 0, 0.3);
-      this.rightArm.rotation.set(-2.4, 0, -0.3);
-    } else if (hspeed > 0.3) {
-      this.animPhase += dt * hspeed * 2.2;
-      const amp = Math.min(1, hspeed / RUN_SPEED) * 0.9 + 0.2;
-      const s = Math.sin(this.animPhase);
-      this.leftLeg.rotation.x = s * amp;
-      this.rightLeg.rotation.x = -s * amp;
-      this.leftArm.rotation.set(-s * amp * 0.8, 0, 0.05);
-      this.rightArm.rotation.set(s * amp * 0.8, 0, -0.05);
-      this.mesh.position.y += Math.abs(Math.cos(this.animPhase)) * 0.06 * amp;
-    } else {
-      // Respiración en reposo
-      this.animPhase += dt * 2;
-      const b = Math.sin(this.animPhase) * 0.03;
-      this.leftLeg.rotation.x *= 0.8;
-      this.rightLeg.rotation.x *= 0.8;
-      this.leftArm.rotation.set(b, 0, 0.08);
-      this.rightArm.rotation.set(-b, 0, -0.08);
-    }
-
-    if (this.aiming) this.poseAim();
+    let pose = 'idle';
     if (this.punchTime > 0) {
       this.punchTime -= dt;
-      this.rightArm.rotation.set(-Math.PI / 2, 0, 0.2);
+      pose = 'punch';
+    } else if (this.reloadTimer > 0) {
+      pose = 'reload';
     }
-    if (this.reloadTimer > 0) this.rightArm.rotation.set(-0.9, 0, 0.6);
+    this.model.animate(dt, {
+      speed: Math.hypot(v.x, v.z),
+      grounded: this.onGround,
+      aim: this.aiming && pose === 'idle',
+      pitch: this.game.cameraRig.pitch,
+      pose,
+    });
   }
 }
 
@@ -619,7 +586,7 @@ export class ThirdPersonCamera {
     if (this.mode === 'foot') {
       const p = player.mesh.position;
       pivot = _v3.set(p.x, p.y + 1.55, p.z);
-      distance = player.aiming ? 2.3 : 4.3;
+      distance = player.aiming ? 2.3 : game.interior ? 3.0 : 4.3;
       shoulder = player.aiming ? 0.6 : 0.35;
       fov = player.aiming ? 50 : 65;
       stiffness = THREE.MathUtils.lerp(4, 30, settle);
@@ -649,11 +616,14 @@ export class ThirdPersonCamera {
     // Colisión de cámara con edificios: acerca la cámara si algo la tapa
     this.raycaster.set(shoulderPivot, dir.clone().negate());
     this.raycaster.far = distance;
-    const hit = this.raycaster.intersectObjects(game.env.buildingMeshes, false)[0];
+    const colliders = game.interior ? game.interiors.cameraColliders() : game.env.buildingMeshes;
+    const hit = this.raycaster.intersectObjects(colliders, false)[0];
     const d = hit ? Math.max(0.6, hit.distance - 0.35) : distance;
 
     const desired = shoulderPivot.clone().addScaledVector(dir, -d);
     desired.y = Math.max(desired.y, 0.35);
+    // Dentro de un edificio la cámara no atraviesa el techo
+    if (game.interior) desired.y = Math.min(desired.y, game.interior.inst.ceiling - 0.3);
     const desiredLook = shoulderPivot.clone().addScaledVector(dir, 10);
 
     const k = 1 - Math.exp(-stiffness * dt);

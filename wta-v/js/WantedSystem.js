@@ -14,6 +14,8 @@ const CRIMES = {
   steal_police: { heat: 0.5, minLevel: 2 },
   attack_police: { heat: 0.35, minLevel: 1, cooldown: 0.4 },
   explosion: { heat: 0.5, minLevel: 2 },
+  murder: { heat: 0.5, minLevel: 1 },
+  kill_cop: { heat: 0.8, minLevel: 3 },
 };
 
 export class WantedSystem {
@@ -224,7 +226,7 @@ export class WantedSystem {
     }
 
     // Mientras vacías una cámara estás dentro del edificio: te rodean, pero no te disparan ni te arrestan
-    const inside = this.game.heists && this.game.heists.active;
+    const inside = this.game.interior || (this.game.heists && this.game.heists.active);
     if (!inside) {
       this.checkBusted(dt, focus);
       this.policeFire(dt, focus);

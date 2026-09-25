@@ -840,3 +840,25 @@ body {
 .link-btn:hover {
   color: #fff;
 }
+
+#income {
+  font-weight: 700;
+  font-size: 15px;
+  color: #a5e08f;
+  text-shadow: 1px 1px 0 #000;
+  font-variant-numeric: tabular-nums;
+}
+
+#fade {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s;
+  z-index: 5;
+}
+
+#fade.show {
+  opacity: 1;
+}

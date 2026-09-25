@@ -145,9 +145,7 @@ export class InteractionSystem {
       player.mesh.scale.setScalar(1 - k * 0.3);
     }
     player.mesh.rotation.y = Math.atan2(door.x - player.mesh.position.x, door.z - player.mesh.position.z) || player.mesh.rotation.y;
-    player.animPhase += dt * 8;
-    player.leftLeg.rotation.x = Math.sin(player.animPhase) * 0.5;
-    player.rightLeg.rotation.x = -Math.sin(player.animPhase) * 0.5;
+    player.model.animate(dt, { speed: t < 0.6 ? 2 : 0 });
 
     if (t >= 1) {
       player.mesh.visible = false;

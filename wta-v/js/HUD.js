@@ -21,6 +21,7 @@ export class HUD {
     this.moneyEl = el('money');
     this.moneyDeltaEl = el('money-delta');
     this.lootEl = el('loot');
+    this.incomeEl = el('income');
     this.weaponName = el('weapon-name');
     this.weaponAmmo = el('weapon-ammo');
     this.healthFill = el('health-fill');
@@ -126,6 +127,13 @@ export class HUD {
     if (this.lootEl.textContent !== text) this.lootEl.textContent = text;
   }
 
+  /** Ingresos de negocios: "+$1.200/min · 0:42". */
+  setIncomeTimer(secondsLeft, perMinute) {
+    const s = Math.max(0, Math.ceil(secondsLeft));
+    const text = perMinute ? `+${formatMoney(perMinute)}/min · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : '';
+    if (this.incomeEl.textContent !== text) this.incomeEl.textContent = text;
+  }
+
   setSubtitle(text) {
     this.subtitle.textContent = text || '';
     this.subtitle.classList.toggle('show', !!text);
@@ -221,7 +229,8 @@ export class HUD {
     const half = size / 2;
     const env = game.env;
     const focus = game.getFocusPosition();
-    const yaw = game.cameraRig.yaw;
+    // Dentro de un edificio el radar se queda mirando al norte
+    const yaw = game.interior ? Math.PI : game.cameraRig.yaw;
     const scale = half / MAP_RADIUS_M; // px por metro en el radar
     const mapPxPerM = env.mapCanvas.width / env.mapSize;
 
@@ -307,6 +316,10 @@ export class HUD {
     for (const v of missions.targetVehicles) {
       const [x, y] = clampEdge(...toRadar(v.position.x, v.position.z));
       this.drawBlip(ctx, x, y, v.tag === 'target' ? '#e53935' : '#fdd835', '', 1, 6);
+    }
+    if (game.waypoint) {
+      const [x, y] = clampEdge(...toRadar(game.waypoint.pos.x, game.waypoint.pos.z));
+      this.drawBlip(ctx, x, y, '#ba68c8', '◆', 1, 7);
     }
     if (missions.target) {
       const [x, y] = clampEdge(...toRadar(missions.target.x, missions.target.z));

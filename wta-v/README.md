@@ -24,23 +24,23 @@ Abre `http://localhost:8080` y elige modo. La primera vez necesitas internet par
 
 | Radar | Lugar | Qué haces allí |
 |---|---|---|
-| H | Tu casa | Guardar, descansar (vida al máximo, +6 h) y sacar coches del garaje |
+| H | Tu casa | Se entra: cama (guardar y dormir), ordenador (negocios y coches) y armario (ropa) |
 | A | Armería Plomo | Comprar armas, munición y chaleco antibalas |
 | C | Autos Velasco | Comprar coches (no cuentan como robo y quedan en tu garaje) |
-| T | Cinco tiendas 24/7 | Atraco corto: 7 s, de 600 a 1.400 dólares, 2 estrellas |
-| $ | Tres bancos | Atracos largos con botín que hay que asegurar |
-| N | Cinco negocios | Ingresos automáticos cada hora de juego |
+| T | Cinco tiendas 24/7 | Se entra: encañonas al dependiente y vacía la caja (700 a 1.600 dólares, 2 estrellas) |
+| $ | Tres bancos | Se entra: atraco en varias fases con guardias, policía, taladro y carros de dinero |
+| N | Cinco negocios | Pagan cada minuto y se pueden mejorar dos veces |
 | + / P | Hospital y comisaría | Donde reapareces si te matan o te arrestan |
 
-**Bancos.** Te quedas junto a la cámara acorazada con un arma de fuego en la mano mientras se vacía. Mientras estás dentro la policía rodea el edificio, pero no dispara. El botín va a la bolsa y solo pasa a ser tuyo cuando pierdes a la policía: si te matan o te arrestan antes, lo pierdes. Si te vas a mitad, te llevas la parte proporcional (a partir del 30 %).
+**Bancos.** El atraco empieza cuando apuntas a un cajero, disparas dentro o pulsas E en las ventanillas. Salta la alarma, los clientes se tiran al suelo, los guardias abren fuego y cada 14 segundos entran policías a pie. Coloca el taladro en la puerta de la cámara acorazada y quédate a su lado hasta que se abra; dentro hay carros de dinero (en la Reserva Federal, también lingotes) que se recogen uno a uno con E. Al salir, la policía te espera fuera. El botín va a la bolsa y solo pasa a ser tuyo cuando pierdes a la policía: si te matan o te arrestan antes, lo pierdes.
 
-| Banco | Duración | Botín | Estrellas |
-|---|---|---|---|
-| Banco del Puerto | 15 s | 12.000 a 18.000 | 2 → 3 |
-| Banco Central | 25 s | 35.000 a 50.000 | 3 → 4 |
-| Reserva Federal | 35 s | 110.000 a 150.000 | 4 → 5 |
+| Banco | Guardias | Taladro | Carros | Botín | Estrellas |
+|---|---|---|---|---|---|
+| Banco del Puerto | 2 | 10 s | 3 | 12.000 a 18.000 | 2 → 3 |
+| Banco Central | 3 | 14 s | 4 | 35.000 a 50.000 | 3 → 4 |
+| Reserva Federal | 4 | 18 s | 5 | 110.000 a 150.000 | 4 → 5 |
 
-**Negocios.** Lavandería Espuma (8.000, 120/h), Taller Pistón (15.000, 220/h), Club Neón (30.000, 450/h), Hotel Marina (60.000, 900/h) y Casino Sombra (150.000, 2.500/h). Una hora de juego son 20 segundos reales. Acelerar el reloj con T no acelera los ingresos.
+**Negocios.** Pagan cada minuto de juego: Lavandería Espuma (8.000, 250/min), Taller Pistón (15.000, 450/min), Club Neón (30.000, 900/min), Hotel Marina (60.000, 1.700/min) y Casino Sombra (150.000, 4.000/min). Cada uno se puede reformar (x1,6) y llevar a lujo (x2,4). Mientras no juegas siguen generando la mitad, hasta una hora. Con **M** abres *Mis propiedades*: negocios, mejoras, tus coches (te los traen donde estés por 250), un resumen de lo ganado y el GPS.
 
 **Armas.** Puños, pistola (400), subfusil (2.200), escopeta (3.200), rifle de asalto (6.500) y lanzacohetes (25.000). Cada arma viene con dos cargadores; luego la munición se compra por cajas. El chaleco (600) absorbe el 70 % del daño. A partir de tres estrellas la policía dispara.
 
@@ -79,7 +79,8 @@ npm run test:vehicles
 | Espacio | saltar | freno de mano (derrape) |
 | Clic izquierdo / derecho | disparar / apuntar | |
 | F | entrar o robar un vehículo | salir (en marcha, saltas) |
-| E | tiendas, atracos, negocios, misiones | |
+| E | entrar en edificios, comprar, atracar, misiones | |
+| M | mis negocios, coches y GPS | mis negocios, coches y GPS |
 | TAB (mantener) o 1-6 | rueda de armas | |
 | R | recargar | enderezar el coche volcado |
 | Enter | saltar diálogo | saltar diálogo |
@@ -87,6 +88,10 @@ npm run test:vehicles
 | Esc | pausa | |
 
 Los menús de las tiendas se manejan con W/S y E (o las teclas 1-9), y se cierran con Q.
+
+## Aspecto
+
+Todo es procedural: no hay modelos ni imágenes externas. Los personajes (jugador, peatones, guardias, cajeros y policías) son figuras de 1,80 m con codos, rodillas, cara y ropa intercambiable. Los coches usan carrocerías extruidas desde un perfil lateral, con pintura barnizada que refleja el cielo. La ciudad tiene cuatro estilos de fachada (hormigón, ladrillo, cristal y moderno) con escaparates en la planta baja, árboles, farolas y aceras de baldosa. Los bancos, las tiendas y tu casa tienen edificio e interior propios. Sigue siendo estilizado: el fotorrealismo necesitaría modelos y texturas hechos a mano.
 
 ## Estructura
 
@@ -96,8 +101,13 @@ style.css                 Estilos del HUD, radar, rueda de armas, tiendas y men�
 js/main.js                Arranque, modos, explosiones, muerte/arresto y bucle principal
 js/GameState.js           Dinero, armas, negocios, coches, progreso y guardado
 js/Missions.js            Guion del modo historia y lógica de objetivos
+js/Interiors.js           Interiores de casa, tiendas y bancos (se construyen fuera del mapa)
+js/Properties.js          Negocios por minuto, mejoras, menú de propiedades, entrega de coches y armario
+js/HumanModel.js          Figura humana articulada y vestuarios
+js/NPC.js                 Guardias, policías, cajeros, clientes y peatones
+js/Textures.js            Texturas procedurales (fachadas, mármol, parqué, baldosas...)
 js/Locations.js           Lugares de la ciudad, letreros, marcadores y menús de compra
-js/Heists.js              Atracos a tiendas y bancos, botín y enfriamiento
+js/Heists.js              Atracos dentro de tiendas y bancos, botín y enfriamiento
 js/Menus.js               Menú de tienda manejable con teclado o ratón
 js/PlayerController.js    Personaje, armas y cámara en tercera persona
 js/VehicleController.js   Catálogo de vehículos y física RaycastVehicle con estabilizador
@@ -114,4 +124,4 @@ Para depurar: `?autostart=story` o `?autostart=free` arranca directamente (añad
 
 ## Limitaciones
 
-No hay peatones, audio ni motos. Los interiores no existen: las tiendas y los bancos se atracan desde un marcador en la acera. En los cruces el tráfico no siempre ve a quien llega por los lados y a veces choca.
+No hay audio ni motos. Solo tienen interior tu casa, las tiendas y los bancos; la armería, el concesionario y los negocios se usan desde la puerta. En los cruces el tráfico no siempre ve a quien llega por los lados y a veces choca. Con muchos peatones y un banco lleno de NPC, un ordenador modesto puede bajar de 60 FPS.

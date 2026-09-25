@@ -38,7 +38,10 @@ export class GameState {
     this.clip = {};       // munición en el cargador por arma
     this.armor = s.armor;
     this.businesses = new Set();
+    this.bizLevel = {};   // nivel de mejora de cada negocio (1-3)
     this.cars = [];       // tipos de coche comprados
+    this.outfit = 'calle';
+    this.savedAt = null;
     this.storyStep = 0;   // índice de la siguiente misión
     this.storyDone = false;
     this.bankCooldown = {};
@@ -72,7 +75,10 @@ export class GameState {
     this.clip = d.clip ?? {};
     this.armor = d.armor ?? 0;
     this.businesses = new Set(d.businesses ?? []);
+    this.bizLevel = d.bizLevel ?? {};
     this.cars = d.cars ?? [];
+    this.outfit = d.outfit ?? 'calle';
+    this.savedAt = d.savedAt ?? null;
     this.storyStep = d.storyStep ?? 0;
     this.storyDone = !!d.storyDone;
     this.stats = { ...this.stats, ...(d.stats || {}) };
@@ -87,7 +93,9 @@ export class GameState {
       clip: this.clip,
       armor: Math.round(this.armor),
       businesses: [...this.businesses],
+      bizLevel: this.bizLevel,
       cars: this.cars,
+      outfit: this.outfit,
       storyStep: this.storyStep,
       storyDone: this.storyDone,
       stats: this.stats,
