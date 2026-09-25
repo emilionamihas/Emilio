@@ -14,6 +14,10 @@ npx serve .
 
 Abre `http://localhost:8080` y elige modo. La primera vez necesitas internet para descargar Three.js, cannon-es y las fuentes.
 
+## Pantalla de inicio
+
+De fondo, la cámara sobrevuela la ciudad en 3D en una órbita lenta. En el centro están las dos tarjetas de juego, **Modo historia** y **Juego libre**. En la esquina izquierda, **Controles** abre la lista de teclas. En la derecha, el botón de **FPS** muestra los fotogramas por segundo en vivo y abre el panel de rendimiento, con la calidad gráfica y la opción de ver los FPS durante la partida. Abajo pasa un teletipo con noticias de Puerto Sombra. Las animaciones respetan la preferencia del sistema de reducir movimiento.
+
 ## Modos
 
 **Modo historia.** Nueve misiones encadenadas con tres personajes: Lucho, el mecánico que te da tus primeros trabajos; Vera, que planifica los golpes; y Don Aurelio, que manda en la ciudad. Empiezas con 300 dólares y solo con los puños. Los golpes van subiendo de nivel: primero un coche cualquiera, luego una tienda, un deportivo por encargo, el Banco del Puerto, una huida cronometrada, una banda rival, el Banco Central y, al final, la Reserva Federal. Cada banco se desbloquea con su misión. La partida se guarda sola al terminar cada misión.
@@ -126,7 +130,7 @@ Los menús de las tiendas se manejan con W/S y E (o las teclas 1-9), y se cierra
 
 ## Rendimiento
 
-En el menú de pausa, el botón **Gráficos** cambia entre Auto, Alta, Media y Baja, y **F3** muestra los FPS. En Auto el juego empieza en Media y, si no llega a unos 40 FPS durante varios segundos, baja solo a Baja (y vuelve a Media cuando sobra margen).
+El botón de FPS de la esquina superior derecha (en el inicio y en la pausa) abre el panel de rendimiento, donde se elige Auto, Alta, Media o Baja. **F3** muestra los FPS durante la partida. En Auto el juego empieza en Media y, si no llega a unos 40 FPS durante varios segundos, baja solo a Baja (y vuelve a Media cuando sobra margen).
 
 | | Alta | Media | Baja |
 |---|---|---|---|

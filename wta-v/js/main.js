@@ -291,8 +291,27 @@ function chooseMode(mode) {
   requestPlay();
 }
 
+// Paneles de las esquinas: controles (izquierda) y rendimiento (derecha)
+const panels = { controls: document.getElementById('panel-controls'), fps: document.getElementById('panel-fps') };
+function togglePanel(name) {
+  for (const [k, el] of Object.entries(panels)) el.classList.toggle('hidden', k !== name || !el.classList.contains('hidden'));
+}
+function closePanels() {
+  for (const el of Object.values(panels)) el.classList.add('hidden');
+}
+document.getElementById('btn-controls').addEventListener('click', () => togglePanel('controls'));
+document.getElementById('btn-fps').addEventListener('click', () => togglePanel('fps'));
+for (const b of document.querySelectorAll('.panel-close')) b.addEventListener('click', closePanels);
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Escape' && !overlay.classList.contains('hidden') && Object.values(panels).some((el) => !el.classList.contains('hidden'))) {
+    closePanels();
+    e.stopImmediatePropagation();
+  }
+});
+
 function start() {
   if (!game.started) return;
+  closePanels();
   overlay.classList.add('hidden');
   game.hud.show(true);
   game.running = true;
@@ -301,6 +320,7 @@ function start() {
 function pause() {
   game.running = false;
   if (game.menus.isOpen) game.menus.close();
+  overlay.classList.add('paused');
   overlay.classList.remove('hidden');
 }
 
@@ -393,7 +413,6 @@ function step(dt) {
   world.step(FIXED_STEP, dt, 4);
 
   // 3. Sincronizar mallas con cuerpos físicos
-  for (const v of game.vehicles) v.sync();
   game.player.animate(dt);
 
   // 4. Cámara, entorno, efectos y HUD
@@ -416,10 +435,29 @@ function step(dt) {
   }
 }
 
+// Menú principal: la cámara sobrevuela la ciudad en una órbita lenta que sube y baja,
+// pasando sobre los rascacielos, la colina del túnel y la costa
+let introT = 0;
+const introLook = new THREE.Vector3();
+function introFlyover(dt) {
+  introT += dt;
+  const a = introT * 0.045 + 0.6;
+  const r = 230 + Math.sin(introT * 0.11) * 60;
+  camera.position.set(Math.cos(a) * r, 55 + Math.sin(introT * 0.17) * 22, -60 + Math.sin(a) * r);
+  introLook.set(Math.cos(a + 0.9) * 70, 12, -60 + Math.sin(a + 0.9) * 70);
+  camera.lookAt(introLook);
+  if (camera.fov !== 55) {
+    camera.fov = 55;
+    camera.updateProjectionMatrix();
+  }
+  game.env.update(dt, introLook);
+}
+
 function frame() {
   requestAnimationFrame(frame);
   const real = clock.getDelta();
   game.quality.update(real, game.running && !game.menus.isOpen && !game.mapOpen);
+  if (!game.started) introFlyover(Math.min(real, 0.05));
   const raw = Math.min(real, 0.05);
   // Con un menú de tienda abierto el mundo se congela
   if (game.running && !game.menus.isOpen && !game.mapOpen) step(raw * game.timeScale);

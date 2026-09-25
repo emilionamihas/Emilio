@@ -124,49 +124,102 @@
   <div id="big-message"></div>
   <div id="fade"></div>
 
-  <!-- Menú principal / pausa -->
+  <!-- Menú principal / pausa: de fondo, la ciudad en 3D sobrevolada por la cámara -->
   <div id="overlay">
+    <div id="intro-fx" aria-hidden="true">
+      <div class="fx-vignette"></div>
+      <div class="fx-scan"></div>
+      <div class="fx-streak s1"></div>
+      <div class="fx-streak s2"></div>
+      <div class="fx-streak s3"></div>
+    </div>
+
+    <!-- Esquinas -->
+    <button class="corner-btn corner-tl" id="btn-controls" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9h2v2h2v2H9v2H7v-2H5v-2h2zm9.5 1a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm-2 4a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM6 5h12a4 4 0 014 4v6a4 4 0 01-4 4H6a4 4 0 01-4-4V9a4 4 0 014-4z" fill="currentColor"/></svg>
+      <span>CONTROLES</span>
+    </button>
+    <button class="corner-btn corner-tr" id="btn-fps" type="button">
+      <span class="fps-num" id="menu-fps">--</span>
+      <span class="fps-lbl">FPS<small id="menu-quality">Gráficos</small></span>
+    </button>
+
     <div id="overlay-box">
-      <h1>WTA <span>V</span></h1>
-      <h2>World Theft Auto</h2>
-      <div id="loading">Cargando Puerto Sombra…</div>
+      <div id="logo">
+        <div class="logo-kicker">PUERTO SOMBRA PRESENTA</div>
+        <h1><span class="l">W</span><span class="l">T</span><span class="l">A</span><span class="l v">V</span></h1>
+        <h2>World Theft Auto</h2>
+      </div>
+      <div id="loading"><span class="spinner"></span>Cargando Puerto Sombra…</div>
 
       <div id="mode-select" class="hidden">
-        <button class="mode-btn" id="btn-story" type="button">
-          <span class="mode-title">MODO HISTORIA</span>
-          <span class="mode-desc" id="story-desc">9 misiones: de robar tu primer coche a vaciar la Reserva Federal.</span>
-        </button>
-        <button class="mode-btn" id="btn-free" type="button">
-          <span class="mode-title">MODO LIBRE</span>
-          <span class="mode-desc" id="free-desc">Toda la ciudad abierta desde el principio y $60.000 para empezar.</span>
-        </button>
+        <div id="mode-cards">
+          <button class="mode-btn mode-story" id="btn-story" type="button">
+            <span class="mode-tag">9 MISIONES</span>
+            <span class="mode-title">MODO HISTORIA</span>
+            <span class="mode-desc" id="story-desc">9 misiones: de robar tu primer coche a vaciar la Reserva Federal.</span>
+            <span class="mode-go">JUGAR ›</span>
+          </button>
+          <button class="mode-btn mode-free" id="btn-free" type="button">
+            <span class="mode-tag">MUNDO ABIERTO</span>
+            <span class="mode-title">JUEGO LIBRE</span>
+            <span class="mode-desc" id="free-desc">Toda la ciudad abierta desde el principio y $60.000 para empezar.</span>
+            <span class="mode-go">JUGAR ›</span>
+          </button>
+        </div>
         <button class="link-btn hidden" id="btn-reset" type="button">Borrar partida de historia</button>
       </div>
 
-      <button class="link-btn" id="btn-quality" type="button">Gráficos</button>
-
       <div id="pause-actions" class="hidden">
+        <div class="pause-title">PAUSA</div>
         <button id="play-btn" type="button">CONTINUAR</button>
         <button class="link-btn" id="btn-menu" type="button">Volver al menú principal</button>
       </div>
+    </div>
 
+    <div id="ticker" aria-hidden="true">
+      <div class="ticker-label">ÚLTIMA HORA</div>
+      <div class="ticker-track">
+        <span>Atraco relámpago en el Banco del Puerto: la policía llegó tarde · El Club Náutico busca nuevo dueño · Abre el túnel de La Meseta bajo la colina · Se disparan las ventas de motos en Autos Velasco · Vecinos de Las Lomas denuncian carreras nocturnas · La Reserva Federal refuerza su cámara acorazada ·&nbsp;</span>
+        <span>Atraco relámpago en el Banco del Puerto: la policía llegó tarde · El Club Náutico busca nuevo dueño · Abre el túnel de La Meseta bajo la colina · Se disparan las ventas de motos en Autos Velasco · Vecinos de Las Lomas denuncian carreras nocturnas · La Reserva Federal refuerza su cámara acorazada ·&nbsp;</span>
+      </div>
+    </div>
+
+    <!-- Panel de controles -->
+    <div class="menu-panel hidden" id="panel-controls" role="dialog" aria-label="Controles">
+      <div class="panel-head"><span>CONTROLES</span><button class="panel-close" type="button" aria-label="Cerrar">✕</button></div>
       <div id="controls-help">
         <div><b>WASD</b> moverse / conducir</div>
-        <div><b>Mouse</b> cámara y apuntar</div>
+        <div><b>Ratón</b> cámara y apuntar</div>
         <div><b>Shift</b> correr</div>
         <div><b>Espacio</b> saltar / freno de mano</div>
         <div><b>Clic izq.</b> disparar</div>
         <div><b>Clic der.</b> apuntar</div>
-        <div><b>F</b> entrar / salir del vehículo</div>
+        <div><b>F</b> subir / bajar del vehículo</div>
         <div><b>E</b> entrar, comprar, atracar, misiones</div>
         <div><b>M</b> mapa y ruta GPS</div>
         <div><b>P</b> mis negocios y coches</div>
-        <div><b>TAB</b> rueda de armas (o teclas 1-6)</div>
-        <div><b>R</b> recargar / enderezar auto</div>
+        <div><b>TAB</b> rueda de armas (o 1-6)</div>
+        <div><b>R</b> recargar / enderezar</div>
         <div><b>T</b> acelerar el tiempo</div>
         <div><b>Enter</b> saltar diálogo</div>
+        <div><b>F3</b> contador de FPS</div>
         <div><b>Esc</b> pausa</div>
       </div>
+    </div>
+
+    <!-- Panel de FPS y gráficos -->
+    <div class="menu-panel hidden" id="panel-fps" role="dialog" aria-label="Rendimiento">
+      <div class="panel-head"><span>RENDIMIENTO</span><button class="panel-close" type="button" aria-label="Cerrar">✕</button></div>
+      <div class="fps-big"><span id="panel-fps-num">--</span><small>FPS ahora mismo</small></div>
+      <div class="quality-list" id="quality-list">
+        <button type="button" data-mode="auto"><b>Auto</b><small>Empieza en Media y baja sola si no llegas a 40 FPS</small></button>
+        <button type="button" data-mode="alta"><b>Alta</b><small>Más resolución, antialiasing y sombras suaves</small></button>
+        <button type="button" data-mode="media"><b>Media</b><small>Equilibrada: sombras ligeras, sin barniz en coches</small></button>
+        <button type="button" data-mode="baja"><b>Baja</b><small>Para ordenadores modestos: sin sombras, menos tráfico</small></button>
+      </div>
+      <label class="fps-toggle"><input type="checkbox" id="fps-ingame" /> Mostrar FPS durante la partida (F3)</label>
+      <div class="panel-note" id="quality-note"></div>
     </div>
   </div>
 

@@ -40,13 +40,21 @@ export class Quality {
     this.autoDowngraded = false;
     this.cooldown = 6; // segundos antes de empezar a juzgar (carga de shaders)
 
+    // Contador en partida (F3) y los del menú principal (esquina y panel de rendimiento)
     this.fpsEl = document.getElementById('fps');
-    this.button = document.getElementById('btn-quality');
-    if (this.button) this.button.addEventListener('click', () => this.cycle());
+    this.menuFps = document.getElementById('menu-fps');
+    this.menuQuality = document.getElementById('menu-quality');
+    this.panelFps = document.getElementById('panel-fps-num');
+    this.note = document.getElementById('quality-note');
+    this.fpsToggle = document.getElementById('fps-ingame');
+    this.modeButtons = [...document.querySelectorAll('#quality-list button')];
+    for (const b of this.modeButtons) b.addEventListener('click', () => this.setMode(b.dataset.mode));
+    if (this.fpsToggle) this.fpsToggle.addEventListener('change', () => this.fpsEl.classList.toggle('hidden', !this.fpsToggle.checked));
     window.addEventListener('keydown', (e) => {
       if (e.code === 'F3') {
         e.preventDefault();
         this.fpsEl.classList.toggle('hidden');
+        if (this.fpsToggle) this.fpsToggle.checked = !this.fpsEl.classList.contains('hidden');
       }
     });
     this.apply(this.mode === 'auto' ? 'media' : this.mode);
@@ -103,12 +111,14 @@ export class Quality {
   }
 
   updateButton() {
-    if (this.button) this.button.textContent = `Gráficos: ${this.label} · F3 muestra los FPS`;
+    if (this.menuQuality) this.menuQuality.textContent = `Gráficos: ${this.label}`;
+    for (const b of this.modeButtons || []) b.classList.toggle('active', b.dataset.mode === this.mode);
   }
 
-  /** Cambia de modo: Auto → Alta → Media → Baja. */
-  cycle() {
-    this.mode = MODES[(MODES.indexOf(this.mode) + 1) % MODES.length];
+  /** Elige el modo ('auto' | 'alta' | 'media' | 'baja') y lo recuerda para la próxima vez. */
+  setMode(mode) {
+    if (!MODES.includes(mode)) return;
+    this.mode = mode;
     try {
       localStorage.setItem(KEY, this.mode);
     } catch {
@@ -118,9 +128,13 @@ export class Quality {
     this.history = [];
     this.cooldown = 4;
     this.apply(this.mode === 'auto' ? 'media' : this.mode);
-    if (this.mode === 'alta' && !this.game.renderer.getContextAttributes().antialias) {
-      this.button.textContent += ' · recarga la página para el antialiasing';
-    }
+    const needsReload = this.mode === 'alta' && !this.game.renderer.getContextAttributes().antialias;
+    if (this.note) this.note.textContent = needsReload ? 'Recarga la página para activar también el antialiasing.' : '';
+  }
+
+  /** Cambia al siguiente modo: Auto → Alta → Media → Baja. */
+  cycle() {
+    this.setMode(MODES[(MODES.indexOf(this.mode) + 1) % MODES.length]);
   }
 
   /** Se llama en cada fotograma con el tiempo real transcurrido. */
@@ -134,7 +148,14 @@ export class Quality {
     this.fps = this.frames / this.acc;
     this.frames = 0;
     this.acc = 0;
-    if (this.fpsEl) this.fpsEl.textContent = `${Math.round(this.fps)} FPS · ${LEVELS[this.level].label}`;
+    const n = Math.round(this.fps);
+    if (this.fpsEl) this.fpsEl.textContent = `${n} FPS · ${LEVELS[this.level].label}`;
+    if (this.menuFps) {
+      this.menuFps.textContent = n;
+      this.menuFps.classList.toggle('warn', n < 45 && n >= 30);
+      this.menuFps.classList.toggle('bad', n < 30);
+    }
+    if (this.panelFps) this.panelFps.textContent = n;
     if (!running || this.mode !== 'auto') return;
     if (this.cooldown > 0) {
       this.cooldown--;
