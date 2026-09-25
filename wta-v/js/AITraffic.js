@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { VehicleController, TRAFFIC_MIX } from './VehicleController.js';
-import { CITY } from './Environment.js';
 
 const _local = new THREE.Vector3();
 const _q = new THREE.Quaternion();
@@ -100,7 +99,7 @@ export class AITraffic {
     v.place(spot.pos.x, spot.pos.z, Math.atan2(spot.dir.x, spot.dir.z));
     v.addToWorld();
     v.driver = 'ai';
-    this.agents.push({ vehicle: v, from: spot.from, to: spot.to, cruise: 11 + Math.random() * 3, stuck: 0, persistent: true });
+    this.agents.push(this.makeAgent(v, spot.from, spot.to, 11 + Math.random() * 3, true));
     return v;
   }
 
@@ -127,15 +126,18 @@ export class AITraffic {
     const focus = this.game.getFocusPosition();
     const camera = this.game.camera;
     const camDir = camera.getWorldDirection(new THREE.Vector3());
-    const nodes = this.env.nodes;
+    const nodes = this.env.nodesNear(focus, Math.max(0, minDist - 20), maxDist + 20).filter((n) => n.out.length);
+    if (!nodes.length) return null;
 
     for (let attempt = 0; attempt < 24; attempt++) {
       const from = nodes[Math.floor(Math.random() * nodes.length)];
-      const to = nodes[from.neighbors[Math.floor(Math.random() * from.neighbors.length)]];
+      const to = this.env.nodes[from.out[Math.floor(Math.random() * from.out.length)]];
+      const edge = this.env.edgeBetween(from.id, to.id);
+      if (edge.tunnel && Math.random() < 0.5) continue;
       const t = 0.3 + Math.random() * 0.4;
       const dir = new THREE.Vector3().subVectors(to.pos, from.pos).normalize();
       const right = new THREE.Vector3(-dir.z, 0, dir.x);
-      const pos = new THREE.Vector3().lerpVectors(from.pos, to.pos, t).addScaledVector(right, CITY.LANE);
+      const pos = new THREE.Vector3().lerpVectors(from.pos, to.pos, t).addScaledVector(right, edge.lane);
       const dist = Math.hypot(pos.x - focus.x, pos.z - focus.z);
       if (dist < minDist || dist > maxDist) continue;
       // Evitar aparecer delante de la cámara a poca distancia
@@ -150,23 +152,20 @@ export class AITraffic {
   trySpawn() {
     const spot = this.findSpawn(this.spawnMin, this.spawnMax);
     if (!spot) return false;
-    {
-      const { from, to, pos, dir } = spot;
-      const v = this.acquire();
-      v.repair();
-      v.place(pos.x, pos.z, Math.atan2(dir.x, dir.z));
-      v.addToWorld();
-      v.driver = 'ai';
-      this.agents.push({
-        vehicle: v,
-        from,
-        to,
-        cruise: 9 + Math.random() * 4,
-        stuck: 0,
-        blockedFor: 0,
-      });
-      return true;
-    }
+    const { from, to, pos, dir } = spot;
+    const v = this.acquire();
+    v.repair();
+    v.place(pos.x, pos.z, Math.atan2(dir.x, dir.z));
+    v.addToWorld();
+    v.driver = 'ai';
+    this.agents.push(this.makeAgent(v, from, to, 9 + Math.random() * 4));
+    return true;
+  }
+
+  makeAgent(vehicle, from, to, cruise, persistent = false) {
+    const agent = { vehicle, from, to, next: null, cruise, stuck: 0, persistent };
+    agent.next = this.pickNext(from, to);
+    return agent;
   }
 
   isOccupied(pos, radius) {
@@ -177,17 +176,35 @@ export class AITraffic {
     return Math.hypot(p.x - pos.x, p.z - pos.z) < radius;
   }
 
+  /** Elige el nodo que sigue a `to` viniendo de `from` (prefiere seguir recto). */
+  pickNext(from, to) {
+    const nodes = this.env.nodes;
+    const options = to.out.filter((id) => id !== from.id);
+    const list = options.length ? options : to.out;
+    if (list.length === 1) return nodes[list[0]];
+    const dx = to.pos.x - from.pos.x;
+    const dz = to.pos.z - from.pos.z;
+    const len = Math.hypot(dx, dz) || 1;
+    let straight = null;
+    let bestDot = -2;
+    for (const id of list) {
+      const n = nodes[id];
+      const ex = n.pos.x - to.pos.x;
+      const ez = n.pos.z - to.pos.z;
+      const dot = (dx * ex + dz * ez) / (len * (Math.hypot(ex, ez) || 1));
+      if (dot > bestDot) {
+        bestDot = dot;
+        straight = n;
+      }
+    }
+    if (bestDot > 0.8 && Math.random() < 0.55) return straight;
+    return nodes[list[Math.floor(Math.random() * list.length)]];
+  }
+
   chooseNext(agent) {
-    const options = agent.to.neighbors.filter((id) => id !== agent.from.id);
-    const list = options.length ? options : agent.to.neighbors;
-    // 50 % seguir recto si es posible
-    const straightId = list.find((id) => {
-      const n = this.env.nodes[id];
-      return n.i - agent.to.i === agent.to.i - agent.from.i && n.j - agent.to.j === agent.to.j - agent.from.j;
-    });
-    const nextId = straightId !== undefined && Math.random() < 0.5 ? straightId : list[Math.floor(Math.random() * list.length)];
     agent.from = agent.to;
-    agent.to = this.env.nodes[nextId];
+    agent.to = agent.next || this.pickNext(agent.from, agent.to);
+    agent.next = this.pickNext(agent.from, agent.to);
   }
 
   update(dt) {
@@ -238,34 +255,53 @@ export class AITraffic {
     const v = agent.vehicle;
     const pos = v.position;
     const env = this.env;
-    const dir = new THREE.Vector3().subVectors(agent.to.pos, agent.from.pos).normalize();
+    const from = agent.from.pos;
+    const to = agent.to.pos;
+    const L = from.distanceTo(to);
+    const dir = new THREE.Vector3().subVectors(to, from).divideScalar(L || 1);
     const right = new THREE.Vector3(-dir.z, 0, dir.x);
+    const lane = env.laneOffset(agent.from.id, agent.to.id);
 
-    // ¿Hemos entrado en la intersección de destino? -> elegir el siguiente tramo
-    const toTarget = new THREE.Vector3(agent.to.pos.x - pos.x, 0, agent.to.pos.z - pos.z);
-    const along = toTarget.dot(dir);
-    if (along < CITY.ROAD / 2 - 2) {
+    // ¿Hemos llegado al final del tramo? En los cruces se cambia antes, al entrar en el cruce
+    const along = (to.x - pos.x) * dir.x + (to.z - pos.z) * dir.z;
+    const switchAt = agent.to.junction ? agent.to.radius - 2 : 1.5;
+    if (along < switchAt) {
       this.chooseNext(agent);
-      return this.driveAgent(agent, dt);
+      if ((agent.hops = (agent.hops || 0) + 1) < 4) return this.driveAgent(agent, dt);
+    }
+    agent.hops = 0;
+
+    // Persecución pura: punto 9 m por delante sobre el carril, que continúa en el tramo siguiente
+    const proj = (pos.x - from.x) * dir.x + (pos.z - from.z) * dir.z;
+    const ahead = proj + 9;
+    let target;
+    if (ahead <= L || !agent.next) {
+      target = from.clone().addScaledVector(dir, ahead).addScaledVector(right, lane);
+    } else {
+      const n = agent.next.pos;
+      const d2 = new THREE.Vector3().subVectors(n, to).normalize();
+      const lane2 = env.laneOffset(agent.to.id, agent.next.id);
+      target = to.clone().addScaledVector(d2, ahead - L).addScaledVector(new THREE.Vector3(-d2.z, 0, d2.x), lane2);
     }
 
-    // Persecución pura sobre la línea del carril derecho
-    const laneOrigin = agent.from.pos.clone().addScaledVector(right, CITY.LANE);
-    const rel = new THREE.Vector3(pos.x - laneOrigin.x, 0, pos.z - laneOrigin.z);
-    const proj = rel.dot(dir);
-    const target = laneOrigin.addScaledVector(dir, proj + 9);
-
     let speed = agent.cruise;
+    // Curvas: aflojar según el giro que viene
+    if (agent.next) {
+      const d2 = new THREE.Vector3().subVectors(agent.next.pos, to).normalize();
+      const turn = 1 - dir.dot(d2);
+      if (along < 25) speed = Math.min(speed, THREE.MathUtils.lerp(agent.cruise, 5, Math.min(1, turn * 1.5)));
+    }
 
     // Semáforo: parar antes de la línea si no está en verde
-    const axis = Math.abs(dir.x) > 0.5 ? 'x' : 'z';
-    const light = env.getLightState(axis);
-    const stopDist = along - (CITY.ROAD / 2 + 2.5);
-    if (light !== 'green' && stopDist > -0.5 && stopDist < 22) {
-      const currentSpeed = v.getForwardSpeed();
-      // En ámbar, si ya no da tiempo a frenar, pasa
-      const canStop = currentSpeed * currentSpeed < 2 * 6 * Math.max(stopDist, 0.1) + 4;
-      if (light === 'red' || canStop) speed = Math.min(speed, Math.max(0, stopDist - 1) * 0.7);
+    if (agent.to.signal) {
+      const light = env.signalState(agent.to, agent.from);
+      const stopDist = along - (agent.to.radius + 2.5);
+      if (light !== 'green' && stopDist > -0.5 && stopDist < 22) {
+        const currentSpeed = v.getForwardSpeed();
+        // En ámbar, si ya no da tiempo a frenar, pasa
+        const canStop = currentSpeed * currentSpeed < 2 * 6 * Math.max(stopDist, 0.1) + 4;
+        if (light === 'red' || canStop) speed = Math.min(speed, Math.max(0, stopDist - 1) * 0.7);
+      }
     }
 
     // Obstáculos delante: otros vehículos y el jugador
@@ -277,7 +313,7 @@ export class AITraffic {
       const dz = o.position.z - pos.z;
       const ahead = dx * fwd.x + dz * fwd.z;
       const lateral = Math.abs(-dx * fwd.z + dz * fwd.x);
-      if (ahead > 0 && ahead < 16 && lateral < 2.4) speed = Math.min(speed, Math.max(0, (ahead - 6) * 0.8));
+      if (ahead > 0 && ahead < 16 && lateral < 2.2) speed = Math.min(speed, Math.max(0, (ahead - 6) * 0.8));
     }
     const pp = this.game.player.mesh.position;
     if (!this.game.interaction.isDriving) {

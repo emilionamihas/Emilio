@@ -66,6 +66,8 @@ export class GameState {
     this.storyDone = false;
     this.bankCooldown = {};
     this.stats = { robberies: 0, banks: 0, earned: 0, cars: 0 };
+    this.infiniteAmmo = false;
+    this.cheated = false;
   }
 
   static hasSave(mode) {
@@ -107,6 +109,8 @@ export class GameState {
     this.storyStep = d.storyStep ?? 0;
     this.storyDone = !!d.storyDone;
     this.stats = { ...this.stats, ...(d.stats || {}) };
+    this.infiniteAmmo = !!d.infiniteAmmo;
+    this.cheated = !!d.cheated;
     return true;
   }
 
@@ -126,6 +130,8 @@ export class GameState {
       storyStep: this.storyStep,
       storyDone: this.storyDone,
       stats: this.stats,
+      infiniteAmmo: this.infiniteAmmo,
+      cheated: this.cheated,
       savedAt: Date.now(),
     };
     safeStorage((ls) => ls.setItem(SAVE_KEYS[this.mode], JSON.stringify(d)));

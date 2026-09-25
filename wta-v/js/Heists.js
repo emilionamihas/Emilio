@@ -4,9 +4,11 @@ import { formatMoney } from './GameState.js';
 import { NPC } from './NPC.js';
 import { OUTFITS } from './HumanModel.js';
 
-const STORE = { duration: 6, loot: [700, 1600], startLevel: 1, endLevel: 2, cooldown: 120 };
-const GRAB_TIME = 1.3;
-const REINFORCE_EVERY = 14;
+const STORE = { duration: 3, loot: [900, 2000], startLevel: 1, endLevel: 1, cooldown: 90 };
+const GRAB_TIME = 0.5;
+const REINFORCE_EVERY = 30;
+const FIRST_REINFORCE = 25;
+const HEAD_START = 20; // segundos sin patrullas nuevas al salir con el botín
 
 const rand = (a, b) => Math.round(a + Math.random() * (b - a));
 
@@ -72,7 +74,7 @@ export class Heists {
     const weights = inst.carts.map((c) => (c.gold ? 1.5 : 1));
     const sum = weights.reduce((a, b) => a + b, 0);
     inst.carts.forEach((c, i) => (c.value = Math.round((total * weights[i]) / sum)));
-    this.active = { type: 'bank', inst, poi, cfg, stage: 'alarm', drill: 0, loot: 0, reinforceTimer: 6, policeSpawned: 0, grab: null };
+    this.active = { type: 'bank', inst, poi, cfg, stage: 'alarm', drill: 0, loot: 0, reinforceTimer: FIRST_REINFORCE, policeSpawned: 0, grab: null };
     for (const n of inst.npcs) n.panic(game.player.mesh.position);
     for (const t of inst.tellers || []) t.state = 'handsUp';
     game.wanted.raiseTo(cfg.startLevel, poi.pos);
@@ -210,6 +212,7 @@ export class Heists {
       game.hud.setProgress(null);
       this.cooldowns[a.poi.id] = game.time + STORE.cooldown;
       game.wanted.raiseTo(STORE.endLevel, a.poi.pos);
+      game.wanted.giveHeadStart(10);
       game.state.addMoney(a.total);
       game.state.stats.robberies++;
       game.hud.moneyDelta(a.total);
@@ -300,7 +303,8 @@ export class Heists {
         this.pendingFrom = a.poi.id;
         game.state.stats.robberies++;
         game.wanted.raiseTo(a.cfg.endLevel, a.poi.pos);
-        game.hud.notify(`Llevas ${formatMoney(a.loot)} en la bolsa. Pierde a la policía para asegurarlo.`, 5);
+        game.wanted.giveHeadStart(HEAD_START);
+        game.hud.notify(`Llevas ${formatMoney(a.loot)} en la bolsa. Tienes ${HEAD_START} s de ventaja: pierde a la policía para asegurarlo.`, 5);
         game.emit('bankRobbed', { id: a.poi.id, partial: a.loot < a.inst.carts.reduce((s, c) => s + (c.value || 0), 0) });
       } else {
         game.hud.notify('Has salido del banco sin nada.');

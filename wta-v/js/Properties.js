@@ -5,11 +5,18 @@ import { OUTFITS } from './HumanModel.js';
 
 /** Negocios: ingresos por MINUTO de juego (nivel 1). Se cobran en dos pagos, cada 30 s. */
 export const BUSINESSES = {
-  lavanderia: { name: 'Lavandería Espuma', price: 8000, income: 1000 },
-  taller: { name: 'Taller Pistón', price: 15000, income: 1800 },
-  club: { name: 'Club Neón', price: 30000, income: 3600 },
-  hotel: { name: 'Hotel Marina', price: 60000, income: 7000 },
-  casino: { name: 'Casino Sombra', price: 150000, income: 16000 },
+  cafeteria: { name: 'Café Brisa', price: 5000, income: 700, zone: 'La Playa' },
+  lavanderia: { name: 'Lavandería Espuma', price: 8000, income: 1000, zone: 'Centro' },
+  taller: { name: 'Taller Pistón', price: 15000, income: 1800, zone: 'Centro' },
+  gasolinera: { name: 'Gasolinera Ruta 9', price: 22000, income: 2600, zone: 'Avenida Oeste' },
+  club: { name: 'Club Neón', price: 30000, income: 3600, zone: 'Centro' },
+  almacen: { name: 'Almacenes del Puerto', price: 45000, income: 5200, zone: 'El Puerto' },
+  hotel: { name: 'Hotel Marina', price: 60000, income: 7000, zone: 'Centro' },
+  restaurante: { name: 'Restaurante Vista', price: 85000, income: 9800, zone: 'Colinas' },
+  fabrica: { name: 'Fábrica Hierro', price: 110000, income: 12500, zone: 'Polígono' },
+  casino: { name: 'Casino Sombra', price: 150000, income: 16000, zone: 'Centro' },
+  torre: { name: 'Torre Delta', price: 260000, income: 27000, zone: 'Avenida del Este' },
+  nautico: { name: 'Club Náutico', price: 420000, income: 42000, zone: 'La Playa' },
 };
 
 /** Colores de pintura y de ropa (nombre, hex). */
@@ -144,6 +151,10 @@ export class Properties {
             return 'Ruta borrada.';
           },
         },
+        // Solo desde el ordenador de casa: una línea de comandos sin más explicación
+        ...(this.game.interior && this.game.interior.inst.key === 'house'
+          ? [{ label: '>_', detail: '', tag: '', action: () => this.game.cheats.showPrompt() }]
+          : []),
       ],
     };
   }
@@ -333,14 +344,9 @@ export class Properties {
     if (!this.state.spend(DELIVERY_FEE)) return 'No tienes dinero para la entrega.';
     const p = game.player.mesh.position;
     const env = game.env;
-    const node = env.nearestNode(p);
-    // Tramo desde el cruce más cercano hacia el vecino más cercano al jugador, en el carril derecho
-    const next = node.neighbors.map((id) => env.nodes[id]).sort((a, b) => a.pos.distanceTo(p) - b.pos.distanceTo(p))[0];
-    const dir = new THREE.Vector3().subVectors(next.pos, node.pos).normalize();
-    const right = new THREE.Vector3(-dir.z, 0, dir.x);
-    const along = THREE.MathUtils.clamp(new THREE.Vector3().subVectors(p, node.pos).dot(dir) + 6, 12, 50);
-    const pos = node.pos.clone().addScaledVector(dir, along).addScaledVector(right, 6.2);
-    game.locations.spawnOwnedCar(car, pos, Math.atan2(dir.x, dir.z));
+    // Plaza en el carril derecho de la calle más cercana
+    const { pos, heading } = env.parkingNear(p);
+    game.locations.spawnOwnedCar(car, pos, heading);
     game.menus.close();
     game.hud.notify(`${CATALOG[car.type].label} aparcado cerca de ti.`);
     return 'Entregado.';

@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { HumanModel, randomCivilianOutfit } from './HumanModel.js';
-import { CITY } from './Environment.js';
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -132,7 +131,7 @@ export class NPC {
       }
       this.fireTimer -= dt;
       if (this.fireTimer <= 0 && d < 28) {
-        this.fireTimer = this.role === 'police' ? 0.8 : 1.0;
+        this.fireTimer = this.role === 'police' ? 1.5 : 1.8;
         this.shoot(d);
       }
     } else if (this.state === 'handsUp' || this.state === 'cower') {
@@ -161,22 +160,19 @@ export class NPC {
     const from = this.muzzle ? this.muzzle.getWorldPosition(new THREE.Vector3()) : this.pos.clone().setY(1.4);
     const p = game.player.mesh.position;
     const moving = Math.hypot(game.player.body.velocity.x, game.player.body.velocity.z);
-    const chance = THREE.MathUtils.clamp(0.55 - dist * 0.015 - moving * 0.035, 0.12, 0.6);
+    const chance = THREE.MathUtils.clamp(0.4 - dist * 0.015 - moving * 0.04, 0.08, 0.4);
     const hit = Math.random() < chance;
     const to = new THREE.Vector3(p.x, p.y + 1.2, p.z);
     if (!hit) to.add(new THREE.Vector3((Math.random() - 0.5) * 2.5, Math.random() * 1.2 - 0.4, (Math.random() - 0.5) * 2.5));
     game.effects.spawnTracer(from, to);
     game.effects.muzzleFlash(from);
-    if (hit) game.player.takeDamage(this.role === 'police' ? 6 : 5);
+    if (hit) game.player.takeDamage(3);
   }
 }
 
 // ======================================================================
 // Peatones: caminan en círculo por la acera de las manzanas cercanas
 // ======================================================================
-const rc = (i) => -CITY.HALF + i * CITY.PERIOD;
-const SIDEWALK_OFFSET = CITY.ROAD / 2 + CITY.SIDEWALK / 2;
-
 export class Pedestrians {
   constructor(game, { count = 14 } = {}) {
     this.game = game;
@@ -185,38 +181,23 @@ export class Pedestrians {
     this.spawnTimer = 0;
   }
 
-  /** Recorrido rectangular por la acera de la manzana (bi, bj), en sentido aleatorio. */
-  blockPath(bi, bj) {
-    const x0 = rc(bi) + SIDEWALK_OFFSET;
-    const x1 = rc(bi + 1) - SIDEWALK_OFFSET;
-    const z0 = rc(bj) + SIDEWALK_OFFSET;
-    const z1 = rc(bj + 1) - SIDEWALK_OFFSET;
-    const pts = [new THREE.Vector3(x0, 0, z0), new THREE.Vector3(x1, 0, z0), new THREE.Vector3(x1, 0, z1), new THREE.Vector3(x0, 0, z1)];
-    if (Math.random() < 0.5) pts.reverse();
-    return pts;
-  }
-
   spawn() {
     const game = this.game;
     if (game.interior) return;
     const focus = game.getFocusPosition();
-    for (let attempt = 0; attempt < 10; attempt++) {
-      const bi = Math.floor(Math.random() * CITY.BLOCKS);
-      const bj = Math.floor(Math.random() * CITY.BLOCKS);
-      const path = this.blockPath(bi, bj);
-      const k = Math.floor(Math.random() * 4);
-      const t = Math.random();
-      const pos = new THREE.Vector3().lerpVectors(path[k], path[(k + 1) % 4], t);
-      const d = Math.hypot(pos.x - focus.x, pos.z - focus.z);
-      if (d < 35 || d > 95) continue;
-      const npc = new NPC(game, { role: 'pedestrian', position: pos });
-      npc.state = 'walk';
-      npc.path = path;
-      npc.pathIndex = (k + 1) % 4;
-      npc.walkSpeed = 1.2 + Math.random() * 0.5;
-      this.active.push(npc);
-      return;
-    }
+    const route = game.env.sidewalkPath(focus, 35, 95);
+    if (!route) return;
+    const { path } = route;
+    const k = Math.floor(Math.random() * (path.length - 1));
+    const pos = new THREE.Vector3().lerpVectors(path[k], path[k + 1], Math.random());
+    const d = Math.hypot(pos.x - focus.x, pos.z - focus.z);
+    if (d < 30 || d > 110 || game.env.isInsideBuilding(pos.x, pos.z, 0.3)) return;
+    const npc = new NPC(game, { role: 'pedestrian', position: pos });
+    npc.state = 'walk';
+    npc.path = path;
+    npc.pathIndex = k + 1;
+    npc.walkSpeed = 1.2 + Math.random() * 0.5;
+    this.active.push(npc);
   }
 
   /** Disparos o explosiones cerca: los peatones huyen. */

@@ -116,7 +116,7 @@ export const STORY = [
     giver: 'vera',
     reward: 10000,
     steps: [
-      { type: 'say', lines: ['Vera: Banco Central. Cuatro estrellas en cuanto suene la alarma.', 'Vera: Ponte chaleco. Esta vez la policía viene a disparar.'] },
+      { type: 'say', lines: ['Vera: Banco Central. Tres estrellas en cuanto salgas con la pasta.', 'Vera: Ponte chaleco por si acaso. Al salir tienes unos segundos de ventaja: úsalos.'] },
       { type: 'event', event: 'bankRobbed', text: 'Atraca el Banco Central', poi: 'central', filter: (d) => d.id === 'central' },
       { type: 'loseWanted', text: 'Pierde a la policía para asegurar el botín', loot: true },
       { type: 'say', lines: ['Vera: Ya casi estamos. Solo queda uno... el más grande.'] },
@@ -128,7 +128,7 @@ export const STORY = [
     giver: 'vera',
     reward: 50000,
     steps: [
-      { type: 'say', lines: ['Vera: La Reserva Federal. Cinco estrellas. Todo Puerto Sombra detrás de ti.', 'Don Aurelio: Si sales vivo, esta ciudad es tuya.'] },
+      { type: 'say', lines: ['Vera: La Reserva Federal. Cuatro estrellas. Media ciudad detrás de ti.', 'Don Aurelio: Si sales vivo, esta ciudad es tuya.'] },
       { type: 'event', event: 'bankRobbed', text: 'Atraca la Reserva Federal', poi: 'reserva', filter: (d) => d.id === 'reserva' },
       { type: 'loseWanted', text: 'Sobrevive y pierde a la policía', loot: true },
       { type: 'goto', text: 'Vuelve a casa', poi: 'casa', radius: 3 },
@@ -138,7 +138,7 @@ export const STORY = [
 ];
 
 /** Índice de la misión en la que se atraca cada banco (desbloqueo en la historia). */
-const BANK_MISSION = { puerto: 3, central: 7, reserva: 8 };
+const BANK_MISSION = { puerto: 3, colinas: 3, central: 7, reserva: 8 };
 
 export class Missions {
   constructor(game) {
@@ -331,6 +331,7 @@ export class Missions {
     if (!this.active) {
       const next = this.nextMission();
       this.giverMarker.visible = !!next;
+      if (!next) this.target = null;
       if (next) {
         const g = GIVERS[next.giver];
         this.giverMarker.position.copy(g.spot.pos);

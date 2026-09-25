@@ -12,9 +12,10 @@ import { stoneTexture, wallTexture, signTexture, makeCanvas, toTexture, addNoise
 const INTERACT_RADIUS = 2.2;
 
 export const BANKS = {
-  puerto: { name: 'Banco del Puerto', duration: 15, loot: [12000, 18000], startLevel: 2, endLevel: 3, cooldown: 300 },
-  central: { name: 'Banco Central', duration: 25, loot: [35000, 50000], startLevel: 3, endLevel: 4, cooldown: 420 },
-  reserva: { name: 'Reserva Federal', duration: 35, loot: [110000, 150000], startLevel: 4, endLevel: 5, cooldown: 600 },
+  puerto: { name: 'Banco del Puerto', duration: 15, loot: [12000, 18000], startLevel: 1, endLevel: 2, cooldown: 240 },
+  colinas: { name: 'Caja de las Colinas', duration: 18, loot: [22000, 30000], startLevel: 2, endLevel: 2, cooldown: 300 },
+  central: { name: 'Banco Central', duration: 25, loot: [35000, 50000], startLevel: 2, endLevel: 3, cooldown: 360 },
+  reserva: { name: 'Reserva Federal', duration: 35, loot: [110000, 150000], startLevel: 3, endLevel: 4, cooldown: 480 },
 };
 
 
@@ -105,35 +106,49 @@ export class Locations {
     this.garageCar = null;
     this.nearest = null;
 
-    const add = (type, name, bi, bj, side, data = {}) => {
-      const spot = sidewalkSpot(bi, bj, side);
+    const env = game.env;
+    // `where`: [manzana i, manzana j, lado] en el centro, o { at: [x, z], road } en cualquier calle
+    const add = (type, name, where, data = {}) => {
+      const spot = Array.isArray(where) ? sidewalkSpot(...where) : env.spotAt(where.at[0], where.at[1], where.road);
       const poi = { id: data.id || name, type, name, ...spot, ...data, style: TYPE_STYLE[type] };
       this.pois.push(poi);
       return poi;
     };
 
-    add('safehouse', 'Tu casa', 3, 3, 'W', { id: 'casa' });
-    add('gunshop', 'Armería Plomo', 2, 3, 'E', { id: 'armeria' });
-    add('dealer', 'Autos Velasco', 3, 4, 'W', { id: 'concesionario' });
-    add('store', '24/7 Centro', 3, 2, 'W', { id: 'tienda1' });
-    add('store', '24/7 Norte', 1, 4, 'N', { id: 'tienda2' });
-    add('store', '24/7 Mercado', 4, 1, 'S', { id: 'tienda3' });
-    add('store', '24/7 Playa', 5, 5, 'W', { id: 'tienda4' });
-    add('store', '24/7 Oeste', 0, 2, 'E', { id: 'tienda5' });
-    add('bank', BANKS.puerto.name, 4, 3, 'W', { id: 'puerto' });
-    add('bank', BANKS.central.name, 2, 2, 'N', { id: 'central' });
-    add('bank', BANKS.reserva.name, 5, 0, 'W', { id: 'reserva' });
-    add('business', BUSINESSES.lavanderia.name, 1, 3, 'E', { id: 'lavanderia' });
-    add('business', BUSINESSES.taller.name, 4, 4, 'N', { id: 'taller' });
-    add('business', BUSINESSES.club.name, 2, 4, 'S', { id: 'club' });
-    add('business', BUSINESSES.hotel.name, 1, 1, 'E', { id: 'hotel' });
-    add('business', BUSINESSES.casino.name, 4, 2, 'E', { id: 'casino' });
-    add('hospital', 'Hospital San Rafael', 2, 3, 'N', { id: 'hospital', passive: true });
-    add('police', 'Comisaría', 4, 3, 'S', { id: 'comisaria', passive: true });
+    add('safehouse', 'Tu casa', [3, 3, 'W'], { id: 'casa' });
+    add('gunshop', 'Armería Plomo', [2, 3, 'E'], { id: 'armeria' });
+    add('gunshop', 'Armería Costa', { at: [250, 108], road: 'lomas' }, { id: 'armeria2' });
+    add('dealer', 'Autos Velasco', [3, 4, 'W'], { id: 'concesionario' });
+    add('store', '24/7 Centro', [3, 2, 'W'], { id: 'tienda1' });
+    add('store', '24/7 Norte', [1, 4, 'N'], { id: 'tienda2' });
+    add('store', '24/7 Mercado', [4, 1, 'S'], { id: 'tienda3' });
+    add('store', '24/7 Playa', [5, 5, 'W'], { id: 'tienda4' });
+    add('store', '24/7 Oeste', [0, 2, 'E'], { id: 'tienda5' });
+    add('store', '24/7 Puerto', { at: [-152, 245], road: 'puertoOeste' }, { id: 'tienda6' });
+    add('store', '24/7 Jardines', { at: [230, -150], road: 'jardines' }, { id: 'tienda7' });
+    add('bank', BANKS.puerto.name, [4, 3, 'W'], { id: 'puerto' });
+    add('bank', BANKS.colinas.name, { at: [60, -470], road: 'mirador' }, { id: 'colinas' });
+    add('bank', BANKS.central.name, [2, 1, 'N'], { id: 'central' });
+    add('bank', BANKS.reserva.name, [5, 0, 'W'], { id: 'reserva' });
+    add('business', BUSINESSES.cafeteria.name, { at: [252, 238], road: 'paseo' }, { id: 'cafeteria' });
+    add('business', BUSINESSES.lavanderia.name, [1, 3, 'E'], { id: 'lavanderia' });
+    add('business', BUSINESSES.taller.name, [4, 4, 'N'], { id: 'taller' });
+    add('business', BUSINESSES.gasolinera.name, { at: [-262, -12], road: 'oeste' }, { id: 'gasolinera' });
+    add('business', BUSINESSES.club.name, [2, 4, 'S'], { id: 'club' });
+    add('business', BUSINESSES.almacen.name, { at: [-80, 314], road: 'circunvalacion' }, { id: 'almacen' });
+    add('business', BUSINESSES.hotel.name, [1, 1, 'E'], { id: 'hotel' });
+    add('business', BUSINESSES.restaurante.name, { at: [200, -436], road: 'mirador' }, { id: 'restaurante' });
+    add('business', BUSINESSES.fabrica.name, { at: [-300, -58], road: 'industria' }, { id: 'fabrica' });
+    add('business', BUSINESSES.casino.name, [4, 2, 'E'], { id: 'casino' });
+    add('business', BUSINESSES.torre.name, { at: [310, -22], road: 'avEste' }, { id: 'torre' });
+    add('business', BUSINESSES.nautico.name, { at: [90, 314], road: 'circunvalacion' }, { id: 'nautico' });
+    add('hospital', 'Hospital San Rafael', [2, 3, 'N'], { id: 'hospital', passive: true });
+    add('police', 'Comisaría', [4, 3, 'S'], { id: 'comisaria', passive: true });
     // Letreros de los personajes de la historia (el marcador lo pone Missions)
-    add('mission', 'Taller de Lucho', 3, 2, 'S', { id: 'lucho', passive: true });
-    add('mission', 'Oficina de Vera', 4, 3, 'N', { id: 'vera', passive: true });
-    add('mission', 'Villa Aurelio', 1, 2, 'E', { id: 'aurelio', passive: true });
+    add('mission', 'Taller de Lucho', [3, 2, 'S'], { id: 'lucho', passive: true });
+    add('mission', 'Oficina de Vera', [4, 3, 'N'], { id: 'vera', passive: true });
+    add('mission', 'Villa Aurelio', [1, 2, 'E'], { id: 'aurelio', passive: true });
+    env.poiSpots = this.pois.map((p) => p.pos);
 
     for (const poi of this.pois) this.buildPoi(poi);
   }
@@ -178,6 +193,7 @@ export class Locations {
     group.position.copy(back);
     group.rotation.y = Math.atan2(poi.normal.x, poi.normal.z);
     scene.add(group);
+    poi.sign = group;
 
     if (!poi.passive) {
       poi.marker = createMarker(poi.style.color);
@@ -194,7 +210,13 @@ export class Locations {
     const t = game.time;
     const night = game.env.night;
     if (this.homeLamp) this.homeLamp.material.emissiveIntensity = night * 2.5;
+    const cam = game.camera.position;
     for (const poi of this.pois) {
+      // Lejos no se dibujan (la niebla ya los tapa): ahorra cientos de llamadas de dibujo
+      const d = Math.hypot(poi.pos.x - cam.x, poi.pos.z - cam.z);
+      if (poi.facade) poi.facade.visible = d < 330;
+      if (poi.sign) poi.sign.visible = d < 220;
+      if (poi.marker) for (const c of poi.marker.children) c.visible = d < 140;
       poi.signMat.emissiveIntensity = 0.15 + night * 0.9;
       if (poi.glowMat) poi.glowMat.emissiveIntensity = 0.35 + night * 0.9;
       if (poi.signGlow) poi.signGlow.emissiveIntensity = 0.5 + night * 1.6;
@@ -262,7 +284,7 @@ export class Locations {
         game.interiors.enter(poi);
         break;
       case 'gunshop':
-        game.menus.open(this.gunshopMenu());
+        game.menus.open(this.gunshopMenu(poi));
         break;
       case 'dealer':
         game.menus.open(this.dealerMenu(poi));
@@ -278,12 +300,12 @@ export class Locations {
   // ------------------------------------------------------------------
   // Menús
   // ------------------------------------------------------------------
-  gunshopMenu() {
+  gunshopMenu(poi) {
     const game = this.game;
     const st = game.state;
     const player = game.player;
     return {
-      title: 'Armería Plomo',
+      title: poi ? poi.name : 'Armería Plomo',
       subtitle: 'W/S para elegir · E para comprar · Q para salir',
       items: () => {
         const list = [];
@@ -433,15 +455,13 @@ export class Locations {
     const n = poi.normal;
     const front = poi.pos.clone().addScaledVector(n, -CITY.SIDEWALK / 2); // línea de fachada
     const center = front.clone().addScaledVector(n, -D / 2);
-    const alongX = Math.abs(n.z) > 0.5; // la fachada corre a lo largo de X
-    const rect = alongX
-      ? { minX: center.x - W / 2, maxX: center.x + W / 2, minZ: center.z - D / 2, maxZ: center.z + D / 2 }
-      : { minX: center.x - D / 2, maxX: center.x + D / 2, minZ: center.z - W / 2, maxZ: center.z + W / 2 };
+    const yaw = Math.atan2(n.x, n.z);
+    const rect = Environment.obbAABB({ x: center.x, z: center.z, hx: W / 2, hz: D / 2, yaw });
     env.removeBuildingsIn({ minX: rect.minX - 0.5, maxX: rect.maxX + 0.5, minZ: rect.minZ - 0.5, maxZ: rect.maxZ + 0.5 });
 
     const group = new THREE.Group();
     group.position.copy(front);
-    group.rotation.y = Math.atan2(n.x, n.z);
+    group.rotation.y = yaw;
     game.scene.add(group);
     const meshes = [];
     const add = (geo, material, x, y, z, collider = true) => {
@@ -584,10 +604,9 @@ export class Locations {
 
     group.updateMatrixWorld(true);
     const body = new CANNON.Body({ mass: 0, collisionFilterGroup: GROUPS.STATIC });
-    const halfX = alongX ? W / 2 : D / 2;
-    const halfZ = alongX ? D / 2 : W / 2;
-    body.addShape(new CANNON.Box(new CANNON.Vec3(halfX, H / 2, halfZ)));
+    body.addShape(new CANNON.Box(new CANNON.Vec3(W / 2, H / 2, D / 2)));
     body.position.set(center.x, H / 2, center.z);
+    body.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), yaw);
     env.registerStructure(meshes, rect, body);
     poi.facade = group;
   }

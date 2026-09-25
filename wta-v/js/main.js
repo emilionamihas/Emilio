@@ -18,6 +18,7 @@ import { Interiors } from './Interiors.js';
 import { Properties } from './Properties.js';
 import { Pedestrians } from './NPC.js';
 import { MapView } from './MapView.js';
+import { Cheats } from './Cheats.js';
 
 const FIXED_STEP = 1 / 60;
 const params = new URLSearchParams(location.search);
@@ -35,7 +36,7 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1500);
+const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 650);
 
 // ----------------------------------------------------------------------
 // Física
@@ -102,6 +103,7 @@ const game = {
 };
 window.game = game; // útil para depurar desde la consola
 
+
 game.env = new Environment(game);
 
 // Contactos: el jugador no tiene fricción (lo movemos por velocidad),
@@ -114,7 +116,8 @@ world.addContactMaterial(new CANNON.ContactMaterial(materials.vehicle, materials
 game.effects = new Effects(scene);
 game.hud = new HUD(game);
 
-const spawn = new THREE.Vector3(CITY.ROAD / 2 + 1.5, 0, 22);
+// Delante de casa (acera oeste de la manzana 3,3, junto a la glorieta)
+const spawn = new THREE.Vector3(CITY.ROAD / 2 + 1.5, 0, 36);
 game.player = new PlayerController(game, spawn);
 game.player.facing = Math.PI;
 game.cameraRig = new ThirdPersonCamera(game);
@@ -124,12 +127,15 @@ game.wanted = new WantedSystem(game);
 game.traffic = new AITraffic(game, { maxActive: 12 });
 game.menus = new Menus(game);
 game.locations = new Locations(game);
+// Con los solares de los lugares ya reservados se levantan edificios, árboles, farolas y semáforos
+game.env.finalize(spawn);
 game.heists = new Heists(game);
 game.missions = new Missions(game);
 game.interiors = new Interiors(game);
 game.properties = new Properties(game);
 game.pedestrians = new Pedestrians(game, { count: 10 });
 game.map = new MapView(game);
+game.cheats = new Cheats(game);
 
 /** Vestidor: el personaje mira a la cámara para ver cómo queda la ropa (el juego está en pausa). */
 game.previewPlayer = () => {
@@ -148,9 +154,9 @@ game.onNpcKilled = (npc) => {
 
 // Coches aparcados junto a la acera del spawn (carril derecho de la calle x = 0)
 const parked = [
-  { z: 12, type: 'compact' },
-  { z: 46, type: 'muscle', color: 0xb71c1c },
-  { z: 58, type: 'pickup' },
+  { z: 47, type: 'compact' },
+  { z: 58, type: 'muscle', color: 0xb71c1c },
+  { z: 70, type: 'pickup' },
 ];
 for (const p of parked) {
   const v = new VehicleController(game, { type: p.type, color: p.color, position: new THREE.Vector3(6.3, 0, p.z), heading: Math.PI });

@@ -3,7 +3,7 @@ import { VehicleController } from './VehicleController.js';
 import { driveTo } from './AITraffic.js';
 
 // Patrullas simultáneas por nivel de búsqueda (índice = estrellas)
-const UNITS_PER_LEVEL = [0, 1, 2, 3, 4, 6];
+const UNITS_PER_LEVEL = [0, 1, 2, 2, 3, 4];
 
 /** Cuánto "calor" suma cada delito. Al llegar a 1 sube una estrella. */
 const CRIMES = {
@@ -96,11 +96,22 @@ export class WantedSystem {
 
   /** Radio del círculo de búsqueda alrededor de la última posición conocida. */
   get searchRadius() {
-    return this.sightRadius * 0.5;
+    return this.sightRadius * 0.4;
   }
 
   get evadeTime() {
-    return 7 + this.level * 2.5;
+    return 5 + this.level * 1.5;
+  }
+
+  /** Ventaja tras un atraco: durante unos segundos no llegan patrullas nuevas ni disparan. */
+  giveHeadStart(seconds) {
+    this.graceUntil = this.game.time + seconds;
+  }
+
+  /** Ventaja activa, o atraco en curso dentro de un edificio (la policía aún no ha llegado). */
+  get inGrace() {
+    const heist = this.game.heists && this.game.heists.active;
+    return this.game.time < (this.graceUntil || 0) || !!(heist && this.game.interior);
   }
 
   // ------------------------------------------------------------------
@@ -109,10 +120,7 @@ export class WantedSystem {
   spawnUnit() {
     const focus = this.game.getFocusPosition();
     const env = this.game.env;
-    const candidates = env.nodes.filter((n) => {
-      const d = Math.hypot(n.pos.x - focus.x, n.pos.z - focus.z);
-      return d > 75 && d < 150;
-    });
+    const candidates = env.nodesNear(focus, 90, 170).filter((n) => !env.inTunnelZone(n.pos.x, n.pos.z));
     if (!candidates.length) return;
     const node = candidates[Math.floor(Math.random() * candidates.length)];
     for (const u of this.units) {
@@ -189,9 +197,9 @@ export class WantedSystem {
     // Número de patrullas
     const wantedUnits = UNITS_PER_LEVEL[this.level];
     this.spawnTimer -= dt;
-    if (this.units.length < wantedUnits && this.spawnTimer <= 0) {
+    if (this.units.length < wantedUnits && this.spawnTimer <= 0 && !this.inGrace) {
       this.spawnUnit();
-      this.spawnTimer = 2.5;
+      this.spawnTimer = 4;
     }
 
     for (let i = this.units.length - 1; i >= 0; i--) {
@@ -227,7 +235,7 @@ export class WantedSystem {
 
     // Mientras vacías una cámara estás dentro del edificio: te rodean, pero no te disparan ni te arrestan
     const inside = this.game.interior || (this.game.heists && this.game.heists.active);
-    if (!inside) {
+    if (!inside && !this.inGrace) {
       this.checkBusted(dt, focus);
       this.policeFire(dt, focus);
     }
@@ -244,12 +252,12 @@ export class WantedSystem {
       if (v.destroyed) continue;
       u.fireTimer = (u.fireTimer ?? Math.random()) - dt;
       if (u.fireTimer > 0) continue;
-      u.fireTimer = 1.3 - this.level * 0.1;
+      u.fireTimer = 1.8 - this.level * 0.1;
       const p = v.position;
       const d = Math.hypot(p.x - focus.x, p.z - focus.z);
       if (d > 38 || !(d < 15 || game.env.segmentOnRoad(p, focus))) continue;
       const from = new THREE.Vector3(p.x, p.y + 1.4, p.z);
-      const chance = 0.22 + this.level * 0.04 - playerSpeed * 0.005 - d * 0.004;
+      const chance = 0.14 + this.level * 0.03 - playerSpeed * 0.006 - d * 0.004;
       const hit = Math.random() < chance;
       const to = new THREE.Vector3(focus.x, focus.y + 1.1, focus.z);
       if (!hit) to.add(new THREE.Vector3((Math.random() - 0.5) * 4, Math.random() * 1.5, (Math.random() - 0.5) * 4));
@@ -257,9 +265,9 @@ export class WantedSystem {
       if (!hit) {
         game.effects.spawnSparks(to, new THREE.Vector3(0, 1, 0), 3);
       } else if (driving) {
-        game.interaction.vehicle.damage(2.5);
+        game.interaction.vehicle.damage(1.5);
       } else {
-        game.player.takeDamage(2 + this.level * 0.8);
+        game.player.takeDamage(1.5 + this.level * 0.5);
       }
     }
   }
@@ -315,31 +323,41 @@ export class WantedSystem {
     }
   }
 
-  /** Ruta por la red de calles: en cada cruce elige el vecino que más acerca al objetivo. */
+  /**
+   * Ruta por la red de calles con A* (se recalcula cada poco). Con `wander` se aleja del objetivo.
+   */
   routeTo(unit, target, speed, wander) {
     const env = this.game.env;
     const v = unit.vehicle;
     const p = v.position;
-    if (!unit.node) {
-      unit.node = env.nearestNode(p);
-      unit.prevNode = null;
-    }
-    const dNode = Math.hypot(unit.node.pos.x - p.x, unit.node.pos.z - p.z);
-    if (dNode < 9) {
-      const options = unit.node.neighbors.map((id) => env.nodes[id]).filter((n) => n !== unit.prevNode);
-      let best = options[0];
+    const now = this.game.time;
+    if (!unit.path || now - (unit.pathAt ?? -99) > 1.5 || unit.pathIndex >= unit.path.length) {
+      let goal = target;
       if (wander) {
-        // Alejarse del objetivo
-        best = options.reduce((a, b) => (b.pos.distanceTo(target) > a.pos.distanceTo(target) ? b : a));
-      } else {
-        best = options.reduce((a, b) =>
-          Math.hypot(b.pos.x - target.x, b.pos.z - target.z) < Math.hypot(a.pos.x - target.x, a.pos.z - target.z) ? b : a
-        );
+        const away = new THREE.Vector3(p.x - target.x, 0, p.z - target.z).normalize().multiplyScalar(150);
+        goal = new THREE.Vector3(p.x + away.x, 0, p.z + away.z);
       }
-      unit.prevNode = unit.node;
-      unit.node = best;
+      unit.path = env.findPath(p, goal);
+      unit.pathIndex = 0;
+      unit.pathAt = now;
+      // Si ya hemos pasado el primer nodo (está detrás, en el sentido de la ruta), empezar por el siguiente
+      const path = unit.path;
+      while (unit.pathIndex < path.length - 1) {
+        const a = path[unit.pathIndex].pos;
+        const b = path[unit.pathIndex + 1].pos;
+        if ((b.x - a.x) * (p.x - a.x) + (b.z - a.z) * (p.z - a.z) > 0) unit.pathIndex++;
+        else break;
+      }
     }
-    driveTo(v, unit.node.pos, speed, { aggressive: !wander });
+    // Avanzar por la ruta: salta los nodos que ya se han pasado
+    while (unit.pathIndex < unit.path.length - 1) {
+      const n = unit.path[unit.pathIndex];
+      if (Math.hypot(n.pos.x - p.x, n.pos.z - p.z) < (n.junction ? 9 : 6)) unit.pathIndex++;
+      else break;
+    }
+    const node = unit.path[Math.min(unit.pathIndex, unit.path.length - 1)];
+    const aim = unit.pathIndex >= unit.path.length - 1 && !wander ? target : node.pos;
+    driveTo(v, aim, speed, { aggressive: !wander });
   }
 
   /** BUSTED: policía detenida junto al jugador parado durante un rato. */

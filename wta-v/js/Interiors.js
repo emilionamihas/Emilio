@@ -14,9 +14,10 @@ const BASE_X = 1600;
 
 // Configuración de cada banco (la tienda y la casa son únicas)
 export const BANK_LAYOUT = {
-  puerto: { guards: 2, tellers: 2, customers: 3, carts: 3, drill: 10, gold: false, police: 3 },
-  central: { guards: 3, tellers: 3, customers: 4, carts: 4, drill: 14, gold: false, police: 5 },
-  reserva: { guards: 4, tellers: 3, customers: 3, carts: 5, drill: 18, gold: true, police: 7 },
+  puerto: { guards: 1, tellers: 2, customers: 3, carts: 3, drill: 4, gold: false, police: 2 },
+  colinas: { guards: 2, tellers: 2, customers: 3, carts: 3, drill: 5, gold: false, police: 2 },
+  central: { guards: 2, tellers: 3, customers: 4, carts: 4, drill: 6, gold: false, police: 3 },
+  reserva: { guards: 3, tellers: 3, customers: 3, carts: 5, drill: 8, gold: true, police: 4 },
 };
 
 function mat(opts) {

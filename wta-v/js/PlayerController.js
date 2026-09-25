@@ -298,7 +298,7 @@ export class PlayerController {
       }
       return;
     }
-    const canReload = w.mag && this.clip(i) < w.mag && this.reserve(i) > 0;
+    const canReload = w.mag && !this.state.infiniteAmmo && this.clip(i) < w.mag && this.reserve(i) > 0;
     if (input.wasPressed('KeyR') && canReload) {
       this.reloadTimer = w.reload;
       return;
@@ -308,7 +308,7 @@ export class PlayerController {
     const wantsFire = w.auto ? input.mouse.left : input.mouse.leftPressed;
     if (!wantsFire || this.fireCooldown > 0) return;
 
-    if (w.mag) {
+    if (w.mag && !this.state.infiniteAmmo) {
       if (this.clip(i) <= 0) {
         if (canReload) this.reloadTimer = w.reload;
         else if (input.mouse.leftPressed) this.game.hud.notify(`Sin munición para ${w.name}. Compra más en la Armería.`, 2.5);

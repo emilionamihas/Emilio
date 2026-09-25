@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { CATALOG } from './VehicleController.js';
 import { formatMoney } from './GameState.js';
 import { BUSINESSES } from './Properties.js';
+import { DISTRICT_LABELS } from './Environment.js';
 
 /**
  * Mapa a pantalla completa (tecla M) con ruta por las calles.
@@ -27,45 +28,9 @@ export class MapView {
   // ------------------------------------------------------------------
   // Ruta
   // ------------------------------------------------------------------
-  /** A* entre los cruces más cercanos al origen y al destino. Devuelve puntos en el mundo. */
+  /** A* por la red de calles (respeta el sentido de la glorieta). Devuelve puntos en el mundo. */
   computeRoute(from, to) {
-    const env = this.game.env;
-    const start = env.nearestNode(from);
-    const goal = env.nearestNode(to);
-    const h = (n) => Math.hypot(n.pos.x - goal.pos.x, n.pos.z - goal.pos.z);
-    const open = new Set([start.id]);
-    const came = new Map();
-    const g = new Map([[start.id, 0]]);
-    const f = new Map([[start.id, h(start)]]);
-    while (open.size) {
-      let cur = null;
-      let best = Infinity;
-      for (const id of open) {
-        if (f.get(id) < best) {
-          best = f.get(id);
-          cur = id;
-        }
-      }
-      if (cur === goal.id) break;
-      open.delete(cur);
-      const node = env.nodes[cur];
-      for (const nid of node.neighbors) {
-        const nb = env.nodes[nid];
-        const tentative = g.get(cur) + node.pos.distanceTo(nb.pos);
-        if (tentative < (g.get(nid) ?? Infinity)) {
-          came.set(nid, cur);
-          g.set(nid, tentative);
-          f.set(nid, tentative + h(nb));
-          open.add(nid);
-        }
-      }
-    }
-    const path = [];
-    let id = goal.id;
-    while (id !== undefined) {
-      path.unshift(env.nodes[id].pos.clone());
-      id = came.get(id);
-    }
+    const path = this.game.env.findPath(from, to).map((n) => n.pos.clone());
     const pts = [new THREE.Vector3(from.x, 0, from.z), ...path, new THREE.Vector3(to.x, 0, to.z)];
     let length = 0;
     for (let i = 1; i < pts.length; i++) length += pts[i].distanceTo(pts[i - 1]);
@@ -217,6 +182,16 @@ export class MapView {
     ctx.drawImage(game.env.mapCanvas, 0, 0, size, size);
     ctx.fillStyle = 'rgba(10,14,20,0.25)';
     ctx.fillRect(0, 0, size, size);
+
+    // Barrios
+    ctx.font = "bold 15px 'Rajdhani', sans-serif";
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    for (const [name, x, z] of DISTRICT_LABELS) {
+      const [mx, my] = this.worldToMap(x, z);
+      ctx.fillText(name, mx, my);
+    }
 
     // Ruta
     if (game.route) {

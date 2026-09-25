@@ -157,6 +157,44 @@ export function facadeTextures(style, rand = Math.random) {
       for (let x = 0; x < W; x += 128) ctx.fillRect(x, 0, 2, H);
       tileW = 12;
       tileH = 18;
+    } else if (style === 'warehouse') {
+      // Nave: chapa grecada con una franja de ventanas altas
+      ctx.fillStyle = '#9aa3a6';
+      ctx.fillRect(0, 0, W, H);
+      for (let x = 0; x < W; x += 16) {
+        const g = ctx.createLinearGradient(x, 0, x + 16, 0);
+        g.addColorStop(0, 'rgba(255,255,255,0.18)');
+        g.addColorStop(0.5, 'rgba(0,0,0,0.05)');
+        g.addColorStop(1, 'rgba(0,0,0,0.22)');
+        ctx.fillStyle = g;
+        ctx.fillRect(x, 0, 16, H);
+      }
+      addStains(ctx, W, H, 18, 'rgba(90,60,40,0.14)', 70, rand);
+      for (let c = 0; c < 4; c++) drawWindow(ctx, glowFn, 8 + c * 64, 40, 48, 30, { frame: '#6b7275', panes: 2, sill: false });
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      ctx.fillRect(0, H - 10, W, 10);
+      tileW = 10;
+      tileH = 10;
+    } else if (style === 'house') {
+      // Vivienda: revoco claro, dos plantas de ventanas con contraventanas
+      const tones = ['#efe6d6', '#e8d8c0', '#f3efe8', '#dcc9b0', '#e9dcd0'];
+      ctx.fillStyle = tones[Math.floor(rand() * tones.length)];
+      ctx.fillRect(0, 0, W, H);
+      addStains(ctx, W, H, 8, 'rgba(80,70,60,0.08)', 60, rand);
+      for (let r = 0; r < 2; r++) {
+        for (let c = 0; c < 2; c++) {
+          const x = 38 + c * 128;
+          const y = 60 + r * 256;
+          drawWindow(ctx, glowFn, x, y, 52, 110, { frame: '#f7f5f0', panes: 2 });
+          ctx.fillStyle = '#5d4a3a';
+          ctx.fillRect(x - 22, y - 3, 14, 116);
+          ctx.fillRect(x + 60, y - 3, 14, 116);
+        }
+      }
+      ctx.fillStyle = 'rgba(0,0,0,0.12)';
+      ctx.fillRect(0, H - 14, W, 14);
+      tileW = 8;
+      tileH = 6;
     } else {
       // office: hormigón con cuadrícula de ventanas
       ctx.fillStyle = '#b8b3a8';

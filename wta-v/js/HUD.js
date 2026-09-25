@@ -167,7 +167,7 @@ export class HUD {
       const owned = st.ownedWeapons.has(i);
       slot.classList.toggle('selected', i === selected);
       slot.classList.toggle('locked', !owned);
-      slot.querySelector('.slot-info').textContent = !owned ? formatMoney(w.price) : w.mag ? `${player.clip(i)} / ${player.reserve(i)}` : '';
+      slot.querySelector('.slot-info').textContent = !owned ? formatMoney(w.price) : w.mag ? (st.infiniteAmmo ? '∞' : `${player.clip(i)} / ${player.reserve(i)}`) : '';
     });
   }
 
@@ -185,7 +185,7 @@ export class HUD {
 
     const w = WEAPONS[player.weaponIndex];
     this.weaponName.textContent = w.name;
-    this.weaponAmmo.textContent = w.mag ? (player.reloadTimer > 0 ? 'RECARGANDO' : `${player.clip()} / ${player.reserve()}`) : '';
+    this.weaponAmmo.textContent = w.mag ? (this.game.state.infiniteAmmo ? '∞' : player.reloadTimer > 0 ? 'RECARGANDO' : `${player.clip()} / ${player.reserve()}`) : '';
 
     this.healthFill.style.width = `${player.health}%`;
     this.healthFill.classList.toggle('low', player.health < 30);
