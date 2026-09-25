@@ -43,8 +43,12 @@ export class InteractionSystem {
       case 'foot': {
         this.candidate = this.findNearestVehicle(player.mesh.position);
         if (this.candidate) {
-          const verb = this.candidate.driver === 'ai' || this.candidate.driver === 'police' || !this.candidate.playerOwned ? 'robar' : 'entrar en';
-          game.hud.setPrompt(`Pulsa <kbd>F</kbd> para ${verb} el vehículo`);
+          const c = this.candidate;
+          if (c.ownedCar) game.hud.setPrompt(`Pulsa <kbd>F</kbd> para subir a tu ${c.spec.label}`);
+          else {
+            const verb = c.driver === 'ai' || c.driver === 'police' || !c.playerOwned ? 'robar' : 'entrar en';
+            game.hud.setPrompt(`Pulsa <kbd>F</kbd> para ${verb} el vehículo`);
+          }
           if (input.wasPressed('KeyF')) this.beginEnter(this.candidate);
         } else {
           game.hud.setPrompt(null);

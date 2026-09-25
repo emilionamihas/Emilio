@@ -22,6 +22,7 @@ export class HUD {
     this.moneyDeltaEl = el('money-delta');
     this.lootEl = el('loot');
     this.incomeEl = el('income');
+    this.gpsEl = el('gps');
     this.weaponName = el('weapon-name');
     this.weaponAmmo = el('weapon-ammo');
     this.healthFill = el('health-fill');
@@ -317,6 +318,27 @@ export class HUD {
       const [x, y] = clampEdge(...toRadar(v.position.x, v.position.z));
       this.drawBlip(ctx, x, y, v.tag === 'target' ? '#e53935' : '#fdd835', '', 1, 6);
     }
+    // Ruta GPS por las calles (recortada al círculo del radar)
+    if (game.route) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(half, half, half - 4, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.strokeStyle = '#c05cff';
+      ctx.lineWidth = 5;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      game.route.points.forEach((p, i) => {
+        const [x, y] = toRadar(p.x, p.z);
+        if (i) ctx.lineTo(x, y);
+        else ctx.moveTo(x, y);
+      });
+      ctx.stroke();
+      ctx.restore();
+    }
+    const gpsText = game.waypoint && game.route ? `GPS · ${game.waypoint.label} · ${Math.round(game.route.length)} m` : '';
+    if (this.gpsEl.textContent !== gpsText) this.gpsEl.textContent = gpsText;
     if (game.waypoint) {
       const [x, y] = clampEdge(...toRadar(game.waypoint.pos.x, game.waypoint.pos.z));
       this.drawBlip(ctx, x, y, '#ba68c8', '◆', 1, 7);

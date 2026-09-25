@@ -862,3 +862,127 @@ body {
 #fade.show {
   opacity: 1;
 }
+
+.swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  vertical-align: -2px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+#gps {
+  margin: 8px auto 0;
+  width: 200px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 14px;
+  color: #d9a8ff;
+  text-shadow: 1px 1px 0 #000;
+  min-height: 17px;
+}
+
+/* ---------- Mapa completo ---------- */
+#map {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 8, 12, 0.82);
+  z-index: 8;
+  pointer-events: auto;
+}
+
+#map-box {
+  display: flex;
+  gap: 18px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+}
+
+#map-canvas {
+  width: min(78vh, 62vw);
+  height: min(78vh, 62vw);
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  cursor: crosshair;
+  background: #1b2a1b;
+}
+
+#map-side {
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: min(78vh, 62vw);
+}
+
+#map-title {
+  font-family: 'Anton', sans-serif;
+  font-size: 24px;
+  letter-spacing: 2px;
+}
+
+#map-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.map-item {
+  display: grid;
+  grid-template-columns: 14px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 10px;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font: 500 15px 'Rajdhani', sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+
+.map-item.selected {
+  background: #f2f2f2;
+  color: #111;
+}
+
+.map-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid #000;
+}
+
+.map-dist {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+#map-help {
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+#map-help kbd {
+  display: inline-block;
+  padding: 0 5px;
+  border-radius: 3px;
+  background: #fff;
+  color: #000;
+  font: 700 12px/17px 'Rajdhani', sans-serif;
+}
+
+@media (max-width: 800px) {
+  #map-box {
+    flex-direction: column;
+  }
+  #map-side {
+    width: auto;
+  }
+}

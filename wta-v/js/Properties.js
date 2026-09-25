@@ -3,14 +3,29 @@ import { formatMoney } from './GameState.js';
 import { CATALOG } from './VehicleController.js';
 import { OUTFITS } from './HumanModel.js';
 
-/** Negocios: ingresos por MINUTO de juego (nivel 1). */
+/** Negocios: ingresos por MINUTO de juego (nivel 1). Se cobran en dos pagos, cada 30 s. */
 export const BUSINESSES = {
-  lavanderia: { name: 'Lavandería Espuma', price: 8000, income: 250 },
-  taller: { name: 'Taller Pistón', price: 15000, income: 450 },
-  club: { name: 'Club Neón', price: 30000, income: 900 },
-  hotel: { name: 'Hotel Marina', price: 60000, income: 1700 },
-  casino: { name: 'Casino Sombra', price: 150000, income: 4000 },
+  lavanderia: { name: 'Lavandería Espuma', price: 8000, income: 1000 },
+  taller: { name: 'Taller Pistón', price: 15000, income: 1800 },
+  club: { name: 'Club Neón', price: 30000, income: 3600 },
+  hotel: { name: 'Hotel Marina', price: 60000, income: 7000 },
+  casino: { name: 'Casino Sombra', price: 150000, income: 16000 },
 };
+
+/** Colores de pintura y de ropa (nombre, hex). */
+export const PALETTE = [
+  ['Blanco', 0xf2f2f2], ['Negro', 0x111111], ['Plata', 0xa9b0b6], ['Gris', 0x4a4f55],
+  ['Rojo', 0xc62828], ['Granate', 0x6d1b1b], ['Naranja', 0xef6c00], ['Amarillo', 0xf9c80e],
+  ['Verde', 0x2e7d32], ['Lima', 0x76ff03], ['Azul', 0x1565c0], ['Celeste', 0x4fc3f7],
+  ['Morado', 0x6a1b9a], ['Rosa', 0xec407a], ['Marrón', 0x5d4037], ['Beige', 0xc8b28c],
+];
+const SKINS = [['Clara', 0xffdbac], ['Media clara', 0xf1c27d], ['Media', 0xe0ac69], ['Morena', 0xc68642], ['Oscura', 0x8d5524], ['Muy oscura', 0x5c3a1e]];
+const HAIRS = [['Negro', 0x1b1b1b], ['Castaño oscuro', 0x3b2314], ['Castaño', 0x6b4423], ['Pelirrojo', 0xa0522d], ['Rubio', 0xd6b370], ['Canoso', 0x9e9e9e], ['Azul', 0x1e88e5], ['Rosa', 0xf06292]];
+const CAR_DESIGNS = [['liso', 'Liso'], ['franjas', 'Franjas dobles'], ['racing', 'Racing (franja ancha y laterales)'], ['bicolor', 'Bicolor (techo y faldón)']];
+const CAR_FINISHES = [['brillo', 'Brillo'], ['metalizado', 'Metalizado'], ['mate', 'Mate']];
+const PAINT_PRICE = 300;
+
+const swatch = (hex) => `<span class="swatch" style="background:#${hex.toString(16).padStart(6, '0')}"></span>`;
 
 /** Mejoras: multiplicador de ingresos y coste (fracción del precio del negocio). */
 export const LEVELS = [
@@ -20,7 +35,7 @@ export const LEVELS = [
   { name: 'De lujo', mult: 2.4, cost: 1.2 },
 ];
 
-const PAY_EVERY = 60; // segundos
+const PAY_EVERY = 30; // segundos (medio minuto de ingresos por pago)
 const OFFLINE_CAP_MIN = 60;
 const DELIVERY_FEE = 250;
 const WARDROBE = ['calle', 'cuero', 'traje', 'deporte', 'verano', 'golpe'];
@@ -82,10 +97,11 @@ export class Properties {
     this.game.hud.setIncomeTimer(PAY_EVERY - this.timer, perMin);
     if (this.timer >= PAY_EVERY) {
       this.timer -= PAY_EVERY;
-      this.state.addMoney(perMin);
-      this.state.stats.businessIncome = (this.state.stats.businessIncome || 0) + perMin;
-      this.game.hud.moneyDelta(perMin);
-      this.game.hud.notify(`Tus negocios han ingresado ${formatMoney(perMin)}.`, 2.5);
+      const pay = Math.round((perMin * PAY_EVERY) / 60);
+      this.state.addMoney(pay);
+      this.state.stats.businessIncome = (this.state.stats.businessIncome || 0) + pay;
+      this.game.hud.moneyDelta(pay);
+      this.game.hud.notify(`Tus negocios han ingresado ${formatMoney(pay)}.`, 2);
       this.state.save();
     }
   }
@@ -102,8 +118,7 @@ export class Properties {
   }
 
   setWaypoint(pos, label) {
-    this.game.waypoint = { pos: pos.clone(), label };
-    this.game.hud.notify(`GPS: ${label} marcado en el radar.`, 2.5);
+    this.game.map.setDestination(pos, label);
   }
 
   // ------------------------------------------------------------------
@@ -119,13 +134,14 @@ export class Properties {
         { label: 'Mis coches', detail: `${st.cars.length} en el garaje · entrega donde estés por ${formatMoney(DELIVERY_FEE)}`, submenu: () => this.carsMenu() },
         { label: 'Resumen', detail: 'Dinero ganado, atracos y negocios', submenu: () => this.statsMenu() },
         {
-          label: 'Quitar marca del GPS',
+          label: 'Quitar ruta del GPS',
           detail: this.game.waypoint ? this.game.waypoint.label : 'No hay ningún destino marcado',
           tag: '',
           disabled: !this.game.waypoint,
           action: () => {
             this.game.waypoint = null;
-            return 'Destino borrado.';
+            this.game.route = null;
+            return 'Ruta borrada.';
           },
         },
       ],
@@ -193,35 +209,96 @@ export class Properties {
     };
   }
 
+  carLabel(car) {
+    const c = CATALOG[car.type];
+    const design = CAR_DESIGNS.find(([id]) => id === car.design);
+    return `${car.color != null ? swatch(car.color) : ''}${c.label} · ${c.kind}${design && car.design !== 'liso' ? ' · ' + design[1].split(' ')[0] : ''}`;
+  }
+
   carsMenu() {
     const st = this.state;
     return {
       title: 'Mis coches',
-      subtitle: () => (st.cars.length ? `Un mecánico te lo trae donde estés por ${formatMoney(DELIVERY_FEE)}` : 'Aún no tienes coches: cómpralos en Autos Velasco (C en el radar)'),
+      subtitle: () => 'Son tuyos: usarlos no es delito. Elige uno para traerlo o personalizarlo.',
       items: () => {
-        if (!st.cars.length) {
-          return [
-            {
-              label: 'Ir al concesionario',
-              detail: 'Marca Autos Velasco en el GPS',
-              tag: 'GPS',
-              action: () => {
-                this.setWaypoint(this.game.locations.byId('concesionario').pos, 'Autos Velasco');
-                return 'Marcado.';
-              },
-            },
-          ];
-        }
-        return st.cars.map((type) => {
-          const c = CATALOG[type];
-          return {
-            label: `${c.label} · ${c.kind}`,
-            detail: `${Math.round(c.maxSpeed * 3.6)} km/h · tracción ${c.drive === 'awd' ? 'total' : c.drive === 'fwd' ? 'delantera' : 'trasera'}`,
-            price: DELIVERY_FEE,
-            action: () => this.deliverCar(type),
-          };
+        const list = st.cars.map((car) => ({
+          label: this.carLabel(car),
+          detail: `${Math.round(CATALOG[car.type].maxSpeed * 3.6)} km/h · ${this.findVehicle(car) ? 'en la calle' : 'en el garaje'}`,
+          submenu: () => this.carDetail(car),
+        }));
+        list.push({
+          label: 'Comprar otro coche',
+          detail: 'Marca Autos Velasco en el GPS',
+          tag: 'GPS',
+          action: () => {
+            this.setWaypoint(this.game.locations.byId('concesionario').pos, 'Autos Velasco');
+            return 'Autos Velasco marcado en el GPS.';
+          },
         });
+        return list;
       },
+    };
+  }
+
+  findVehicle(car) {
+    return this.game.vehicles.find((v) => v.ownedCar && v.ownedCar.id === car.id && !v.destroyed);
+  }
+
+  /** Aplica el cambio a la ficha y al coche si está en la calle. */
+  restyle(car, changes) {
+    if (!this.state.spend(PAINT_PRICE)) return `Te faltan ${formatMoney(PAINT_PRICE - this.state.money)}.`;
+    Object.assign(car, changes);
+    const v = this.findVehicle(car);
+    if (v) v.applyStyle(car);
+    this.state.save();
+    return 'Hecho. ¡Queda genial!';
+  }
+
+  carDetail(car) {
+    const atHome = () => this.game.interior && this.game.interior.inst.key === 'house';
+    const colorMenu = (field, title) => () => ({
+      title,
+      subtitle: `${formatMoney(PAINT_PRICE)} por cambio`,
+      items: () =>
+        PALETTE.map(([name, hex]) => ({
+          label: `${swatch(hex)}${name}`,
+          detail: car[field] === hex ? 'Color actual' : '',
+          price: PAINT_PRICE,
+          action: () => this.restyle(car, { [field]: hex }),
+        })),
+    });
+    return {
+      title: CATALOG[car.type].label,
+      subtitle: () => `Tu ${CATALOG[car.type].kind.toLowerCase()}: nadie te busca por conducirlo`,
+      items: () => [
+        {
+          label: atHome() ? 'Sacarlo a la puerta de casa' : 'Traerlo hasta aquí',
+          detail: atHome() ? 'Gratis: te espera al salir' : `Un mecánico lo aparca en la calle más cercana`,
+          price: atHome() ? null : DELIVERY_FEE,
+          tag: atHome() ? 'GRATIS' : undefined,
+          action: () => this.deliverCar(car),
+        },
+        { label: 'Pintura', detail: 'Color principal', submenu: colorMenu('color', 'Pintura') },
+        { label: 'Segundo color', detail: 'Para franjas, racing y bicolor', submenu: colorMenu('color2', 'Segundo color') },
+        {
+          label: 'Dibujo',
+          detail: CAR_DESIGNS.find(([id]) => id === car.design)?.[1] || 'Liso',
+          submenu: () => ({
+            title: 'Dibujo',
+            subtitle: `${formatMoney(PAINT_PRICE)} por cambio`,
+            items: () => CAR_DESIGNS.map(([id, name]) => ({ label: name, detail: car.design === id ? 'Actual' : '', price: PAINT_PRICE, action: () => this.restyle(car, { design: id }) })),
+          }),
+        },
+        {
+          label: 'Acabado',
+          detail: CAR_FINISHES.find(([id]) => id === car.finish)?.[1] || 'Brillo',
+          submenu: () => ({
+            title: 'Acabado',
+            subtitle: `${formatMoney(PAINT_PRICE)} por cambio`,
+            items: () => CAR_FINISHES.map(([id, name]) => ({ label: name, detail: car.finish === id ? 'Actual' : '', price: PAINT_PRICE, action: () => this.restyle(car, { finish: id }) })),
+          }),
+        },
+      ],
     };
   }
 
@@ -242,10 +319,16 @@ export class Properties {
     };
   }
 
-  /** Trae un coche del garaje a la calle más cercana. */
-  deliverCar(type) {
+  /** Trae un coche propio: gratis a la puerta de casa (desde dentro) o a la calle más cercana por 250. */
+  deliverCar(car) {
     const game = this.game;
-    if (game.interior) return 'Sal a la calle para que te lo traigan.';
+    const home = game.locations.byId('casa');
+    if (game.interior) {
+      if (game.interior.inst.key !== 'house') return 'Sal a la calle para que te lo traigan.';
+      game.locations.spawnOwnedCar(car, home.park, home.heading);
+      game.menus.close();
+      return 'Te espera en la puerta de casa.';
+    }
     if (game.interaction.state !== 'foot') return 'Bájate del vehículo primero.';
     if (!this.state.spend(DELIVERY_FEE)) return 'No tienes dinero para la entrega.';
     const p = game.player.mesh.position;
@@ -257,28 +340,70 @@ export class Properties {
     const right = new THREE.Vector3(-dir.z, 0, dir.x);
     const along = THREE.MathUtils.clamp(new THREE.Vector3().subVectors(p, node.pos).dot(dir) + 6, 12, 50);
     const pos = node.pos.clone().addScaledVector(dir, along).addScaledVector(right, 6.2);
-    const v = game.locations.spawnOwnedCar(type, pos, Math.atan2(dir.x, dir.z));
+    game.locations.spawnOwnedCar(car, pos, Math.atan2(dir.x, dir.z));
     game.menus.close();
-    return `${v.label} aparcado cerca de ti.`;
+    game.hud.notify(`${CATALOG[car.type].label} aparcado cerca de ti.`);
+    return 'Entregado.';
+  }
+
+  /** Cambia el aspecto (se guarda y se aplica al instante). */
+  setLook(changes) {
+    Object.assign(this.state.look, changes);
+    this.state.outfit = 'custom';
+    this.game.player.applyLook(this.state.look);
+    this.state.save();
+    this.game.previewPlayer();
   }
 
   wardrobeMenu() {
+    const look = this.state.look;
+    const colorList = (field, title, list = PALETTE) => () => ({
+      title,
+      subtitle: 'Elige un color',
+      items: () => list.map(([name, hex]) => ({ label: `${swatch(hex)}${name}`, tag: look[field] === hex ? 'PUESTO' : '', action: () => this.setLook({ [field]: hex }) })),
+    });
+    const styleList = (field, title, options) => () => ({
+      title,
+      subtitle: 'Elige un estilo',
+      items: () => options.map(([id, name]) => ({ label: name, tag: look[field] === id ? 'PUESTO' : '', action: () => this.setLook({ [field]: id }) })),
+    });
     const player = this.game.player;
     return {
-      title: 'Armario',
-      subtitle: 'Elige qué ponerte',
-      items: () =>
-        WARDROBE.map((id) => ({
-          label: OUTFITS[id].name,
-          detail: id === 'golpe' ? 'Mono y pasamontañas para los atracos' : '',
-          tag: player.outfitId === id ? 'PUESTO' : '',
-          action: () => {
-            player.setOutfit(id);
-            this.state.outfit = id;
-            this.state.save();
-            return `Te has puesto: ${OUTFITS[id].name}.`;
-          },
-        })),
+      title: 'Vestidor',
+      subtitle: 'Todo se guarda al momento. Q para volver.',
+      items: () => [
+        { label: 'Parte de arriba', detail: 'Camiseta, polo, camisa, sudadera o tirantes', submenu: styleList('top', 'Parte de arriba', [['camiseta', 'Camiseta'], ['polo', 'Polo'], ['camisa', 'Camisa de manga larga'], ['sudadera', 'Sudadera'], ['tirantes', 'Camiseta de tirantes']]) },
+        { label: `${swatch(look.topColor)}Color de arriba`, submenu: colorList('topColor', 'Color de arriba') },
+        { label: 'Gorro', detail: 'Gorra, gorra hacia atrás, gorro de lana, sombrero o nada', submenu: styleList('hat', 'Gorro', [['none', 'Sin gorro'], ['gorra', 'Gorra'], ['gorraAtras', 'Gorra hacia atrás'], ['lana', 'Gorro de lana'], ['sombrero', 'Sombrero']]) },
+        { label: `${swatch(look.hatColor)}Color del gorro`, submenu: colorList('hatColor', 'Color del gorro') },
+        { label: 'Parte de abajo', detail: 'Pantalón largo o short', submenu: styleList('bottom', 'Parte de abajo', [['largo', 'Pantalón largo'], ['short', 'Short']]) },
+        { label: `${swatch(look.bottomColor)}Color de abajo`, submenu: colorList('bottomColor', 'Color de abajo') },
+        { label: `${swatch(look.shoes)}Zapatillas`, submenu: colorList('shoes', 'Zapatillas') },
+        { label: `${swatch(look.skin)}Tono de piel`, submenu: colorList('skin', 'Tono de piel', SKINS) },
+        { label: 'Peinado', submenu: styleList('hairStyle', 'Peinado', [['short', 'Corto'], ['long', 'Largo'], ['bun', 'Moño'], ['bald', 'Rapado']]) },
+        { label: `${swatch(look.hair)}Color de pelo`, submenu: colorList('hair', 'Color de pelo', HAIRS) },
+        {
+          label: 'Conjuntos',
+          detail: 'Traje, chupa de cuero, chándal, mono de golpe...',
+          submenu: () => ({
+            title: 'Conjuntos',
+            subtitle: 'Ropa completa ya combinada',
+            items: () =>
+              WARDROBE.map((id) => ({
+                label: OUTFITS[id].name,
+                detail: id === 'golpe' ? 'Mono y pasamontañas para los atracos' : '',
+                tag: player.outfitId === id ? 'PUESTO' : '',
+                action: () => {
+                  player.setOutfit(id);
+                  this.state.outfit = id;
+                  this.state.save();
+                  this.game.previewPlayer();
+                  return `Te has puesto: ${OUTFITS[id].name}.`;
+                },
+              })),
+          }),
+        },
+      ],
     };
   }
 }

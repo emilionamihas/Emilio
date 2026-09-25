@@ -83,8 +83,10 @@ export class HumanModel {
 
   build() {
     const b = this.body;
-    const skin = mat(this.skinColor, 0.65);
+    // Piel y pelo con material propio: se pueden cambiar sin afectar a otros personajes
+    const skin = new THREE.MeshStandardMaterial({ color: this.skinColor, roughness: 0.65 });
     this.skinMat = skin;
+    this.hairMat = new THREE.MeshStandardMaterial({ color: this.hairColor, roughness: 0.9 });
 
     // Pelvis y torso: esferas escaladas dan una silueta orgánica
     this.pelvis = this.part(geo('pelvis', () => new THREE.SphereGeometry(1, 14, 10)), skin, b, 0, 0.98, 0);
@@ -96,6 +98,10 @@ export class HumanModel {
     this.jacketShell = this.part(geo('jacket', () => new THREE.SphereGeometry(1, 16, 12)), skin, b, 0, 1.3, -0.005);
     this.jacketShell.scale.set(0.215, 0.235, 0.13);
     this.tie = this.part(geo('tie', () => new THREE.BoxGeometry(0.035, 0.26, 0.01)), skin, b, 0, 1.3, 0.125);
+    // Cuello de polo/camisa y botonadura
+    this.collar = this.part(geo('collar', () => new THREE.TorusGeometry(0.062, 0.02, 6, 16)), skin, b, 0, 1.48, 0.01);
+    this.collar.rotation.x = Math.PI / 2 + 0.25;
+    this.buttons = this.part(geo('buttons', () => new THREE.BoxGeometry(0.012, 0.3, 0.008)), mat(0xeeeeee, 0.4), b, 0, 1.3, 0.122);
     this.badge = this.part(geo('badge', () => new THREE.BoxGeometry(0.05, 0.05, 0.01)), mat(0xd4af37, 0.3, 0.8), b, 0.09, 1.38, 0.12);
     this.part(geo('neck', () => new THREE.CylinderGeometry(0.045, 0.05, 0.12, 10)), skin, b, 0, 1.53, 0);
 
@@ -116,27 +122,29 @@ export class HumanModel {
     const earR = this.part(ear, skin, this.headPivot, -0.097, 0.1, 0, 'head');
     earR.scale.set(0.015, 0.03, 0.02);
     this.brows = [
-      this.part(geo('brow', () => new THREE.BoxGeometry(0.035, 0.008, 0.01)), mat(this.hairColor), this.headPivot, 0.036, 0.145, 0.098, 'head'),
-      this.part(geo('brow', () => null), mat(this.hairColor), this.headPivot, -0.036, 0.145, 0.098, 'head'),
+      this.part(geo('brow', () => new THREE.BoxGeometry(0.035, 0.008, 0.01)), this.hairMat, this.headPivot, 0.036, 0.145, 0.098, 'head'),
+      this.part(geo('brow', () => null), this.hairMat, this.headPivot, -0.036, 0.145, 0.098, 'head'),
     ];
     this.mouth = this.part(geo('mouth', () => new THREE.BoxGeometry(0.04, 0.008, 0.01)), mat(0x7a3b3b, 0.6), this.headPivot, 0, 0.055, 0.1, 'head');
 
-    // Pelo según estilo
-    const hairMat = mat(this.hairColor, 0.9);
-    if (this.hairStyle !== 'bald') {
-      const cap = this.part(geo('hairCap', () => new THREE.SphereGeometry(1, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.55)), hairMat, this.headPivot, 0, 0.115, -0.005, 'head');
-      cap.scale.set(0.106, 0.125, 0.116);
-      cap.rotation.x = -0.25;
-      if (this.hairStyle === 'long') {
-        const back = this.part(geo('hairBack', () => new THREE.SphereGeometry(1, 12, 10)), hairMat, this.headPivot, 0, 0.02, -0.06, 'head');
-        back.scale.set(0.1, 0.16, 0.06);
-      } else if (this.hairStyle === 'bun') {
-        this.part(geo('bun', () => new THREE.SphereGeometry(0.045, 10, 8)), hairMat, this.headPivot, 0, 0.2, -0.08, 'head');
-      }
-    }
+    // Pelo: se construyen todas las variantes y se muestran según el estilo
+    const hairMat = this.hairMat;
+    this.hairCap = this.part(geo('hairCap', () => new THREE.SphereGeometry(1, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.55)), hairMat, this.headPivot, 0, 0.115, -0.005, 'head');
+    this.hairCap.scale.set(0.106, 0.125, 0.116);
+    this.hairCap.rotation.x = -0.25;
+    this.hairLong = this.part(geo('hairBack', () => new THREE.SphereGeometry(1, 12, 10)), hairMat, this.headPivot, 0, 0.02, -0.06, 'head');
+    this.hairLong.scale.set(0.1, 0.16, 0.06);
+    this.hairBun = this.part(geo('bun', () => new THREE.SphereGeometry(0.045, 10, 8)), hairMat, this.headPivot, 0, 0.2, -0.08, 'head');
+    this.setHairStyle(this.hairStyle);
     // Gorra (uniformes) y pasamontañas (golpes)
     this.cap = this.part(geo('cap', () => new THREE.CylinderGeometry(0.108, 0.112, 0.07, 16)), hairMat, this.headPivot, 0, 0.2, 0, 'head');
     this.capVisor = this.part(geo('visor', () => new THREE.BoxGeometry(0.16, 0.012, 0.09)), hairMat, this.headPivot, 0, 0.17, 0.11, 'head');
+    this.beanie = this.part(geo('beanie', () => new THREE.SphereGeometry(1, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.55)), hairMat, this.headPivot, 0, 0.11, -0.005, 'head');
+    this.beanie.scale.set(0.112, 0.15, 0.122);
+    this.beanie.rotation.x = -0.15;
+    this.hatCrown = this.part(geo('hatCrown', () => new THREE.CylinderGeometry(0.095, 0.11, 0.13, 18)), hairMat, this.headPivot, 0, 0.225, 0, 'head');
+    this.hatBrim = this.part(geo('hatBrim', () => new THREE.CylinderGeometry(0.19, 0.19, 0.012, 24)), hairMat, this.headPivot, 0, 0.17, 0, 'head');
+    this.hatBand = this.part(geo('hatBand', () => new THREE.CylinderGeometry(0.112, 0.112, 0.03, 18)), mat(0x111111), this.headPivot, 0, 0.19, 0, 'head');
     this.mask = this.part(geo('mask', () => new THREE.SphereGeometry(1, 16, 12)), hairMat, this.headPivot, 0, 0.09, 0.005, 'head');
     this.mask.scale.set(0.103, 0.124, 0.113);
 
@@ -196,23 +204,75 @@ export class HumanModel {
     if (o.tie) this.tie.material = mat(o.tie, 0.6);
     this.badge.visible = !!o.badge;
     for (const a of [this.armL, this.armR]) {
-      a.upper.material = jacket;
-      a.fore.material = o.jacket != null || o.long ? jacket : this.skinMat;
+      a.upper.material = o.sleeveless ? this.skinMat : jacket;
+      a.fore.material = o.jacket != null ? jacket : o.long ? shirt : this.skinMat;
       a.hand.material = o.gloves ? mat(o.gloves) : this.skinMat;
     }
     for (const l of [this.legL, this.legR]) {
       l.thigh.material = pants;
-      l.shin.material = pants;
+      l.shin.material = o.shorts ? this.skinMat : pants;
       l.foot.material = shoes;
     }
-    this.cap.visible = this.capVisor.visible = o.cap != null;
-    if (o.cap != null) this.cap.material = this.capVisor.material = mat(o.cap, 0.7);
+    this.collar.visible = !!o.collar;
+    if (o.collar) this.collar.material = o.jacket != null ? jacket : shirt;
+    this.buttons.visible = !!o.buttons;
+    // Gorros: 'gorra', 'gorraAtras', 'lana', 'sombrero' (los uniformes usan `cap` = gorra)
+    const hat = o.hatStyle || (o.cap != null ? 'gorra' : 'none');
+    const hatMat = mat(o.hatColor ?? o.cap ?? 0x222222, 0.75);
+    const isCap = hat === 'gorra' || hat === 'gorraAtras';
+    this.cap.visible = this.capVisor.visible = isCap;
+    this.cap.material = this.capVisor.material = hatMat;
+    this.capVisor.position.z = hat === 'gorraAtras' ? -0.11 : 0.11;
+    this.beanie.visible = hat === 'lana';
+    this.beanie.material = hatMat;
+    this.hatCrown.visible = this.hatBrim.visible = this.hatBand.visible = hat === 'sombrero';
+    this.hatCrown.material = this.hatBrim.material = hatMat;
+    this.hairCap.visible = this.hairStyle !== 'bald' && hat !== 'lana';
     this.mask.visible = o.mask != null;
     if (o.mask != null) this.mask.material = mat(o.mask, 0.9);
     for (const s of this.stripes) {
       s.visible = !!o.stripes;
       if (o.stripes) s.material = mat(o.stripes);
     }
+  }
+
+  setSkin(color) {
+    this.skinMat.color.setHex(color);
+  }
+
+  setHairColor(color) {
+    this.hairMat.color.setHex(color);
+  }
+
+  setHairStyle(style) {
+    this.hairStyle = style;
+    this.hairCap.visible = style !== 'bald';
+    this.hairLong.visible = style === 'long';
+    this.hairBun.visible = style === 'bun';
+  }
+
+  /**
+   * Aspecto personalizado del vestidor:
+   * { top, topColor, hat, hatColor, bottom, bottomColor, shoes, skin, hair, hairStyle }
+   */
+  setLook(l) {
+    this.setSkin(l.skin);
+    this.setHairColor(l.hair);
+    this.setHairStyle(l.hairStyle);
+    const darker = new THREE.Color(l.topColor).multiplyScalar(0.8).getHex();
+    this.setOutfit({
+      shirt: l.topColor,
+      pants: l.bottomColor,
+      shoes: l.shoes,
+      jacket: l.top === 'sudadera' ? darker : null,
+      long: l.top === 'camisa' || l.top === 'sudadera',
+      collar: l.top === 'polo' || l.top === 'camisa',
+      buttons: l.top === 'camisa',
+      sleeveless: l.top === 'tirantes',
+      shorts: l.bottom === 'short',
+      hatStyle: l.hat,
+      hatColor: l.hatColor,
+    });
   }
 
   /** Mano derecha: punto de anclaje para el arma. */

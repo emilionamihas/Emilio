@@ -47,6 +47,7 @@
     <div id="radar">
       <canvas id="minimap" width="220" height="220"></canvas>
       <div id="radar-north">N</div>
+      <div id="gps"></div>
       <div id="bars">
         <div id="health-bar"><div id="health-fill"></div></div>
         <div id="armor-bar"><div id="armor-fill"></div></div>
@@ -98,6 +99,18 @@
     </div>
   </div>
 
+  <!-- Mapa completo (tecla M) -->
+  <div id="map" class="hidden">
+    <div id="map-box">
+      <canvas id="map-canvas" width="760" height="760"></canvas>
+      <div id="map-side">
+        <div id="map-title">MAPA DE PUERTO SOMBRA</div>
+        <div id="map-list"></div>
+        <div id="map-help"><kbd>W</kbd><kbd>S</kbd> elegir · <kbd>E</kbd> poner ruta · clic en el mapa para cualquier punto · <kbd>X</kbd> borrar ruta · <kbd>M</kbd> cerrar</div>
+      </div>
+    </div>
+  </div>
+
   <div id="big-message"></div>
   <div id="fade"></div>
 
@@ -134,7 +147,8 @@
         <div><b>Clic der.</b> apuntar</div>
         <div><b>F</b> entrar / salir del vehículo</div>
         <div><b>E</b> entrar, comprar, atracar, misiones</div>
-        <div><b>M</b> mis negocios y coches</div>
+        <div><b>M</b> mapa y ruta GPS</div>
+        <div><b>P</b> mis negocios y coches</div>
         <div><b>TAB</b> rueda de armas (o teclas 1-6)</div>
         <div><b>R</b> recargar / enderezar auto</div>
         <div><b>T</b> acelerar el tiempo</div>

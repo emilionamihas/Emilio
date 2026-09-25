@@ -24,7 +24,7 @@ Abre `http://localhost:8080` y elige modo. La primera vez necesitas internet par
 
 | Radar | Lugar | Qué haces allí |
 |---|---|---|
-| H | Tu casa | Se entra: cama (guardar y dormir), ordenador (negocios y coches) y armario (ropa) |
+| H | Tu casa | Se entra: cama (guardar y dormir), ordenador (negocios y coches) y vestidor |
 | A | Armería Plomo | Comprar armas, munición y chaleco antibalas |
 | C | Autos Velasco | Comprar coches (no cuentan como robo y quedan en tu garaje) |
 | T | Cinco tiendas 24/7 | Se entra: encañonas al dependiente y vacía la caja (700 a 1.600 dólares, 2 estrellas) |
@@ -40,7 +40,13 @@ Abre `http://localhost:8080` y elige modo. La primera vez necesitas internet par
 | Banco Central | 3 | 14 s | 4 | 35.000 a 50.000 | 3 → 4 |
 | Reserva Federal | 4 | 18 s | 5 | 110.000 a 150.000 | 4 → 5 |
 
-**Negocios.** Pagan cada minuto de juego: Lavandería Espuma (8.000, 250/min), Taller Pistón (15.000, 450/min), Club Neón (30.000, 900/min), Hotel Marina (60.000, 1.700/min) y Casino Sombra (150.000, 4.000/min). Cada uno se puede reformar (x1,6) y llevar a lujo (x2,4). Mientras no juegas siguen generando la mitad, hasta una hora. Con **M** abres *Mis propiedades*: negocios, mejoras, tus coches (te los traen donde estés por 250), un resumen de lo ganado y el GPS.
+**Negocios.** Pagan cada 30 segundos: Lavandería Espuma (8.000, 1.000/min), Taller Pistón (15.000, 1.800/min), Club Neón (30.000, 3.600/min), Hotel Marina (60.000, 7.000/min) y Casino Sombra (150.000, 16.000/min). Cada uno se puede reformar (x1,6) y llevar a lujo (x2,4). Mientras no juegas siguen generando la mitad, hasta una hora. Con **P** abres *Mis propiedades*: negocios, mejoras, tus coches, un resumen de lo ganado y el GPS.
+
+**Tus coches.** Empiezas con un sedán propio aparcado frente a casa. Los coches propios (el de serie y los que compras en Autos Velasco) no son robo: subir a ellos nunca da estrellas; solo robar uno ajeno. Puedes tener varios, incluso del mismo modelo, y cada uno con su diseño: pintura (16 colores), segundo color, dibujo (liso, franjas dobles, racing o bicolor) y acabado (brillo, metalizado o mate), 300 por cambio desde *P › Mis coches*. Desde el ordenador de casa te lo sacan a la puerta gratis; en la calle, un mecánico te lo trae por 250.
+
+**Vestidor.** En tu casa: parte de arriba (camiseta, polo, camisa, sudadera o tirantes), gorro (gorra, gorra hacia atrás, gorro de lana o sombrero), pantalón largo o short, zapatillas, tono de piel, peinado y color de pelo, cada uno con su color. También hay conjuntos completos.
+
+**Mapa y GPS.** La tecla **M** abre el mapa de la ciudad. Elige un destino de la lista (W/S y E) o haz clic en cualquier punto: la ruta se calcula por las calles y se dibuja en morado en el radar, con la distancia debajo.
 
 **Armas.** Puños, pistola (400), subfusil (2.200), escopeta (3.200), rifle de asalto (6.500) y lanzacohetes (25.000). Cada arma viene con dos cargadores; luego la munición se compra por cajas. El chaleco (600) absorbe el 70 % del daño. A partir de tres estrellas la policía dispara.
 
@@ -80,7 +86,8 @@ npm run test:vehicles
 | Clic izquierdo / derecho | disparar / apuntar | |
 | F | entrar o robar un vehículo | salir (en marcha, saltas) |
 | E | entrar en edificios, comprar, atracar, misiones | |
-| M | mis negocios, coches y GPS | mis negocios, coches y GPS |
+| M | mapa y ruta GPS | mapa y ruta GPS |
+| P | mis negocios y coches | mis negocios y coches |
 | TAB (mantener) o 1-6 | rueda de armas | |
 | R | recargar | enderezar el coche volcado |
 | Enter | saltar diálogo | saltar diálogo |
@@ -102,7 +109,8 @@ js/main.js                Arranque, modos, explosiones, muerte/arresto y bucle p
 js/GameState.js           Dinero, armas, negocios, coches, progreso y guardado
 js/Missions.js            Guion del modo historia y lógica de objetivos
 js/Interiors.js           Interiores de casa, tiendas y bancos (se construyen fuera del mapa)
-js/Properties.js          Negocios por minuto, mejoras, menú de propiedades, entrega de coches y armario
+js/Properties.js          Negocios, mejoras, menú de propiedades, personalización de coches y vestidor
+js/MapView.js             Mapa completo y ruta por las calles (A*)
 js/HumanModel.js          Figura humana articulada y vestuarios
 js/NPC.js                 Guardias, policías, cajeros, clientes y peatones
 js/Textures.js            Texturas procedurales (fachadas, mármol, parqué, baldosas...)

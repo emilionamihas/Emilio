@@ -110,6 +110,12 @@ export class PlayerController {
     this.game.scene.add(root);
   }
 
+  /** Aspecto personalizado del vestidor. */
+  applyLook(look) {
+    this.outfitId = 'custom';
+    this.model.setLook(look);
+  }
+
   /** Cambia la ropa (armario de casa). */
   setOutfit(id) {
     if (!OUTFITS[id]) return;

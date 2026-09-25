@@ -382,7 +382,8 @@ export class VehicleController {
         [zf - slopeF - 0.05, top + 0.05],
         [zr + slopeR + 0.05, top + 0.05],
       ];
-      add(extrudeProfile(roof, gw - 0.02, 0.03), style === 'police' || style === 'taxi' ? (style === 'police' ? whiteMat : this.paintMat) : this.paintMat);
+      this.roofMesh = add(extrudeProfile(roof, gw - 0.02, 0.03), style === 'police' || style === 'taxi' ? (style === 'police' ? whiteMat : this.paintMat) : this.paintMat);
+      this.roofInfo = { y: top + 0.05, zf: zf - slopeF, zr: zr + slopeR, w: gw };
       // Pilares B (color carrocería) y retrovisores
       const bz = (zf - slopeF + zr + slopeR) / 2;
       for (const side of [-1, 1]) {
@@ -488,6 +489,54 @@ export class VehicleController {
     });
 
     this.mesh = group;
+    this.dims = { W, L, H };
+    this.stripes = new THREE.Group();
+    group.add(this.stripes);
+  }
+
+  /**
+   * Personalización de un coche propio.
+   * car: { color, color2, design: 'liso'|'franjas'|'bicolor'|'racing', finish: 'brillo'|'metalizado'|'mate' }
+   */
+  applyStyle(car) {
+    const m = this.paintMat;
+    if (car.color != null) m.color.setHex(car.color);
+    const finish = { brillo: [0.45, 0.32, 0.9], metalizado: [0.9, 0.22, 1], mate: [0.1, 0.85, 0] }[car.finish || 'brillo'];
+    m.metalness = finish[0];
+    m.roughness = finish[1];
+    m.clearcoat = finish[2];
+    this.originalColor = m.color.getHex();
+
+    // Dibujo: se reconstruye cada vez
+    for (const c of [...this.stripes.children]) this.stripes.remove(c);
+    if (this.roofMesh) this.roofMesh.material = m;
+    const second = new THREE.MeshPhysicalMaterial({ color: car.color2 ?? 0x111111, metalness: finish[0], roughness: finish[1], clearcoat: finish[2] });
+    const { W, L, H } = this.dims;
+    const strip = (w, h, d, x, y, z) => {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), second);
+      b.position.set(x, y, z);
+      this.stripes.add(b);
+    };
+    const r = this.roofInfo;
+    switch (car.design) {
+      case 'franjas':
+        for (const x of [-0.2, 0.2]) {
+          strip(0.22, 0.012, L * 0.98, x, H + 0.008, 0);
+          if (r) strip(0.22, 0.012, r.zf - r.zr, x, r.y + 0.004, (r.zf + r.zr) / 2);
+        }
+        break;
+      case 'racing':
+        strip(0.5, 0.012, L * 0.98, 0, H + 0.008, 0);
+        if (r) strip(0.5, 0.012, r.zf - r.zr, 0, r.y + 0.004, (r.zf + r.zr) / 2);
+        for (const side of [-1, 1]) strip(0.012, 0.12, L * 0.7, side * (W / 2 + 0.005), H * 0.55, 0);
+        break;
+      case 'bicolor':
+        if (this.roofMesh) this.roofMesh.material = second;
+        for (const side of [-1, 1]) strip(0.012, H * 0.35, L * 0.92, side * (W / 2 + 0.004), H * 0.3, 0);
+        break;
+      default:
+        break;
+    }
   }
 
   // ------------------------------------------------------------------

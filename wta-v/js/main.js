@@ -17,6 +17,7 @@ import { Missions, STORY } from './Missions.js';
 import { Interiors } from './Interiors.js';
 import { Properties } from './Properties.js';
 import { Pedestrians } from './NPC.js';
+import { MapView } from './MapView.js';
 
 const FIXED_STEP = 1 / 60;
 const params = new URLSearchParams(location.search);
@@ -70,6 +71,8 @@ const game = {
   state: new GameState('free'), // se sustituye al elegir modo
   interior: null, // { inst, poi } mientras estás dentro de un edificio
   waypoint: null, // destino marcado en el GPS
+  route: null, // ruta por las calles hasta el destino
+  mapOpen: false,
   on(type, fn) {
     bus.addEventListener(type, (e) => fn(e.detail));
   },
@@ -126,6 +129,16 @@ game.missions = new Missions(game);
 game.interiors = new Interiors(game);
 game.properties = new Properties(game);
 game.pedestrians = new Pedestrians(game, { count: 10 });
+game.map = new MapView(game);
+
+/** Vestidor: el personaje mira a la cámara para ver cómo queda la ropa (el juego está en pausa). */
+game.previewPlayer = () => {
+  const p = game.player;
+  p.facing = game.cameraRig.yaw;
+  p.syncMesh();
+  p.model.animate(0.1, { speed: 0 });
+  for (let i = 0; i < 20; i++) game.cameraRig.update(1 / 30);
+};
 
 // NPC abatidos: delito según a quién
 game.onNpcKilled = (npc) => {
@@ -242,7 +255,11 @@ function applyState() {
   const player = game.player;
   player.weaponIndex = 0;
   player.updateWeaponVisual();
-  player.setOutfit(st.outfit || 'calle');
+  // Tu coche (el primero del garaje) aparcado frente a casa
+  const home = game.locations.byId('casa');
+  if (st.cars[0]) game.locations.spawnOwnedCar(st.cars[0], home.park, home.heading);
+  if (st.outfit && st.outfit !== 'custom') player.setOutfit(st.outfit);
+  else player.applyLook(st.look);
   game.hud.shownMoney = st.money;
   // Las armas iniciales llegan con munición
   for (const i of st.ownedWeapons) if (i > 0 && st.clip[i] == null) player.giveWeapon(i);
@@ -308,6 +325,7 @@ canvas.addEventListener('click', () => {
   if (game.running && !game.input.locked && !game.input.freeMouse) game.input.requestLock();
 });
 game.input.onLockChange = (locked) => {
+  if (game.mapOpen) return; // el mapa libera el ratón a propósito
   if (locked) start();
   else if (!params.has('autostart') && !game.input.freeMouse) pause(); // Esc libera el ratón: pausa
 };
@@ -344,7 +362,8 @@ function step(dt) {
   const input = game.input;
 
   game.env.timeSpeed = input.isDown('KeyT') ? 25 : 1;
-  if (input.wasPressed('KeyM') && !game.menus.isOpen) game.menus.open(game.properties.rootMenu());
+  if (input.wasPressed('KeyP') && !game.menus.isOpen) game.menus.open(game.properties.rootMenu());
+  if (input.wasPressed('KeyM') && !game.menus.isOpen) game.map.show();
 
   // 1. Lógica previa a la física: jugador, interacción, lugares, misiones e IA
   game.player.update(dt, game.cameraRig);
@@ -355,6 +374,7 @@ function step(dt) {
   game.interiors.update(dt);
   game.properties.update(dt);
   game.pedestrians.update(dt);
+  game.map.update(dt);
   game.traffic.update(dt);
   game.wanted.update(dt);
   for (const v of game.vehicles) v.update(dt);
@@ -374,6 +394,7 @@ function step(dt) {
     if (Math.hypot(f.x - game.waypoint.pos.x, f.z - game.waypoint.pos.z) < 8) {
       game.hud.notify(`Has llegado: ${game.waypoint.label}.`, 2);
       game.waypoint = null;
+      game.route = null;
     }
   }
   game.effects.update(dt);
@@ -389,7 +410,7 @@ function frame() {
   requestAnimationFrame(frame);
   const raw = Math.min(clock.getDelta(), 0.05);
   // Con un menú de tienda abierto el mundo se congela
-  if (game.running && !game.menus.isOpen) step(raw * game.timeScale);
+  if (game.running && !game.menus.isOpen && !game.mapOpen) step(raw * game.timeScale);
   renderer.render(scene, camera);
   game.input.endFrame();
 }

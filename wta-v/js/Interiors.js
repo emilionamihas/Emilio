@@ -242,7 +242,7 @@ export class Interiors {
     // Armario (pared izquierda)
     B(0.65, 2.3, 2.0, mat({ color: 0xcfc7b8, roughness: 0.6 }), -6.65, 1.15, -1.9);
     B(0.02, 2.2, 0.02, black, -6.31, 1.15, -1.9, { collide: false });
-    inst.interactables.push({ id: 'wardrobe', pos: this.world(inst, -5.7, -1.9), radius: 1.3, label: 'Armario: cambiarte de ropa' });
+    inst.interactables.push({ id: 'wardrobe', pos: this.world(inst, -5.7, -1.9), radius: 1.3, label: 'Vestidor: polo, gorro, short, colores y peinado' });
 
     // Despacho (fondo a la derecha) con portátil
     B(1.8, 0.05, 0.8, wood, 4.5, 0.76, -5.3);
@@ -655,6 +655,7 @@ export class Interiors {
         break;
       case 'wardrobe':
         game.menus.open(game.properties.wardrobeMenu());
+        game.previewPlayer();
         break;
       case 'laptop':
         game.menus.open(game.properties.rootMenu());

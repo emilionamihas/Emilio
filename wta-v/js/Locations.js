@@ -344,18 +344,18 @@ export class Locations {
       items: () =>
         DEALER_MODELS.map((type) => {
           const c = CATALOG[type];
-          const owned = st.cars.includes(type);
+          const owned = st.cars.filter((car) => car.type === type).length;
           return {
             label: `${c.label} · ${c.kind}`,
-            detail: `${Math.round(c.maxSpeed * 3.6)} km/h · tracción ${c.drive === 'awd' ? 'total' : c.drive === 'fwd' ? 'delantera' : 'trasera'}${owned ? ' · ya en tu garaje (compra otro)' : ''}`,
+            detail: `${Math.round(c.maxSpeed * 3.6)} km/h · tracción ${c.drive === 'awd' ? 'total' : c.drive === 'fwd' ? 'delantera' : 'trasera'}${owned ? ` · ya tienes ${owned}` : ''}`,
             price: c.price,
             action: () => {
               st.spend(c.price);
-              if (!owned) st.cars.push(type);
+              const car = st.addCar({ type, color: c.colors[Math.floor(Math.random() * c.colors.length)] });
               st.stats.cars++;
               st.save();
-              const v = this.spawnOwnedCar(type, poi.park, poi.heading);
-              game.hud.notify(`${v.label} te espera en la calle. Pulsa F para subir.`);
+              const v = this.spawnOwnedCar(car, poi.park, poi.heading);
+              game.hud.notify(`${v.label} es tuyo y te espera en la calle. Personalízalo con P › Mis coches.`);
               game.emit('carBought', { type });
             },
           };
@@ -387,8 +387,20 @@ export class Locations {
     };
   }
 
-  spawnOwnedCar(type, pos, heading) {
+  /**
+   * Aparca un coche en la calle. Con una ficha de coche propio ({ id, type, color... }) el coche es tuyo:
+   * no cuenta como robo y, si ya estaba en la calle, se mueve en vez de duplicarse.
+   * Con un tipo ('sport') es un coche cualquiera (misiones).
+   */
+  spawnOwnedCar(typeOrCar, pos, heading) {
     const game = this.game;
+    const car = typeof typeOrCar === 'object' ? typeOrCar : null;
+    const type = car ? car.type : typeOrCar;
+    if (car) {
+      const existing = game.vehicles.find((v) => v.ownedCar && v.ownedCar.id === car.id);
+      if (existing && existing.driver !== 'player') existing.removeFromWorld();
+      if (existing && existing.driver === 'player') return existing;
+    }
     // Aparta cualquier coche sin conductor que ocupe la plaza
     for (const v of [...game.vehicles]) {
       if (v.driver !== 'player' && Math.hypot(v.position.x - pos.x, v.position.z - pos.z) < 5) {
@@ -398,6 +410,10 @@ export class Locations {
     }
     const v = new VehicleController(game, { type, position: pos, heading });
     v.playerOwned = true;
+    if (car) {
+      v.ownedCar = car;
+      v.applyStyle(car);
+    }
     v.addToWorld();
     return v;
   }

@@ -10,6 +10,23 @@ export const START = {
   free: { money: 60000, weapons: [0, 1], armor: 50 },
 };
 
+/** Aspecto inicial del personaje (vestidor de casa). */
+export const DEFAULT_LOOK = {
+  top: 'polo',
+  topColor: 0xeeeeee,
+  hat: 'none',
+  hatColor: 0x1a237e,
+  bottom: 'largo',
+  bottomColor: 0x2c3e66,
+  shoes: 0x1b1b1b,
+  skin: 0xc68642,
+  hair: 0x1b1b1b,
+  hairStyle: 'short',
+};
+
+/** Coche de serie con el que empiezas: es tuyo, así que usarlo no es delito. */
+export const STARTER_CAR = { type: 'sedan', color: 0x1565c0, color2: 0xeeeeee, design: 'liso', finish: 'metalizado' };
+
 /** $1.234.567 (agrupa siempre de tres en tres, también con 4 cifras). */
 export function formatMoney(n) {
   const v = Math.floor(Math.abs(n));
@@ -39,8 +56,11 @@ export class GameState {
     this.armor = s.armor;
     this.businesses = new Set();
     this.bizLevel = {};   // nivel de mejora de cada negocio (1-3)
-    this.cars = [];       // tipos de coche comprados
-    this.outfit = 'calle';
+    this.cars = [];       // coches propios: { id, type, color, color2, design, finish }
+    this.nextCarId = 1;
+    this.addCar(STARTER_CAR);
+    this.look = { ...DEFAULT_LOOK };
+    this.outfit = 'custom';
     this.savedAt = null;
     this.storyStep = 0;   // índice de la siguiente misión
     this.storyDone = false;
@@ -76,8 +96,13 @@ export class GameState {
     this.armor = d.armor ?? 0;
     this.businesses = new Set(d.businesses ?? []);
     this.bizLevel = d.bizLevel ?? {};
-    this.cars = d.cars ?? [];
-    this.outfit = d.outfit ?? 'calle';
+    this.nextCarId = d.nextCarId ?? 1;
+    this.cars = [];
+    // Partidas antiguas guardaban solo el tipo ('sport'); se convierten a fichas de coche
+    for (const c of d.cars ?? []) this.cars.push(typeof c === 'string' ? { id: this.nextCarId++, type: c, color: null, color2: 0x111111, design: 'liso', finish: 'brillo' } : c);
+    if (!this.cars.length) this.addCar(STARTER_CAR);
+    this.look = { ...DEFAULT_LOOK, ...(d.look || {}) };
+    this.outfit = d.outfit ?? 'custom';
     this.savedAt = d.savedAt ?? null;
     this.storyStep = d.storyStep ?? 0;
     this.storyDone = !!d.storyDone;
@@ -95,6 +120,8 @@ export class GameState {
       businesses: [...this.businesses],
       bizLevel: this.bizLevel,
       cars: this.cars,
+      nextCarId: this.nextCarId,
+      look: this.look,
       outfit: this.outfit,
       storyStep: this.storyStep,
       storyDone: this.storyDone,
@@ -102,6 +129,12 @@ export class GameState {
       savedAt: Date.now(),
     };
     safeStorage((ls) => ls.setItem(SAVE_KEYS[this.mode], JSON.stringify(d)));
+  }
+
+  addCar(opts) {
+    const car = { id: this.nextCarId++, type: opts.type, color: opts.color ?? null, color2: opts.color2 ?? 0x111111, design: opts.design || 'liso', finish: opts.finish || 'brillo' };
+    this.cars.push(car);
+    return car;
   }
 
   addMoney(amount) {

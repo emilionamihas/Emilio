@@ -24,9 +24,9 @@ export const STORY = [
     giver: 'lucho',
     reward: 1500,
     steps: [
-      { type: 'say', lines: ['Lucho: ¿Así que tú eres el sobrino de Ramón? Puerto Sombra no regala nada.', 'Lucho: Tráeme cualquier coche. Me da igual de quién sea. Te pago por la chapa.'] },
-      { type: 'getInVehicle', text: 'Consigue un coche (acércate a uno y pulsa F)' },
-      { type: 'deliver', text: 'Lleva el coche al taller de Lucho', at: 'lucho' },
+      { type: 'say', lines: ['Lucho: ¿Así que tú eres el sobrino de Ramón? Puerto Sombra no regala nada.', 'Lucho: Tráeme un coche que no sea el tuyo. Me da igual de quién sea. Te pago por la chapa.'] },
+      { type: 'getInVehicle', text: 'Roba un coche que no sea tuyo (acércate a uno y pulsa F)', notOwned: true },
+      { type: 'deliver', text: 'Lleva el coche robado al taller de Lucho', at: 'lucho', notOwned: true },
       { type: 'say', lines: ['Lucho: No está mal para ser el primero. Vuelve cuando quieras más trabajo.'] },
     ],
   },
@@ -77,7 +77,7 @@ export const STORY = [
     steps: [
       { type: 'say', lines: ['Vera: Tanto efectivo llama la atención. Necesitas un negocio que lo justifique.', 'Vera: La Lavandería Espuma está en venta. Cómprala, o cualquier otro negocio (N en el radar).'] },
       { type: 'event', event: 'businessBought', text: 'Compra un negocio (N en el radar)', poi: 'lavanderia', already: (g) => g.state.businesses.size > 0 },
-      { type: 'say', lines: ['Vera: Ahora tus ingresos parecen legales, y el negocio te paga cada minuto. Mira tus cuentas con la tecla M.'] },
+      { type: 'say', lines: ['Vera: Ahora tus ingresos parecen legales, y el negocio te paga cada minuto. Mira tus cuentas con la tecla P.'] },
     ],
   },
   {
@@ -371,7 +371,12 @@ export class Missions {
       case 'getInVehicle': {
         const inter = game.interaction;
         const v = inter.isDriving ? inter.vehicle : null;
+        game.hud.setObjective(step.text);
         if (step.tagged) this.setTarget(a.missionVehicle.position, 'Objetivo', false);
+        if (v && step.notOwned && v.ownedCar) {
+          game.hud.setObjective('Ese es tu coche. Roba uno que no sea tuyo.');
+          break;
+        }
         if (v && (!step.tagged || v === a.missionVehicle)) {
           if (step.alarm) game.wanted.raiseTo(step.alarm);
           this.advance();
@@ -384,6 +389,10 @@ export class Missions {
         this.setTarget(dest, g.place, true);
         const inter = game.interaction;
         const v = inter.isDriving ? inter.vehicle : null;
+        if (step.notOwned && v && v.ownedCar) {
+          game.hud.setObjective('Lucho no quiere tu coche: roba otro.');
+          break;
+        }
         if (step.tagged && v !== a.missionVehicle) {
           game.hud.setObjective('Vuelve a subir al vehículo de la misión');
           if (a.missionVehicle) this.setTarget(a.missionVehicle.position, 'Vehículo', false);
