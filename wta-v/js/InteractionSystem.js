@@ -45,6 +45,7 @@ export class InteractionSystem {
         if (this.candidate) {
           const c = this.candidate;
           if (c.ownedCar) game.hud.setPrompt(`Pulsa <kbd>F</kbd> para subir a tu ${c.spec.label}`);
+          else if (c.spec.bike) game.hud.setPrompt(`Pulsa <kbd>F</kbd> para ${c.driver ? 'robar' : 'coger'} la moto`);
           else {
             const verb = c.driver === 'ai' || c.driver === 'police' || !c.playerOwned ? 'robar' : 'entrar en';
             game.hud.setPrompt(`Pulsa <kbd>F</kbd> para ${verb} el vehículo`);
@@ -146,13 +147,15 @@ export class InteractionSystem {
       const k = (t - 0.6) / 0.4;
       const seat = _b.set(v.position.x, v.position.y - 0.3, v.position.z);
       player.mesh.position.lerpVectors(door, seat, k);
-      player.mesh.scale.setScalar(1 - k * 0.3);
+      if (!v.spec.bike) player.mesh.scale.setScalar(1 - k * 0.3);
     }
     player.mesh.rotation.y = Math.atan2(door.x - player.mesh.position.x, door.z - player.mesh.position.z) || player.mesh.rotation.y;
     player.model.animate(dt, { speed: t < 0.6 ? 2 : 0 });
 
     if (t >= 1) {
-      player.mesh.visible = false;
+      // En moto el piloto se ve: lo coloca la propia moto en cada fotograma
+      player.mesh.visible = !!v.spec.bike;
+      if (v.spec.bike) v.rider = player;
       player.mesh.scale.setScalar(1);
       v.input.handbrake = false;
       this.state = 'driving';
@@ -181,6 +184,7 @@ export class InteractionSystem {
     const jumpOut = Math.abs(speed) > 8; // salto en marcha: el coche sigue sin conductor
 
     v.driver = null;
+    v.rider = null;
     v.input.throttle = v.input.reverse = v.input.steer = 0;
     v.input.handbrake = !jumpOut;
     game.hud.showSpeedometer(false);
@@ -190,7 +194,7 @@ export class InteractionSystem {
     player.mesh.visible = true;
     player.facing = v.getHeading();
     const seat = new THREE.Vector3(v.position.x, v.position.y - 0.3, v.position.z);
-    this.anim = { t: 0, seat, door, jumpOut, side, carVel: v.chassisBody.velocity.clone() };
+    this.anim = { t: 0, seat, door, jumpOut, side, bike: !!v.spec.bike, carVel: v.chassisBody.velocity.clone() };
     this.state = 'exiting';
   }
 
@@ -203,8 +207,8 @@ export class InteractionSystem {
     const k = THREE.MathUtils.smoothstep(t, 0, 1);
     player.mesh.position.lerpVectors(a.seat, a.door, k);
     player.mesh.position.y = a.seat.y * (1 - k) + (a.door.y || 0) * k;
-    player.mesh.scale.setScalar(0.7 + 0.3 * k);
-    player.mesh.rotation.y = player.facing;
+    player.mesh.scale.setScalar(a.bike ? 1 : 0.7 + 0.3 * k);
+    player.mesh.rotation.set(0, player.facing, 0);
 
     if (t >= 1) {
       player.mesh.scale.setScalar(1);
@@ -225,6 +229,7 @@ export class InteractionSystem {
   forceExit() {
     if (this.vehicle) {
       this.vehicle.driver = null;
+      this.vehicle.rider = null;
       this.vehicle.input.handbrake = true;
     }
     this.lightHolder.removeFromParent();
@@ -234,6 +239,7 @@ export class InteractionSystem {
     const player = this.game.player;
     player.mesh.visible = true;
     player.mesh.scale.setScalar(1);
+    player.mesh.rotation.set(0, player.facing, 0);
     player.setEnabled(true);
     this.game.hud.showSpeedometer(false);
     this.game.cameraRig.setMode('foot', player);

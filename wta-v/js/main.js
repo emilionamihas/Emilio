@@ -19,6 +19,7 @@ import { Properties } from './Properties.js';
 import { Pedestrians } from './NPC.js';
 import { MapView } from './MapView.js';
 import { Cheats } from './Cheats.js';
+import { Quality, savedQualityMode } from './Quality.js';
 
 const FIXED_STEP = 1 / 60;
 const params = new URLSearchParams(location.search);
@@ -27,8 +28,9 @@ const params = new URLSearchParams(location.search);
 // Renderizado
 // ----------------------------------------------------------------------
 const canvas = document.getElementById('game-canvas');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+// El MSAA solo en calidad Alta: a resolución alta es de lo que más GPU consume (se fija al crear el contexto)
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: savedQualityMode() === 'alta', powerPreference: 'high-performance' });
+renderer.setPixelRatio(1);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -136,6 +138,7 @@ game.properties = new Properties(game);
 game.pedestrians = new Pedestrians(game, { count: 10 });
 game.map = new MapView(game);
 game.cheats = new Cheats(game);
+game.quality = new Quality(game);
 
 /** Vestidor: el personaje mira a la cámara para ver cómo queda la ropa (el juego está en pausa). */
 game.previewPlayer = () => {
@@ -157,6 +160,7 @@ const parked = [
   { z: 47, type: 'compact' },
   { z: 58, type: 'muscle', color: 0xb71c1c },
   { z: 70, type: 'pickup' },
+  { z: 80, type: 'scooter', color: 0x26a69a },
 ];
 for (const p of parked) {
   const v = new VehicleController(game, { type: p.type, color: p.color, position: new THREE.Vector3(6.3, 0, p.z), heading: Math.PI });
@@ -414,7 +418,9 @@ function step(dt) {
 
 function frame() {
   requestAnimationFrame(frame);
-  const raw = Math.min(clock.getDelta(), 0.05);
+  const real = clock.getDelta();
+  game.quality.update(real, game.running && !game.menus.isOpen && !game.mapOpen);
+  const raw = Math.min(real, 0.05);
   // Con un menú de tienda abierto el mundo se congela
   if (game.running && !game.menus.isOpen && !game.mapOpen) step(raw * game.timeScale);
   renderer.render(scene, camera);

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { GROUPS } from './Environment.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 /**
  * Catálogo de vehículos.
@@ -84,6 +85,23 @@ export const CATALOG = {
     body: { w: 1.0, l: 2.5, h: 1.6 }, cabin: null,
     wheel: { r: 0.4, x: 0.88, zf: 1.65, zr: -1.5, rest: 0.34 },
     style: 'van', colors: [0xf5f5f5, 0x1e88e5, 0x795548],
+  },
+  // Motos: física de cuatro ruedas muy juntas (dos por eje) con la inclinación solo visual
+  scooter: {
+    label: 'Vespino', kind: 'Scooter', price: 1500, mass: 170, drive: 'rwd', power: 1000, maxSpeed: 36,
+    brakeDecel: 9, handbrakeDecel: 4, maxSteer: 0.5, gripFront: 2.0, gripRear: 1.9, drift: 0.8,
+    stiffness: 34, damping: [2.4, 4.2], health: 70,
+    body: { w: 0.24, l: 0.85, h: 0.5 }, cabin: null,
+    wheel: { r: 0.26, x: 0.2, zf: 0.62, zr: -0.58, rest: 0.22 },
+    style: 'scooter', bike: true, colors: [0xef5350, 0x26a69a, 0xfdd835, 0xf5f5f5, 0x5c6bc0],
+  },
+  moto: {
+    label: 'Rayo', kind: 'Moto deportiva', price: 12000, mass: 240, drive: 'rwd', power: 2600, maxSpeed: 64,
+    brakeDecel: 11, handbrakeDecel: 4, maxSteer: 0.42, gripFront: 2.3, gripRear: 2.2, drift: 0.8,
+    stiffness: 40, damping: [2.6, 4.4], health: 85,
+    body: { w: 0.24, l: 1.0, h: 0.5 }, cabin: null,
+    wheel: { r: 0.32, x: 0.2, zf: 0.74, zr: -0.72, rest: 0.24 },
+    style: 'sportbike', bike: true, colors: [0xd50000, 0x111111, 0x1e88e5, 0x76ff03, 0xff6d00],
   },
   police: {
     label: 'Patrulla', kind: 'Policía', price: 0, mass: 1300, drive: 'rwd', power: 8600, maxSpeed: 56,
@@ -194,6 +212,10 @@ const _fwd = new CANNON.Vec3();
 const _up = new CANNON.Vec3();
 const _right = new CANNON.Vec3();
 const _zero = new CANNON.Vec3();
+const _q = new THREE.Quaternion();
+const _bodyQ = new THREE.Quaternion();
+const _v3 = new THREE.Vector3();
+const _zAxis = new THREE.Vector3(0, 0, 1);
 
 function derive(spec) {
   if (spec._derived) return spec;
@@ -208,7 +230,27 @@ function derive(spec) {
   return spec;
 }
 
+/** Materiales con barniz (clearcoat) para poder quitarlo en calidad media/baja. */
+const COATED = new Set();
+function coat(mat) {
+  mat.userData.cc = mat.clearcoat;
+  if (!VehicleController.CLEARCOAT) mat.clearcoat = 0;
+  COATED.add(mat);
+  return mat;
+}
+
 export class VehicleController {
+  static CLEARCOAT = true;
+
+  static setClearcoat(on) {
+    if (VehicleController.CLEARCOAT === on) return;
+    VehicleController.CLEARCOAT = on;
+    for (const m of COATED) {
+      m.clearcoat = on ? m.userData.cc : 0;
+      m.needsUpdate = true;
+    }
+  }
+
   constructor(game, { type = 'sedan', color, position = new THREE.Vector3(), heading = 0 } = {}) {
     this.game = game;
     this.type = type === 'civil' ? 'sedan' : type;
@@ -262,6 +304,12 @@ export class VehicleController {
     }
     chassis.allowSleep = false;
     chassis.userData = { vehicle: this };
+    if (s.bike) {
+      // Moto + piloto: más inercia de giro de la que da su caja de colisión, tan estrecha
+      chassis.inertia.y *= 2.5;
+      chassis.invInertia.y = 1 / chassis.inertia.y;
+      chassis.updateInertiaWorld(true);
+    }
 
     const vehicle = new CANNON.RaycastVehicle({
       chassisBody: chassis,
@@ -281,7 +329,7 @@ export class VehicleController {
       maxSuspensionForce: 1e6,
       dampingRelaxation: s.damping[0],
       dampingCompression: s.damping[1],
-      rollInfluence: 0.02,
+      rollInfluence: s.bike ? 0 : 0.02, // en las motos la fuerza lateral no vuelca el chasis
       customSlidingRotationalSpeed: -30,
       useCustomSlidingRotationalSpeed: true,
     };
@@ -308,14 +356,19 @@ export class VehicleController {
 
   createMeshes(color) {
     const s = this.spec;
+    if (s.bike) {
+      this.createBikeMeshes(color);
+      VehicleController.mergeByMaterial(this.mesh, new Set([this.roofMesh]));
+      return;
+    }
     const group = new THREE.Group();
     group.userData.vehicle = this;
     const style = s.style;
     const paint = color ?? s.colors[Math.floor(Math.random() * s.colors.length)];
 
     // Pintura con capa de barniz: refleja el cielo (scene.environment)
-    this.paintMat = new THREE.MeshPhysicalMaterial({ color: paint, metalness: 0.55, roughness: 0.32, clearcoat: 0.9, clearcoatRoughness: 0.12 });
-    const whiteMat = new THREE.MeshPhysicalMaterial({ color: 0xf2f2f2, metalness: 0.3, roughness: 0.3, clearcoat: 0.8 });
+    this.paintMat = coat(new THREE.MeshPhysicalMaterial({ color: paint, metalness: 0.55, roughness: 0.32, clearcoat: 0.9, clearcoatRoughness: 0.12 }));
+    const whiteMat = coat(new THREE.MeshPhysicalMaterial({ color: 0xf2f2f2, metalness: 0.3, roughness: 0.3, clearcoat: 0.8 }));
     const glassMat = new THREE.MeshStandardMaterial({ color: 0x0e1419, metalness: 0.9, roughness: 0.05, envMapIntensity: 1.4 });
     const trimMat = SHARED.trim;
     const chromeMat = SHARED.chrome;
@@ -490,8 +543,115 @@ export class VehicleController {
 
     this.mesh = group;
     this.dims = { W, L, H };
+    // Menos llamadas de dibujo: las piezas que comparten material se fusionan en una sola malla
+    VehicleController.mergeByMaterial(group, new Set([this.roofMesh]));
     this.stripes = new THREE.Group();
     group.add(this.stripes);
+  }
+
+  /**
+   * Fusiona los hijos directos de `group` que comparten material (una llamada de dibujo por material
+   * en vez de una por pieza). Las mallas de `keep` se dejan sueltas (p. ej. el techo, que cambia de material).
+   */
+  static mergeByMaterial(group, keep = new Set()) {
+    const buckets = new Map();
+    for (const m of [...group.children]) {
+      if (!m.isMesh || keep.has(m) || Array.isArray(m.material)) continue;
+      m.updateMatrix();
+      const g = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone();
+      g.applyMatrix4(m.matrix);
+      for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
+      if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+      if (!buckets.has(m.material)) buckets.set(m.material, []);
+      buckets.get(m.material).push(g);
+      group.remove(m);
+    }
+    for (const [mat, geos] of buckets) {
+      const merged = mergeGeometries(geos, false);
+      for (const g of geos) g.dispose();
+      const mesh = new THREE.Mesh(merged, mat);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      group.add(mesh);
+    }
+  }
+
+  /** Moto: depósito, carenado, asiento, motor, horquilla, manillar y dos ruedas finas. */
+  createBikeMeshes(color) {
+    const s = this.spec;
+    const group = new THREE.Group();
+    group.userData.vehicle = this;
+    const paint = color ?? s.colors[Math.floor(Math.random() * s.colors.length)];
+    this.paintMat = coat(new THREE.MeshPhysicalMaterial({ color: paint, metalness: 0.55, roughness: 0.3, clearcoat: 0.9, clearcoatRoughness: 0.12 }));
+    this.headMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff4d6, emissiveIntensity: 0.6, roughness: 0.1 });
+    this.tailMat = new THREE.MeshStandardMaterial({ color: 0x550000, emissive: 0xff1a1a, emissiveIntensity: 0.4, roughness: 0.2 });
+    this.reverseMat = this.tailMat;
+    const trim = SHARED.trim;
+    const chrome = SHARED.chrome;
+    const add = (geo, mat, x = 0, y = 0, z = 0, rx = 0) => {
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(x, y, z);
+      m.rotation.x = rx;
+      m.castShadow = true;
+      group.add(m);
+      return m;
+    };
+    const box = (w, h, d, mat, x, y, z, rx = 0) => add(new THREE.BoxGeometry(w, h, d), mat, x, y, z, rx);
+    const cyl = (r, len, mat, x, y, z, rx) => add(new THREE.CylinderGeometry(r, r, len, 10), mat, x, y, z, rx);
+    const w = s.wheel;
+    const axleY = s.connY - w.rest * 0.55; // altura aproximada del eje en reposo (local del chasis)
+    const fz = w.zf;
+    const rz = w.zr;
+    if (s.style === 'scooter') {
+      // Plataforma, escudo delantero y carrocería trasera redondeada
+      box(0.34, 0.08, 0.7, trim, 0, axleY + 0.05, 0.02);
+      add(extrudeProfile([[fz - 0.12, axleY + 0.05], [fz + 0.02, axleY + 0.1], [fz - 0.05, axleY + 0.85], [fz - 0.2, axleY + 0.85], [fz - 0.25, axleY + 0.1]], 0.36, 0.04), this.paintMat);
+      add(extrudeProfile([[-0.15, axleY + 0.1], [rz - 0.12, axleY + 0.1], [rz - 0.2, axleY + 0.42], [rz + 0.05, axleY + 0.6], [-0.1, axleY + 0.55]], 0.38, 0.06), this.paintMat);
+      box(0.28, 0.08, 0.55, trim, 0, axleY + 0.64, rz + 0.4); // asiento
+      cyl(0.022, 0.62, chrome, 0, axleY + 0.95, fz - 0.14, 0).rotation.z = Math.PI / 2; // manillar
+      cyl(0.03, 0.5, chrome, 0, axleY + 0.62, fz - 0.1, -0.25); // columna
+      box(0.16, 0.1, 0.05, this.headMat, 0, axleY + 0.78, fz - 0.02);
+      box(0.14, 0.05, 0.04, this.tailMat, 0, axleY + 0.5, rz - 0.19);
+      box(0.08, 0.08, 0.35, chrome, 0.12, axleY - 0.05, rz + 0.15); // escape
+      this.seat = { y: axleY + 0.7, z: rz + 0.45 };
+    } else {
+      // Deportiva: carenado, depósito, colín y motor visto
+      add(extrudeProfile([[fz - 0.1, axleY + 0.2], [fz + 0.05, axleY + 0.35], [fz - 0.05, axleY + 0.8], [fz - 0.35, axleY + 0.95], [fz - 0.45, axleY + 0.55], [fz - 0.3, axleY + 0.2]], 0.42, 0.05), this.paintMat);
+      add(extrudeProfile([[fz - 0.4, axleY + 0.6], [fz - 0.42, axleY + 0.85], [-0.05, axleY + 0.82], [0.05, axleY + 0.55]], 0.36, 0.06), this.paintMat); // depósito
+      add(extrudeProfile([[-0.1, axleY + 0.62], [rz - 0.15, axleY + 0.9], [rz - 0.05, axleY + 0.78], [-0.2, axleY + 0.5]], 0.26, 0.04), this.paintMat); // colín
+      box(0.26, 0.07, 0.42, trim, 0, axleY + 0.76, rz + 0.5); // asiento
+      box(0.3, 0.32, 0.45, SHARED.grille, 0, axleY + 0.2, 0.05); // motor
+      box(0.06, 0.06, 0.8, chrome, 0.15, axleY + 0.05, rz + 0.1); // escape
+      box(0.1, 0.1, 0.18, chrome, 0.15, axleY + 0.12, rz - 0.3);
+      box(0.08, 0.05, 0.9, trim, 0, axleY + 0.25, (rz + 0) / 2); // basculante
+      box(0.62, 0.03, 0.03, chrome, 0, axleY + 0.9, fz - 0.42); // manillar
+      box(0.2, 0.08, 0.04, this.headMat, 0, axleY + 0.62, fz + 0.06);
+      box(0.12, 0.05, 0.04, this.tailMat, 0, axleY + 0.82, rz - 0.18);
+      box(0.3, 0.18, 0.02, new THREE.MeshStandardMaterial({ color: 0x0e1419, metalness: 0.9, roughness: 0.05, transparent: true, opacity: 0.7 }), 0, axleY + 0.98, fz - 0.33, -0.5); // cúpula
+      this.seat = { y: axleY + 0.8, z: rz + 0.52 };
+    }
+    // Horquilla delantera
+    for (const x of [-0.09, 0.09]) cyl(0.025, 0.8, chrome, x, axleY + 0.38, fz - 0.14, -0.3);
+
+    // Ruedas: dos visibles (cada una representa a un par de ruedas físicas)
+    const wheelGeo = new THREE.CylinderGeometry(w.r, w.r, 0.13, 22);
+    wheelGeo.rotateZ(Math.PI / 2);
+    const rimGeo = new THREE.CylinderGeometry(w.r * 0.66, w.r * 0.66, 0.14, 18);
+    rimGeo.rotateZ(Math.PI / 2);
+    const rimCap = s.style === 'sportbike' ? SHARED.rimDark : SHARED.rim;
+    this.wheelMeshes = [0, 1].map(() => {
+      const wm = new THREE.Group();
+      const tire = new THREE.Mesh(wheelGeo, SHARED.tire);
+      tire.castShadow = true;
+      wm.add(tire, new THREE.Mesh(rimGeo, [SHARED.rimSide, rimCap, rimCap]));
+      wm.userData.vehicle = this;
+      return wm;
+    });
+    this.mesh = group;
+    this.dims = { W: 0.4, L: s.body.l * 2, H: s.body.h };
+    this.stripes = new THREE.Group();
+    group.add(this.stripes);
+    this.lean = 0;
   }
 
   /**
@@ -504,13 +664,15 @@ export class VehicleController {
     const finish = { brillo: [0.45, 0.32, 0.9], metalizado: [0.9, 0.22, 1], mate: [0.1, 0.85, 0] }[car.finish || 'brillo'];
     m.metalness = finish[0];
     m.roughness = finish[1];
-    m.clearcoat = finish[2];
+    m.userData.cc = finish[2];
+    m.clearcoat = VehicleController.CLEARCOAT ? finish[2] : 0;
     this.originalColor = m.color.getHex();
 
-    // Dibujo: se reconstruye cada vez
+    // Dibujo: se reconstruye cada vez (las motos solo cambian pintura y acabado)
     for (const c of [...this.stripes.children]) this.stripes.remove(c);
+    if (this.spec.bike) return;
     if (this.roofMesh) this.roofMesh.material = m;
-    const second = new THREE.MeshPhysicalMaterial({ color: car.color2 ?? 0x111111, metalness: finish[0], roughness: finish[1], clearcoat: finish[2] });
+    const second = coat(new THREE.MeshPhysicalMaterial({ color: car.color2 ?? 0x111111, metalness: finish[0], roughness: finish[1], clearcoat: finish[2] }));
     const { W, L, H } = this.dims;
     const strip = (w, h, d, x, y, z) => {
       const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), second);
@@ -777,14 +939,15 @@ export class VehicleController {
     const w = body.angularVelocity;
     const roll = w.dot(fwd);
     const pitch = w.dot(right);
-    const kr = Math.min(1, 6 * dt);
+    const bike = this.spec.bike ? 3 : 1;
+    const kr = Math.min(1, 6 * bike * dt);
     const kp = Math.min(1, 3 * dt);
     w.x -= fwd.x * roll * kr + right.x * pitch * kp;
     w.y -= fwd.y * roll * kr + right.y * pitch * kp;
     w.z -= fwd.z * roll * kr + right.z * pitch * kp;
 
     // Par corrector: eje = up × vertical
-    const k = this.spec.mass * 30;
+    const k = this.spec.mass * 30 * bike;
     body.torque.x += -up.z * k;
     body.torque.z += up.x * k;
 
@@ -828,11 +991,50 @@ export class VehicleController {
     if (this.game.onVehicleDestroyed) this.game.onVehicleDestroyed(this);
   }
 
+  /**
+   * Moto: se inclina hacia el lado del giro según la velocidad (solo visual), las dos ruedas
+   * se colocan en el centro de cada par físico y el piloto va sentado encima.
+   */
+  syncBike() {
+    const speed = Math.abs(this.getForwardSpeed());
+    const target = -(this.steerValue / this.spec.maxSteer) * Math.min(1, speed / 12) * 0.55;
+    this.lean += (target - this.lean) * 0.15;
+    _q.setFromAxisAngle(_zAxis, this.lean);
+    this.mesh.quaternion.multiply(_q);
+    for (let k = 0; k < 2; k++) {
+      const a = k * 2;
+      this.vehicle.updateWheelTransform(a);
+      this.vehicle.updateWheelTransform(a + 1);
+      const t0 = this.vehicle.wheelInfos[a].worldTransform;
+      const t1 = this.vehicle.wheelInfos[a + 1].worldTransform;
+      const wm = this.wheelMeshes[k];
+      wm.position.set((t0.position.x + t1.position.x) / 2, (t0.position.y + t1.position.y) / 2, (t0.position.z + t1.position.z) / 2);
+      wm.quaternion.set(t0.quaternion.x, t0.quaternion.y, t0.quaternion.z, t0.quaternion.w);
+      // la rueda se inclina con la moto alrededor del eje longitudinal
+      _q.setFromAxisAngle(_v3.set(0, 0, 1).applyQuaternion(_bodyQ.set(this.chassisBody.quaternion.x, this.chassisBody.quaternion.y, this.chassisBody.quaternion.z, this.chassisBody.quaternion.w)), this.lean);
+      wm.quaternion.premultiply(_q);
+      // bajar la rueda lo que se inclina para que siga tocando el suelo
+      wm.position.y -= (1 - Math.cos(this.lean)) * this.spec.wheel.r;
+    }
+    if (this.rider) {
+      const seat = this.seat;
+      const m = this.rider.mesh;
+      _v3.set(0, seat.y - 0.95, seat.z - 0.08).applyQuaternion(this.mesh.quaternion);
+      m.position.set(this.mesh.position.x + _v3.x, this.mesh.position.y + _v3.y, this.mesh.position.z + _v3.z);
+      m.quaternion.copy(this.mesh.quaternion);
+      this.rider.model.animate(1 / 60, { pose: 'ride' });
+    }
+  }
+
   /** Copia el estado físico a las mallas de Three.js. */
   sync() {
     const b = this.chassisBody;
     this.mesh.position.set(b.position.x, b.position.y, b.position.z);
     this.mesh.quaternion.set(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w);
+    if (this.spec.bike) {
+      this.syncBike();
+      return;
+    }
     for (let i = 0; i < this.wheelMeshes.length; i++) {
       this.vehicle.updateWheelTransform(i);
       const t = this.vehicle.wheelInfos[i].worldTransform;

@@ -70,7 +70,7 @@ Cada uno se puede reformar (x1,6) y llevar a lujo (x2,4). Mientras no juegas sig
 
 **Mapa y GPS.** La tecla **M** abre el mapa de la ciudad. Elige un destino de la lista (W/S y E) o haz clic en cualquier punto: la ruta se calcula por las calles y se dibuja en morado en el radar, con la distancia debajo.
 
-**Código secreto.** En el ordenador de tu casa, la última opción del menú (`>_`) abre una terminal. Escribe `WTASECRET` y pulsa Enter. También funciona tecleándolo de corrido mientras juegas. Da 10 millones de dólares, todas las armas con munición infinita, un coche de cada modelo (propios, sin estrellas), los doce negocios al nivel máximo, salud y chaleco llenos y, en el modo historia, la historia completada con todos los bancos abiertos.
+**Código secreto.** En el ordenador de tu casa, la última opción del menú (`>_`) abre una terminal. Escribe `WTASECRET` y pulsa Enter. También funciona tecleándolo de corrido mientras juegas. Da 10 millones de dólares, todas las armas con munición infinita, un vehículo de cada modelo, motos incluidas (propios, sin estrellas), los doce negocios al nivel máximo, salud y chaleco llenos y, en el modo historia, la historia completada con todos los bancos abiertos.
 
 **Armas.** Puños, pistola (400), subfusil (2.200), escopeta (3.200), rifle de asalto (6.500) y lanzacohetes (25.000). Cada arma viene con dos cargadores; luego la munición se compra por cajas. El chaleco (600) absorbe el 70 % del daño. A partir de tres estrellas la policía dispara.
 
@@ -78,7 +78,7 @@ Cada uno se puede reformar (x1,6) y llevar a lujo (x2,4). Mientras no juegas sig
 
 ## Vehículos
 
-Diez modelos con física propia (masa, tracción, agarre, suspensión y medidas). Todos se ajustaron con un banco de pruebas automático que comprueba aceleración, frenada, curvas y slalom sin volcar, y que el freno de mano derrapa sin hacer trompo.
+Doce modelos (diez coches y dos motos) con física propia (masa, tracción, agarre, suspensión y medidas). Todos se ajustaron con un banco de pruebas automático que comprueba aceleración, frenada, curvas y slalom sin volcar, y que el freno de mano derrapa sin hacer trompo.
 
 | Modelo | Tipo | Tracción | 0-100 | Punta | Precio |
 |---|---|---|---|---|---|
@@ -90,7 +90,11 @@ Diez modelos con física propia (masa, tracción, agarre, suspensión y medidas)
 | Toro | Muscle | trasera | 4,5 s | 187 km/h | 22.000 |
 | Vento GT | Deportivo | trasera | 3,7 s | 215 km/h | 38.000 |
 | Furia R | Superdeportivo | total | 2,5 s | 265 km/h | 95.000 |
+| Vespino | Scooter | trasera | 6,6 s | 126 km/h | 1.500 |
+| Rayo | Moto deportiva | trasera | 2,8 s | 224 km/h | 12.000 |
 | Taxi y Patrulla | Solo se roban | trasera | | | |
+
+**Motos.** Se compran en Autos Velasco (hay un Vespino aparcado cerca de casa para probarlo) y el código secreto también te las da. El piloto va a la vista y la moto se inclina en las curvas según la velocidad. Por dentro usan cuatro ruedas físicas muy juntas, dos por eje, con más inercia de giro y un estabilizador más fuerte, así que no se caen solas; la inclinación es visual. Aguantan menos golpes que un coche.
 
 Para volver a pasar las pruebas (solo hace falta Node):
 
@@ -120,6 +124,21 @@ npm run test:vehicles
 
 Los menús de las tiendas se manejan con W/S y E (o las teclas 1-9), y se cierran con Q.
 
+## Rendimiento
+
+En el menú de pausa, el botón **Gráficos** cambia entre Auto, Alta, Media y Baja, y **F3** muestra los FPS. En Auto el juego empieza en Media y, si no llega a unos 40 FPS durante varios segundos, baja solo a Baja (y vuelve a Media cuando sobra margen).
+
+| | Alta | Media | Baja |
+|---|---|---|---|
+| Resolución interna | hasta 1,5× | 1× | 0,7× |
+| Antialiasing (MSAA) | sí (al recargar) | no | no |
+| Sombras | 2048, suaves, cada fotograma | 1024, cada 2 fotogramas | no |
+| Barniz de los coches | sí | no | no |
+| Distancia de visión | 650 m | 560 m | 430 m |
+| Tráfico / peatones | 12 / 10 | 10 / 8 | 7 / 5 |
+
+Además, en todas las calidades: las luces de los interiores solo existen cuando estás dentro, el túnel se ilumina sin luces puntuales, las piezas de cada coche se fusionan por material (menos de la mitad de llamadas de dibujo) y el reflejo del cielo se regenera como mucho cada 4 segundos.
+
 ## Aspecto
 
 Todo es procedural: no hay modelos ni imágenes externas. Los personajes (jugador, peatones, guardias, cajeros y policías) son figuras de 1,80 m con codos, rodillas, cara y ropa intercambiable. Los coches usan carrocerías extruidas desde un perfil lateral, con pintura barnizada que refleja el cielo. La ciudad tiene seis estilos de fachada (hormigón, ladrillo, cristal, moderno, nave industrial y vivienda con tejado), edificios orientados a su calle aunque sea curva, árboles, farolas, semáforos por acceso, una colina con bosque y el mar con barcos. Los bancos, las tiendas y tu casa tienen edificio e interior propios. Sigue siendo estilizado: el fotorrealismo necesitaría modelos y texturas hechos a mano.
@@ -148,6 +167,7 @@ js/AITraffic.js           Tráfico por la red de calles con semáforos y object 
 js/WantedSystem.js        Estrellas, patrullas, disparos de la policía y arrestos
 js/Environment.js         Red de calles (curvas, glorieta, túnel), barrios, edificios, mar y ciclo día/noche
 js/Cheats.js              Código secreto (terminal del ordenador de casa)
+js/Quality.js             Calidad gráfica, contador de FPS y ajuste automático
 js/HUD.js                 Radar, dinero, velocímetro, objetivos y avisos
 js/Input.js / Effects.js  Entrada con Pointer Lock y efectos visuales
 tools/vehicle-test.mjs    Banco de pruebas de conducción en Node
@@ -157,4 +177,4 @@ Para depurar: `?autostart=story` o `?autostart=free` arranca directamente (añad
 
 ## Limitaciones
 
-No hay audio ni motos. El suelo es plano: la colina se cruza por el túnel o se rodea, no se sube. Solo tienen interior tu casa, las tiendas y los bancos; la armería, el concesionario y los negocios se usan desde la puerta. En los cruces el tráfico no siempre ve a quien llega por los lados y a veces choca. La ciudad ocupa unas cinco veces más superficie que la primera versión; con muchos peatones y un banco lleno de NPC, un ordenador modesto puede bajar de 60 FPS.
+No hay audio. Las motos no aparecen en el tráfico (no hay pilotos de IA en moto). El suelo es plano: la colina se cruza por el túnel o se rodea, no se sube. Solo tienen interior tu casa, las tiendas y los bancos; la armería, el concesionario y los negocios se usan desde la puerta. En los cruces el tráfico no siempre ve a quien llega por los lados y a veces choca. La ciudad ocupa unas cinco veces más superficie que la primera versión; con muchos peatones y un banco lleno de NPC, un ordenador modesto puede bajar de 60 FPS.

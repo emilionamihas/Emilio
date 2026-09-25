@@ -31,9 +31,11 @@ export class Interiors {
     this.count = 0;
     this.fadeEl = document.getElementById('fade');
     this.busy = false;
-    // Luces de interior fijas en escena (intensidad 0 fuera) para no recompilar shaders
+    // Luces de interior: solo existen (visible) dentro. Fuera costaban en cada píxel de la ciudad
+    // aunque tuvieran intensidad 0. El cambio recompila shaders una vez, tapado por el fundido.
     this.lights = [0, 1, 2].map(() => {
       const l = new THREE.PointLight(0xfff1dc, 0, 22, 1.4);
+      l.visible = false;
       game.scene.add(l);
       return l;
     });
@@ -522,6 +524,7 @@ export class Interiors {
         this.lights[i].position.set(inst.origin.x + p.x, p.y, inst.origin.z + p.z);
         this.lights[i].intensity = inst.key.startsWith('bank') ? 60 : 30;
         this.lights[i].distance = inst.key.startsWith('bank') ? 30 : 18;
+        this.lights[i].visible = true;
       });
       game.hud.setPrompt(null);
       game.input.pressed.clear(); // la E que abrió la puerta no debe usarse también dentro
@@ -539,7 +542,10 @@ export class Interiors {
       for (const n of cur.inst.npcs) n.remove();
       cur.inst.npcs = [];
       game.interior = null;
-      for (const l of this.lights) l.intensity = 0;
+      for (const l of this.lights) {
+        l.intensity = 0;
+        l.visible = false;
+      }
       const out = cur.poi.pos.clone().addScaledVector(cur.poi.normal, 0.6);
       game.player.teleport(out);
       game.input.pressed.clear();

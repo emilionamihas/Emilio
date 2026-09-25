@@ -330,6 +330,21 @@ export class HumanModel {
     body.position.y += (0 - body.position.y) * k;
     lerp(this.headPivot, aim ? -pitch * 0.5 : 0, 0, 0, k);
 
+    if (pose === 'ride') {
+      // En moto: muslos hacia delante y abajo, brazos estirados al manillar, algo echado hacia delante
+      lerp(this.body, 0.25, 0, 0, k);
+      lerp(L.hip, -1.15, 0, 0.18, k);
+      lerp(R.hip, -1.15, 0, -0.18, k);
+      lerp(L.knee, 1.55, 0, 0, k);
+      lerp(R.knee, 1.55, 0, 0, k);
+      lerp(aL.shoulder, -1.15, 0, 0.12, k);
+      lerp(aR.shoulder, -1.15, 0, -0.12, k);
+      lerp(aL.elbow, -0.35, 0, 0, k);
+      lerp(aR.elbow, -0.35, 0, 0, k);
+      return;
+    }
+    if (pose !== 'ride' && this.body.rotation.x !== 0) this.body.rotation.x += (0 - this.body.rotation.x) * k;
+
     if (pose === 'sit') {
       lerp(L.hip, -1.5, 0, 0.05, k);
       lerp(R.hip, -1.5, 0, -0.05, k);

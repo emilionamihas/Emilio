@@ -1296,15 +1296,7 @@ export class Environment {
     }
     lights.count = k;
     this.scene.add(lights);
-    // Una luz real a cada boca para que el interior no quede negro al entrar
-    for (const dirZ of [-1, 1]) {
-      const l = new THREE.PointLight(0xffe2a8, 30, 40, 1.6);
-      l.position.set(0, H - 1, R.zc + dirZ * (R.tunnelHalf - 12));
-      this.scene.add(l);
-    }
-    const mid = new THREE.PointLight(0xffe2a8, 30, 40, 1.6);
-    mid.position.set(0, H - 1, R.zc);
-    this.scene.add(mid);
+    // Sin luces puntuales: cada una se calcula en TODOS los píxeles de la pantalla, no solo en el túnel
   }
 
   createSea() {
@@ -1783,7 +1775,7 @@ export class Environment {
 
     const trunkGeo = new THREE.CylinderGeometry(0.14, 0.22, 3, 6);
     // Copa orgánica: icosaedro con vértices desplazados
-    const crownGeo = new THREE.IcosahedronGeometry(1.6, 2);
+    const crownGeo = new THREE.IcosahedronGeometry(1.6, 1); // 80 triángulos por copa (con detalle 2 eran 320 y los árboles eran la mitad de la escena)
     crownGeo.deleteAttribute('normal');
     const merged = mergeVertices(crownGeo);
     const pos = merged.attributes.position;
@@ -1833,6 +1825,7 @@ export class Environment {
       trunks.castShadow = crowns.castShadow = true;
       crowns.receiveShadow = true;
       this.scene.add(trunks, crowns);
+      (this.treeMeshes ||= []).push(trunks, crowns);
     }
   }
 
@@ -2004,10 +1997,26 @@ export class Environment {
     this.sunDir = new THREE.Vector3();
   }
 
+  /** Distancia de visión (calidad): plano lejano de la cámara, niebla y cielo dentro de ese plano. */
+  setViewDistance(far, fogFar) {
+    const cam = this.game.camera;
+    cam.far = far;
+    cam.updateProjectionMatrix();
+    this.scene.fog.far = fogFar;
+    this.scene.fog.near = Math.min(140, fogFar * 0.3);
+    this.sky.scale.setScalar(far * 0.92);
+    this.stars.scale.setScalar((far * 0.75) / 500);
+    this.moonDist = far * 0.75;
+  }
+
   /** Regenera el mapa de entorno si la hora ha cambiado más de 20 minutos. */
   updateEnvironmentMap(force = false) {
     const diff = Math.abs(this.timeOfDay - this.envHour);
     if (!force && diff < 0.33 && diff < 23.6) return;
+    // Como mucho una vez cada 4 s reales (con el reloj acelerado se regeneraba casi cada fotograma)
+    const now = performance.now();
+    if (!force && now - (this.envAt || -1e9) < 4000) return;
+    this.envAt = now;
     this.envHour = this.timeOfDay;
     const src = this.sky.material.uniforms;
     const dst = this.envSky.material.uniforms;
@@ -2044,7 +2053,7 @@ export class Environment {
     this.sky.position.copy(this.game.camera.position);
     this.stars.position.copy(this.game.camera.position);
     this.stars.material.opacity = THREE.MathUtils.smoothstep(this.night, 0.5, 1);
-    this.moon.position.copy(this.game.camera.position).addScaledVector(this.sunDir, -500);
+    this.moon.position.copy(this.game.camera.position).addScaledVector(this.sunDir, -(this.moonDist || 500));
     this.moon.material.opacity = this.night;
 
     // La luz direccional hace de sol de día y de luna de noche
