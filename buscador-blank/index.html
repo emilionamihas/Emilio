@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Buscador</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #16181d; --muted: #5b6270;
+    --line: #dfe2e8; --accent: #2f6fed; --accent-text: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f1115; --panel: #181b22; --text: #e8eaef; --muted: #9aa1ad;
+            --line: #2a2f3a; --accent: #5b8cff; --accent-text: #0b0d12; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body { background: var(--bg); color: var(--text);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 14vh 16px 48px; }
+  h1 { font-size: 30px; margin: 0 0 20px; letter-spacing: -0.01em; }
+  form { display: flex; gap: 8px; }
+  input, button { font: inherit; color: inherit; }
+  #q { flex: 1; min-width: 0; padding: 12px 14px; border: 1px solid var(--line);
+       border-radius: 10px; background: var(--panel); }
+  #q:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  button { padding: 10px 18px; border-radius: 10px; border: 1px solid var(--accent);
+           background: var(--accent); color: var(--accent-text); cursor: pointer; }
+  .engines { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 24px; }
+  .engines label { font-size: 14px; padding: 5px 11px; border: 1px solid var(--line);
+                   border-radius: 999px; cursor: pointer; background: var(--panel); }
+  .engines input { position: absolute; opacity: 0; pointer-events: none; }
+  .engines input:checked + span { color: var(--accent); font-weight: 600; }
+  .engines label:has(input:focus-visible) { outline: 2px solid var(--accent); }
+  .hint { color: var(--muted); font-size: 13px; margin: 0; }
+  code { font-size: 12px; background: var(--panel); border: 1px solid var(--line);
+         border-radius: 4px; padding: 1px 4px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Buscador</h1>
+
+  <form id="search">
+    <input id="q" type="search" autocomplete="off" autofocus
+           placeholder="Busca algo o pega una URL" aria-label="Búsqueda">
+    <button type="submit">Buscar</button>
+  </form>
+
+  <div class="engines" id="engines" role="radiogroup" aria-label="Motor de búsqueda"></div>
+
+  <p class="hint">
+    Atajos: pulsa <code>/</code> para ir a la barra. Empieza con <code>!yt</code>, <code>!w</code>,
+    <code>!img</code>, <code>!gh</code>… para buscar en un sitio concreto sin cambiar de motor.
+    Si escribes una URL, se abre directamente.
+  </p>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  var ENGINES = [
+    { id: "google",    bang: "g",    name: "Google",      url: "https://www.google.com/search?q=%s" },
+    { id: "images",    bang: "img",  name: "Imágenes",    url: "https://www.google.com/search?tbm=isch&q=%s" },
+    { id: "news",      bang: "n",    name: "Noticias",    url: "https://news.google.com/search?q=%s" },
+    { id: "maps",      bang: "m",    name: "Maps",        url: "https://www.google.com/maps/search/%s" },
+    { id: "scholar",   bang: "s",    name: "Académico",   url: "https://scholar.google.com/scholar?q=%s" },
+    { id: "youtube",   bang: "yt",   name: "YouTube",     url: "https://www.youtube.com/results?search_query=%s" },
+    { id: "wikipedia", bang: "w",    name: "Wikipedia",   url: "https://es.wikipedia.org/w/index.php?search=%s" },
+    { id: "ddg",       bang: "d",    name: "DuckDuckGo",  url: "https://duckduckgo.com/?q=%s" },
+    { id: "bing",      bang: "b",    name: "Bing",        url: "https://www.bing.com/search?q=%s" },
+    { id: "brave",     bang: "br",   name: "Brave",       url: "https://search.brave.com/search?q=%s" },
+    { id: "reddit",    bang: "r",    name: "Reddit",      url: "https://www.reddit.com/search/?q=%s" },
+    { id: "github",    bang: "gh",   name: "GitHub",      url: "https://github.com/search?q=%s" }
+  ];
+
+  var store = {
+    get: function (k, d) { try { var v = localStorage.getItem("buscador:" + k); return v === null ? d : v; } catch (e) { return d; } },
+    set: function (k, v) { try { localStorage.setItem("buscador:" + k, v); } catch (e) {} }
+  };
+
+  var byId = {}, byBang = {};
+  ENGINES.forEach(function (e) { byId[e.id] = e; byBang[e.bang] = e; });
+
+  var current = byId[store.get("engine", "google")] ? store.get("engine", "google") : "google";
+
+  var box = document.getElementById("engines");
+  ENGINES.forEach(function (e) {
+    var label = document.createElement("label");
+    var radio = document.createElement("input");
+    radio.type = "radio";
+    radio.name = "engine";
+    radio.value = e.id;
+    radio.checked = e.id === current;
+    radio.addEventListener("change", function () {
+      current = e.id;
+      store.set("engine", e.id);
+      q.focus();
+    });
+    var span = document.createElement("span");
+    span.textContent = e.name;
+    label.appendChild(radio);
+    label.appendChild(span);
+    box.appendChild(label);
+  });
+
+  var q = document.getElementById("q");
+
+  function toUrl(text) {
+    if (/^https?:\/\/\S+$/i.test(text)) return text;
+    // dominio.tld o dominio.tld/ruta, sin espacios
+    if (/^[\w-]+(\.[\w-]+)*\.[a-z]{2,}(:\d+)?(\/\S*)?$/i.test(text)) return "https://" + text;
+    return null;
+  }
+
+  function resolve(text) {
+    var engine = byId[current];
+    var m = text.match(/^!(\w+)\s+(.+)$/) || text.match(/^(.+)\s+!(\w+)$/);
+    if (m) {
+      var bang = byBang[m[1]] ? m[1] : m[2];
+      var rest = byBang[m[1]] ? m[2] : m[1];
+      if (byBang[bang]) { engine = byBang[bang]; text = rest; }
+    }
+    var direct = toUrl(text);
+    if (direct && engine === byId[current]) return direct;
+    return engine.url.replace("%s", encodeURIComponent(text));
+  }
+
+  document.getElementById("search").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var text = q.value.trim();
+    if (!text) { q.focus(); return; }
+    window.location.href = resolve(text);
+  });
+
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key === "/" && document.activeElement !== q) {
+      ev.preventDefault();
+      q.focus();
+      q.select();
+    }
+  });
+})();
+</script>
+</body>
+</html>
