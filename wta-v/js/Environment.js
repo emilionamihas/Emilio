@@ -328,7 +328,9 @@ export class Environment {
       new THREE.MeshStandardMaterial({ color: 0x3f5a31, roughness: 1 })
     );
     outer.rotation.x = -Math.PI / 2;
-    outer.position.y = -0.02;
+    // Bien por debajo del suelo de la ciudad: a -0.02 m había z-fighting con buffers de profundidad
+    // de 16 bits (el césped "atravesaba" el asfalto). Los muros del borde tapan el escalón.
+    outer.position.y = -0.5;
     outer.receiveShadow = true;
     this.scene.add(outer);
 

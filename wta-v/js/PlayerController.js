@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { GROUPS } from './Environment.js';
+import { formatMoney } from './GameState.js';
 
 const WALK_SPEED = 3.4;
 const RUN_SPEED = 7.2;
@@ -8,11 +9,17 @@ const JUMP_VELOCITY = 6.2;
 const BODY_RADIUS = 0.42;
 const MOUSE_SENS = 0.0022;
 
+/**
+ * Arsenal. price = coste del arma en la Armería; ammoPack/ammoPrice = caja de munición.
+ * El orden define la posición en la rueda de armas (0 arriba, en sentido horario).
+ */
 export const WEAPONS = [
-  { name: 'PUÑOS', melee: true, fireRate: 0.45, range: 1.8, force: 250, damage: 2 },
-  { name: 'PISTOLA', fireRate: 0.22, auto: false, mag: 12, reload: 1.2, range: 150, spread: 0.004, force: 900, damage: 9 },
-  { name: 'SUBFUSIL', fireRate: 0.075, auto: true, mag: 30, reload: 1.8, range: 120, spread: 0.018, force: 600, damage: 5 },
-  { name: 'ESCOPETA', fireRate: 0.85, auto: false, mag: 6, reload: 2.4, range: 45, spread: 0.06, pellets: 8, force: 450, damage: 5 },
+  { name: 'PUÑOS', melee: true, fireRate: 0.45, range: 1.8, force: 250, damage: 2, price: 0 },
+  { name: 'PISTOLA', fireRate: 0.22, auto: false, mag: 12, reload: 1.2, range: 150, spread: 0.004, force: 900, damage: 9, price: 400, ammoPack: 36, ammoPrice: 60 },
+  { name: 'SUBFUSIL', fireRate: 0.075, auto: true, mag: 30, reload: 1.8, range: 120, spread: 0.018, force: 600, damage: 5, price: 2200, ammoPack: 90, ammoPrice: 150 },
+  { name: 'ESCOPETA', fireRate: 0.85, auto: false, mag: 6, reload: 2.4, range: 45, spread: 0.06, pellets: 8, force: 450, damage: 5, price: 3200, ammoPack: 24, ammoPrice: 120 },
+  { name: 'RIFLE', fireRate: 0.1, auto: true, mag: 30, reload: 2.0, range: 220, spread: 0.008, force: 1100, damage: 11, price: 6500, ammoPack: 90, ammoPrice: 250 },
+  { name: 'LANZACOHETES', fireRate: 1.2, auto: false, mag: 1, reload: 2.2, range: 250, spread: 0, force: 0, damage: 200, explosive: 7, price: 25000, ammoPack: 5, ammoPrice: 1000 },
 ];
 
 const _v3 = new THREE.Vector3();
@@ -44,10 +51,10 @@ export class PlayerController {
     this.lastShot = -10;
     this.fireCooldown = 0;
     this.reloadTimer = 0;
-    this.weaponIndex = 1;
-    this.ammo = WEAPONS.map((w) => w.mag || 0);
+    this.weaponIndex = 0;
     this.wheelOpen = false;
-    this.wheelSelection = 1;
+    this.wheelSelection = 0;
+    this.lastHurt = -10;
     this.wheelVec = new THREE.Vector2();
     this.hitTimer = 0;
 
@@ -143,6 +150,33 @@ export class PlayerController {
     return WEAPONS[this.weaponIndex];
   }
 
+  get state() {
+    return this.game.state;
+  }
+
+  /** Balas en el cargador del arma i. */
+  clip(i = this.weaponIndex) {
+    return this.state.clip[i] ?? 0;
+  }
+
+  reserve(i = this.weaponIndex) {
+    return this.state.reserve[i] ?? 0;
+  }
+
+  /** Da un arma (compra) con dos cargadores de reserva. */
+  giveWeapon(i) {
+    const w = WEAPONS[i];
+    this.state.ownedWeapons.add(i);
+    if (w.mag) {
+      this.state.clip[i] = w.mag;
+      this.state.reserve[i] = (this.state.reserve[i] ?? 0) + w.mag * 2;
+    }
+  }
+
+  addAmmo(i, amount) {
+    this.state.reserve[i] = (this.state.reserve[i] ?? 0) + amount;
+  }
+
   // ------------------------------------------------------------------
   // Activación (al entrar/salir de vehículos)
   // ------------------------------------------------------------------
@@ -169,6 +203,14 @@ export class PlayerController {
 
   takeDamage(amount) {
     if (this.health <= 0) return;
+    // El chaleco absorbe el 70 % del daño mientras le quede aguante
+    const st = this.game.state;
+    if (st && st.armor > 0) {
+      const absorbed = Math.min(st.armor, amount * 0.7);
+      st.armor -= absorbed;
+      amount -= absorbed;
+    }
+    this.lastHurt = this.game.time;
     this.health = Math.max(0, this.health - amount);
     this.hitTimer = 0.3;
     if (this.health <= 0 && this.game.onPlayerDeath) this.game.onPlayerDeath();
@@ -241,6 +283,9 @@ export class PlayerController {
     this.handleWeapons(dt);
     if (this.hitTimer > 0) this.hitTimer -= dt;
 
+    // Regeneración lenta hasta la mitad de la vida si llevas un rato sin recibir daño
+    if (this.health > 0 && this.health < 50 && this.game.time - this.lastHurt > 6) this.health = Math.min(50, this.health + dt * 2);
+
     // Evita caer al vacío si algo sale mal
     if (this.body.position.y < -10) this.teleport(this.spawnPoint);
   }
@@ -266,12 +311,18 @@ export class PlayerController {
     const w = this.weapon;
     this.fireCooldown -= dt;
 
+    const i = this.weaponIndex;
     if (this.reloadTimer > 0) {
       this.reloadTimer -= dt;
-      if (this.reloadTimer <= 0) this.ammo[this.weaponIndex] = w.mag;
+      if (this.reloadTimer <= 0) {
+        const moved = Math.min(w.mag - this.clip(i), this.reserve(i));
+        this.state.clip[i] = this.clip(i) + moved;
+        this.state.reserve[i] = this.reserve(i) - moved;
+      }
       return;
     }
-    if (input.wasPressed('KeyR') && w.mag && this.ammo[this.weaponIndex] < w.mag) {
+    const canReload = w.mag && this.clip(i) < w.mag && this.reserve(i) > 0;
+    if (input.wasPressed('KeyR') && canReload) {
       this.reloadTimer = w.reload;
       return;
     }
@@ -281,11 +332,12 @@ export class PlayerController {
     if (!wantsFire || this.fireCooldown > 0) return;
 
     if (w.mag) {
-      if (this.ammo[this.weaponIndex] <= 0) {
-        this.reloadTimer = w.reload;
+      if (this.clip(i) <= 0) {
+        if (canReload) this.reloadTimer = w.reload;
+        else if (input.mouse.leftPressed) this.game.hud.notify(`Sin munición para ${w.name}. Compra más en la Armería.`, 2.5);
         return;
       }
-      this.ammo[this.weaponIndex]--;
+      this.state.clip[i] = this.clip(i) - 1;
     }
     this.fireCooldown = w.fireRate;
     this.lastShot = this.game.time;
@@ -303,6 +355,11 @@ export class PlayerController {
     this.mesh.updateMatrixWorld(true);
     const muzzlePos = this.muzzle.getWorldPosition(new THREE.Vector3());
     game.effects.muzzleFlash(muzzlePos);
+
+    if (w.explosive) {
+      this.fireRocket(w, muzzlePos);
+      return;
+    }
 
     const targets = game.getShootables();
     const pellets = w.pellets || 1;
@@ -346,6 +403,22 @@ export class PlayerController {
     game.wanted.reportCrime('gunshot');
   }
 
+  /** Cohete: impacto instantáneo por raycast con explosión en el punto de impacto. */
+  fireRocket(w, muzzlePos) {
+    const game = this.game;
+    _ray.setFromCamera(_center, game.camera);
+    _ray.far = w.range;
+    _ray.near = Math.max(0, _v3b.copy(this.mesh.position).sub(game.camera.position).dot(_ray.ray.direction));
+    const hit = _ray.intersectObjects(game.getShootables(), true)[0];
+    const end = hit ? hit.point.clone() : _ray.ray.at(w.range, new THREE.Vector3());
+    game.effects.spawnTracer(muzzlePos, end);
+    game.effects.spawnSmoke(muzzlePos.clone(), new THREE.Vector3(0, 0.5, 0), 0.8);
+    if (hit) {
+      game.explosion(end, w.explosive, w.damage);
+      game.wanted.reportCrime('explosion');
+    }
+  }
+
   punch() {
     const game = this.game;
     const dir = new THREE.Vector3(Math.sin(this.facing), 0, Math.cos(this.facing));
@@ -379,7 +452,7 @@ export class PlayerController {
   // ------------------------------------------------------------------
   updateWeaponWheel() {
     const input = this.game.input;
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < WEAPONS.length; i++) {
       if (input.wasPressed(`Digit${i + 1}`)) this.selectWeapon(i);
     }
     if (input.wasPressed('Tab')) {
@@ -394,11 +467,10 @@ export class PlayerController {
       this.wheelVec.y += m.dy;
       if (this.wheelVec.length() > 30) {
         this.wheelVec.clampLength(0, 80);
-        // Slots: 0 arriba, 1 derecha, 2 abajo, 3 izquierda
-        const a = Math.atan2(this.wheelVec.y, this.wheelVec.x); // 0 = derecha
-        // round(a / 90°): -1 arriba, 0 derecha, 1 abajo, ±2 izquierda
-        const slot = Math.round(a / (Math.PI / 2));
-        this.wheelSelection = { '-2': 3, '-1': 0, 0: 1, 1: 2, 2: 3 }[slot];
+        // Ángulo medido desde arriba en sentido horario (la Y de pantalla crece hacia abajo)
+        const a = Math.atan2(this.wheelVec.y, this.wheelVec.x) + Math.PI / 2;
+        const sector = (Math.PI * 2) / WEAPONS.length;
+        this.wheelSelection = ((Math.round(a / sector) % WEAPONS.length) + WEAPONS.length) % WEAPONS.length;
       }
       this.game.hud.setWeaponWheel(true, this.wheelSelection);
       if (!input.isDown('Tab')) {
@@ -412,6 +484,10 @@ export class PlayerController {
 
   selectWeapon(i) {
     if (i === this.weaponIndex) return;
+    if (!this.state.ownedWeapons.has(i)) {
+      this.game.hud.notify(`No tienes ${WEAPONS[i].name}. Cómprala en la Armería (${formatMoney(WEAPONS[i].price)}).`, 3);
+      return;
+    }
     this.weaponIndex = i;
     this.reloadTimer = 0;
     this.fireCooldown = 0.2;
@@ -421,10 +497,11 @@ export class PlayerController {
   updateWeaponVisual() {
     const w = this.weapon;
     this.gun.visible = !w.melee;
-    const long = w.name === 'SUBFUSIL' || w.name === 'ESCOPETA';
-    this.gunBarrel.scale.z = long ? 2 : 1;
-    this.gunBarrel.position.z = long ? 0.25 : 0.12;
-    this.muzzle.position.z = long ? 0.6 : 0.32;
+    const length = { SUBFUSIL: 2, ESCOPETA: 2.2, RIFLE: 2.6, LANZACOHETES: 3.2 }[w.name] || 1;
+    const thick = w.name === 'LANZACOHETES' ? 2.2 : 1;
+    this.gunBarrel.scale.set(thick, thick, length);
+    this.gunBarrel.position.z = 0.12 * length;
+    this.muzzle.position.z = 0.3 * length;
   }
 
   // ------------------------------------------------------------------

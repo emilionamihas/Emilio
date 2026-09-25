@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { VehicleController } from './VehicleController.js';
+import { VehicleController, TRAFFIC_MIX } from './VehicleController.js';
 import { CITY } from './Environment.js';
 
 const _local = new THREE.Vector3();
@@ -74,8 +74,34 @@ export class AITraffic {
   }
 
   createVehicle() {
-    const type = Math.random() < 0.18 ? 'sport' : 'civil';
+    // Modelo aleatorio según los pesos de TRAFFIC_MIX
+    const entries = Object.entries(TRAFFIC_MIX);
+    let r = Math.random() * entries.reduce((sum, [, w]) => sum + w, 0);
+    let type = entries[0][0];
+    for (const [t, w] of entries) {
+      r -= w;
+      if (r <= 0) {
+        type = t;
+        break;
+      }
+    }
     return new VehicleController(this.game, { type });
+  }
+
+  /**
+   * Vehículo de misión que circula como tráfico pero no se recicla al alejarse.
+   * Aparece a 90-180 m del jugador.
+   */
+  spawnPersistent(type, color, tag) {
+    const spot = this.findSpawn(90, 180, false);
+    if (!spot) return null;
+    const v = new VehicleController(this.game, { type, color });
+    v.tag = tag;
+    v.place(spot.pos.x, spot.pos.z, Math.atan2(spot.dir.x, spot.dir.z));
+    v.addToWorld();
+    v.driver = 'ai';
+    this.agents.push({ vehicle: v, from: spot.from, to: spot.to, cruise: 11 + Math.random() * 3, stuck: 0, persistent: true });
+    return v;
   }
 
   acquire() {
@@ -97,13 +123,13 @@ export class AITraffic {
   }
 
   /** Busca un tramo de calle a distancia adecuada y fuera de la vista si es posible. */
-  trySpawn() {
+  findSpawn(minDist, maxDist, avoidView = true) {
     const focus = this.game.getFocusPosition();
     const camera = this.game.camera;
     const camDir = camera.getWorldDirection(new THREE.Vector3());
     const nodes = this.env.nodes;
 
-    for (let attempt = 0; attempt < 12; attempt++) {
+    for (let attempt = 0; attempt < 24; attempt++) {
       const from = nodes[Math.floor(Math.random() * nodes.length)];
       const to = nodes[from.neighbors[Math.floor(Math.random() * from.neighbors.length)]];
       const t = 0.3 + Math.random() * 0.4;
@@ -111,12 +137,21 @@ export class AITraffic {
       const right = new THREE.Vector3(-dir.z, 0, dir.x);
       const pos = new THREE.Vector3().lerpVectors(from.pos, to.pos, t).addScaledVector(right, CITY.LANE);
       const dist = Math.hypot(pos.x - focus.x, pos.z - focus.z);
-      if (dist < this.spawnMin || dist > this.spawnMax) continue;
+      if (dist < minDist || dist > maxDist) continue;
       // Evitar aparecer delante de la cámara a poca distancia
       const toPos = new THREE.Vector3(pos.x - camera.position.x, 0, pos.z - camera.position.z).normalize();
-      if (dist < 100 && toPos.dot(camDir) > 0.5) continue;
+      if (avoidView && dist < 100 && toPos.dot(camDir) > 0.5) continue;
       if (this.isOccupied(pos, 9)) continue;
+      return { from, to, pos, dir };
+    }
+    return null;
+  }
 
+  trySpawn() {
+    const spot = this.findSpawn(this.spawnMin, this.spawnMax);
+    if (!spot) return false;
+    {
+      const { from, to, pos, dir } = spot;
       const v = this.acquire();
       v.repair();
       v.place(pos.x, pos.z, Math.atan2(dir.x, dir.z));
@@ -132,7 +167,6 @@ export class AITraffic {
       });
       return true;
     }
-    return false;
   }
 
   isOccupied(pos, radius) {
@@ -158,7 +192,8 @@ export class AITraffic {
 
   update(dt) {
     this.spawnTimer -= dt;
-    if (this.spawnTimer <= 0 && this.agents.length < this.maxActive) {
+    const civilians = this.agents.filter((a) => !a.persistent).length;
+    if (this.spawnTimer <= 0 && civilians < this.maxActive) {
       this.trySpawn();
       this.spawnTimer = 0.4;
     }
@@ -170,6 +205,21 @@ export class AITraffic {
       const pos = v.position;
       const dist = Math.hypot(pos.x - focus.x, pos.z - focus.z);
 
+      if (agent.persistent) {
+        // Vehículos de misión: nunca se reciclan; si se destruyen, quedan como chatarra
+        if (v.destroyed) {
+          this.agents.splice(i, 1);
+          v.driver = null;
+          continue;
+        }
+        if (v.isFlipped()) {
+          agent.stuck += dt;
+          if (agent.stuck > 4) v.resetUpright();
+          continue;
+        }
+        this.driveAgent(agent, dt);
+        continue;
+      }
       if (dist > this.despawnDist || v.destroyed) {
         if (!v.destroyed || dist > 60) this.despawn(agent);
         else v.input.throttle = 0;
@@ -245,7 +295,7 @@ export class AITraffic {
     else agent.stuck = Math.max(0, agent.stuck - dt);
     if (agent.stuck > 8) {
       const focus = this.game.getFocusPosition();
-      if (Math.hypot(pos.x - focus.x, pos.z - focus.z) > 40) this.despawn(agent);
+      if (!agent.persistent && Math.hypot(pos.x - focus.x, pos.z - focus.z) > 40) this.despawn(agent);
       else agent.stuck = 0;
     }
   }

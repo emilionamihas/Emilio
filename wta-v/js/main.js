@@ -9,6 +9,11 @@ import { InteractionSystem } from './InteractionSystem.js';
 import { AITraffic } from './AITraffic.js';
 import { WantedSystem } from './WantedSystem.js';
 import { HUD } from './HUD.js';
+import { GameState, formatMoney } from './GameState.js';
+import { Menus } from './Menus.js';
+import { Locations } from './Locations.js';
+import { Heists } from './Heists.js';
+import { Missions, STORY } from './Missions.js';
 
 const FIXED_STEP = 1 / 60;
 const params = new URLSearchParams(location.search);
@@ -46,6 +51,7 @@ const materials = {
 // ----------------------------------------------------------------------
 // Contexto compartido del juego
 // ----------------------------------------------------------------------
+const bus = new EventTarget();
 const game = {
   renderer,
   scene,
@@ -56,7 +62,15 @@ const game = {
   time: 0,
   timeScale: 1,
   running: false,
+  started: false,
   input: new Input(canvas),
+  state: new GameState('free'), // se sustituye al elegir modo
+  on(type, fn) {
+    bus.addEventListener(type, (e) => fn(e.detail));
+  },
+  emit(type, detail) {
+    bus.dispatchEvent(new CustomEvent(type, { detail }));
+  },
   getFocusPosition() {
     const v = game.interaction && game.interaction.vehicle;
     if (v && game.interaction.state !== 'foot') return new THREE.Vector3(v.position.x, v.position.y, v.position.z);
@@ -92,56 +106,153 @@ game.cameraRig.yaw = 0;
 game.interaction = new InteractionSystem(game);
 game.wanted = new WantedSystem(game);
 game.traffic = new AITraffic(game, { maxActive: 12 });
+game.menus = new Menus(game);
+game.locations = new Locations(game);
+game.heists = new Heists(game);
+game.missions = new Missions(game);
 
 // Coches aparcados junto a la acera del spawn (carril derecho de la calle x = 0)
 const parked = [
-  { z: 14, heading: Math.PI, type: 'sport', color: 0xffc107 },
-  { z: 30, heading: Math.PI, type: 'civil' },
-  { z: 46, heading: Math.PI, type: 'civil', color: 0x1e88e5 },
+  { z: 12, type: 'compact' },
+  { z: 46, type: 'muscle', color: 0xb71c1c },
+  { z: 58, type: 'pickup' },
 ];
 for (const p of parked) {
-  const v = new VehicleController(game, { type: p.type, color: p.color, position: new THREE.Vector3(6.3, 0, p.z), heading: p.heading });
+  const v = new VehicleController(game, { type: p.type, color: p.color, position: new THREE.Vector3(6.3, 0, p.z), heading: Math.PI });
   v.addToWorld();
 }
+
+// ----------------------------------------------------------------------
+// Explosiones (cohetes y coches que revientan)
+// ----------------------------------------------------------------------
+game.explosion = (point, radius, damage, source = null) => {
+  const fx = game.effects;
+  fx.muzzleFlash(point);
+  fx.flashLight.intensity = 60;
+  fx.flashLight.distance = radius * 5;
+  fx.flashTime = 0.15;
+  fx.spawnSparks(point, new THREE.Vector3(0, 1, 0), 40, 0xff8a3d);
+  for (let i = 0; i < 14; i++) {
+    fx.spawnSmoke(point, new THREE.Vector3((Math.random() - 0.5) * 7, Math.random() * 5, (Math.random() - 0.5) * 7), 1.8, true);
+  }
+  for (const v of [...game.vehicles]) {
+    if (v === source) continue;
+    const b = v.chassisBody;
+    const d = Math.hypot(b.position.x - point.x, b.position.y - point.y, b.position.z - point.z);
+    if (d > radius) continue;
+    const k = 1 - d / radius;
+    const dir = new CANNON.Vec3(b.position.x - point.x, 0, b.position.z - point.z);
+    dir.normalize();
+    b.applyImpulse(new CANNON.Vec3(dir.x * b.mass * 6 * k, b.mass * 5 * k, dir.z * b.mass * 6 * k), new CANNON.Vec3(0.2, 0, 0.3));
+    v.damage(damage * k);
+  }
+  if (game.interaction.state === 'foot') {
+    const p = game.player.mesh.position;
+    const d = p.distanceTo(point);
+    if (d < radius) game.player.takeDamage(damage * 0.8 * (1 - d / radius));
+  }
+};
 
 // ----------------------------------------------------------------------
 // Muerte y arresto
 // ----------------------------------------------------------------------
 let respawnTimer = 0;
-function endLife(text, cls) {
+let downKind = null;
+function endLife(text, cls, kind) {
   if (respawnTimer > 0) return;
+  downKind = kind;
   game.hud.bigText(text, cls);
   respawnTimer = 3;
   game.timeScale = 0.3;
+  game.missions.onPlayerDown(kind);
 }
-game.onPlayerDeath = () => endLife('WASTED', 'wasted');
-game.onBusted = () => endLife('BUSTED', 'busted');
+game.onPlayerDeath = () => endLife('WASTED', 'wasted', 'wasted');
+game.onBusted = () => endLife('BUSTED', 'busted', 'busted');
 
 function respawn() {
+  const st = game.state;
+  const lostLoot = game.heists.onPlayerDown();
+  // Factura del hospital o fianza: 10 % del dinero, máximo $5.000
+  const fee = Math.min(5000, Math.floor(st.money * 0.1));
+  st.money -= fee;
+  const where = game.locations.byId(downKind === 'busted' ? 'comisaria' : 'hospital');
+
   game.hud.hideBigText();
   game.timeScale = 1;
   game.interaction.forceExit();
   game.wanted.reset();
   game.player.health = 100;
-  game.player.teleport(spawn);
-  game.cameraRig.yaw = 0;
-  game.hud.notify('Has vuelto al punto de inicio.');
+  game.player.teleport(where.pos);
+  game.player.facing = Math.atan2(where.normal.x, where.normal.z);
+  game.cameraRig.yaw = Math.atan2(-where.normal.x, -where.normal.z);
+  game.hud.moneyDelta(-fee);
+  const what = downKind === 'busted' ? `Fianza pagada: ${formatMoney(fee)}` : `Factura del hospital: ${formatMoney(fee)}`;
+  game.hud.notify(lostLoot ? `${what}. Has perdido el botín (${formatMoney(lostLoot)}).` : `${what}.`, 5);
+  st.save();
 }
 
 // ----------------------------------------------------------------------
-// Pantalla de inicio / pausa y Pointer Lock
+// Menú principal, pausa y Pointer Lock
 // ----------------------------------------------------------------------
 const overlay = document.getElementById('overlay');
+const modeSelect = document.getElementById('mode-select');
+const pauseActions = document.getElementById('pause-actions');
 const playBtn = document.getElementById('play-btn');
+const resetBtn = document.getElementById('btn-reset');
 document.getElementById('loading').classList.add('hidden');
-playBtn.classList.remove('hidden');
+modeSelect.classList.remove('hidden');
+
+// Descripción del botón de historia según la partida guardada
+const storySave = GameState.peek('story');
+if (storySave) {
+  const next = STORY[storySave.storyStep];
+  document.getElementById('story-desc').textContent = storySave.storyDone
+    ? `Historia completada · ${formatMoney(storySave.money)}. Sigue jugando en la ciudad.`
+    : `Continuar: misión ${storySave.storyStep + 1}/${STORY.length} "${next ? next.title : ''}" · ${formatMoney(storySave.money)}`;
+  resetBtn.classList.remove('hidden');
+}
+const freeSave = GameState.peek('free');
+if (freeSave) document.getElementById('free-desc').textContent = `Continuar partida libre · ${formatMoney(freeSave.money)} · ${freeSave.businesses.length} negocios`;
+
+function applyState() {
+  const st = game.state;
+  const player = game.player;
+  player.weaponIndex = 0;
+  player.updateWeaponVisual();
+  game.hud.shownMoney = st.money;
+  // Las armas iniciales llegan con munición
+  for (const i of st.ownedWeapons) if (i > 0 && st.clip[i] == null) player.giveWeapon(i);
+}
+
+function chooseMode(mode) {
+  const st = new GameState(mode);
+  const loaded = st.load();
+  game.state = st;
+  applyState();
+  game.started = true;
+  modeSelect.classList.add('hidden');
+  pauseActions.classList.remove('hidden');
+  if (mode === 'story' && !loaded) game.missions.playIntro();
+  if (mode === 'story' && loaded && !st.storyDone) game.hud.notify('Partida cargada. Sigue el marcador amarillo del radar.');
+  if (mode === 'free') game.hud.notify('Modo libre: atraca bancos (verde $), compra negocios (N) y coches (C).', 6);
+  st.save();
+  requestPlay();
+}
 
 function start() {
+  if (!game.started) return;
   overlay.classList.add('hidden');
   game.hud.show(true);
   game.running = true;
 }
-playBtn.addEventListener('click', () => {
+
+function pause() {
+  game.running = false;
+  if (game.menus.isOpen) game.menus.close();
+  overlay.classList.remove('hidden');
+}
+
+function requestPlay() {
   game.input.requestLock();
   // Si Pointer Lock no está disponible (iframe, móvil...), se juega con el ratón libre
   setTimeout(() => {
@@ -150,34 +261,52 @@ playBtn.addEventListener('click', () => {
       start();
     }
   }, 400);
+}
+
+document.getElementById('btn-story').addEventListener('click', () => chooseMode('story'));
+document.getElementById('btn-free').addEventListener('click', () => chooseMode('free'));
+resetBtn.addEventListener('click', () => {
+  GameState.erase('story');
+  resetBtn.classList.add('hidden');
+  document.getElementById('story-desc').textContent = '9 misiones: de robar tu primer coche a vaciar la Reserva Federal.';
 });
+playBtn.addEventListener('click', requestPlay);
+document.getElementById('btn-menu').addEventListener('click', () => {
+  game.state.save();
+  location.reload();
+});
+
 window.addEventListener('keydown', (e) => {
-  if (e.code === 'Escape' && game.input.freeMouse && game.running) {
-    game.running = false;
-    playBtn.textContent = 'CONTINUAR';
-    overlay.classList.remove('hidden');
-  }
+  if (e.code === 'Escape' && game.input.freeMouse && game.running && !game.menus.isOpen) pause();
 });
 canvas.addEventListener('click', () => {
   if (game.running && !game.input.locked && !game.input.freeMouse) game.input.requestLock();
 });
 game.input.onLockChange = (locked) => {
-  if (locked) {
-    start();
-  } else if (!params.has('autostart') && !game.input.freeMouse) {
-    // Esc libera el ratón: pausa
-    game.running = false;
-    playBtn.textContent = 'CONTINUAR';
-    overlay.classList.remove('hidden');
-  }
+  if (locked) start();
+  else if (!params.has('autostart') && !game.input.freeMouse) pause(); // Esc libera el ratón: pausa
 };
-if (params.has('autostart')) start(); // sin Pointer Lock, útil para pruebas automáticas
+
+// Arranque directo para pruebas automáticas: ?autostart=story | ?autostart=free
+if (params.has('autostart')) {
+  const mode = params.get('autostart') === 'story' ? 'story' : 'free';
+  const st = new GameState(mode);
+  if (!params.has('fresh')) st.load();
+  game.state = st;
+  applyState();
+  game.started = true;
+  if (mode === 'story' && st.storyStep === 0) game.missions.playIntro();
+  start();
+}
 if (params.has('time')) game.env.timeOfDay = parseFloat(params.get('time'));
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+});
+window.addEventListener('beforeunload', () => {
+  if (game.started) game.state.save();
 });
 
 // ----------------------------------------------------------------------
@@ -191,9 +320,12 @@ function step(dt) {
 
   game.env.timeSpeed = input.isDown('KeyT') ? 25 : 1;
 
-  // 1. Lógica previa a la física: jugador, interacción, IA
+  // 1. Lógica previa a la física: jugador, interacción, lugares, misiones e IA
   game.player.update(dt, game.cameraRig);
   game.interaction.update(dt);
+  game.locations.update(dt);
+  game.missions.update(dt);
+  game.heists.update(dt);
   game.traffic.update(dt);
   game.wanted.update(dt);
   for (const v of game.vehicles) v.update(dt);
@@ -220,7 +352,8 @@ function step(dt) {
 function frame() {
   requestAnimationFrame(frame);
   const raw = Math.min(clock.getDelta(), 0.05);
-  if (game.running) step(raw * game.timeScale);
+  // Con un menú de tienda abierto el mundo se congela
+  if (game.running && !game.menus.isOpen) step(raw * game.timeScale);
   renderer.render(scene, camera);
   game.input.endFrame();
 }

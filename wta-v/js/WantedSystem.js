@@ -13,6 +13,7 @@ const CRIMES = {
   carjack: { heat: 0.6, minLevel: 1 },
   steal_police: { heat: 0.5, minLevel: 2 },
   attack_police: { heat: 0.35, minLevel: 1, cooldown: 0.4 },
+  explosion: { heat: 0.5, minLevel: 2 },
 };
 
 export class WantedSystem {
@@ -62,11 +63,24 @@ export class WantedSystem {
     }
   }
 
+  /** Alarma (atracos): sube directamente al nivel indicado y fija la zona de búsqueda. */
+  raiseTo(level, pos) {
+    const before = this.level;
+    if (level > this.level) this.level = Math.min(5, level);
+    this.heat = 0;
+    this.lastKnown.copy(pos || this.game.getFocusPosition());
+    this.timeUnseen = 0;
+    this.render();
+    if (before === 0 && this.level > 0) this.game.hud.notify('¡Ha saltado la alarma! La policía va de camino.');
+  }
+
   clear() {
+    const was = this.level;
     this.level = 0;
     this.heat = 0;
     this.evading = false;
     this.render();
+    if (was > 0 && this.game.emit) this.game.emit('wantedCleared', {});
   }
 
   render() {
@@ -209,7 +223,43 @@ export class WantedSystem {
       this.chase(unit, dt, focus, seen);
     }
 
-    this.checkBusted(dt, focus);
+    // Mientras vacías una cámara estás dentro del edificio: te rodean, pero no te disparan ni te arrestan
+    const inside = this.game.heists && this.game.heists.active;
+    if (!inside) {
+      this.checkBusted(dt, focus);
+      this.policeFire(dt, focus);
+    }
+  }
+
+  /** A partir de 3 estrellas los agentes disparan desde las patrullas cercanas con visión. */
+  policeFire(dt, focus) {
+    if (this.level < 3) return;
+    const game = this.game;
+    const driving = game.interaction.isDriving;
+    const playerSpeed = driving ? Math.abs(game.interaction.vehicle.getForwardSpeed()) : 0;
+    for (const u of this.units) {
+      const v = u.vehicle;
+      if (v.destroyed) continue;
+      u.fireTimer = (u.fireTimer ?? Math.random()) - dt;
+      if (u.fireTimer > 0) continue;
+      u.fireTimer = 1.3 - this.level * 0.1;
+      const p = v.position;
+      const d = Math.hypot(p.x - focus.x, p.z - focus.z);
+      if (d > 38 || !(d < 15 || game.env.segmentOnRoad(p, focus))) continue;
+      const from = new THREE.Vector3(p.x, p.y + 1.4, p.z);
+      const chance = 0.22 + this.level * 0.04 - playerSpeed * 0.005 - d * 0.004;
+      const hit = Math.random() < chance;
+      const to = new THREE.Vector3(focus.x, focus.y + 1.1, focus.z);
+      if (!hit) to.add(new THREE.Vector3((Math.random() - 0.5) * 4, Math.random() * 1.5, (Math.random() - 0.5) * 4));
+      game.effects.spawnTracer(from, to);
+      if (!hit) {
+        game.effects.spawnSparks(to, new THREE.Vector3(0, 1, 0), 3);
+      } else if (driving) {
+        game.interaction.vehicle.damage(2.5);
+      } else {
+        game.player.takeDamage(2 + this.level * 0.8);
+      }
+    }
   }
 
   chase(unit, dt, focus, seen) {

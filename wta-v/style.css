@@ -127,12 +127,26 @@ body {
   text-align: center;
 }
 
-#health-bar {
+#bars {
+  display: flex;
+  gap: 4px;
+  width: 190px;
   margin: 10px auto 0;
-  width: 180px;
+}
+
+#health-bar,
+#armor-bar {
+  flex: 1;
   height: 9px;
   background: rgba(0, 0, 0, 0.6);
   border: 1px solid rgba(0, 0, 0, 0.9);
+}
+
+#armor-fill {
+  width: 0;
+  height: 100%;
+  background: linear-gradient(#64b5f6, #1e6fbf);
+  transition: width 0.2s;
 }
 
 #health-fill {
@@ -326,9 +340,9 @@ body {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 380px;
-  height: 380px;
-  margin: -190px 0 0 -190px;
+  width: 440px;
+  height: 440px;
+  margin: -220px 0 0 -220px;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(0, 0, 0, 0.25) 0 22%, rgba(0, 0, 0, 0.65) 23% 100%);
   border: 3px solid rgba(255, 255, 255, 0.2);
@@ -338,11 +352,12 @@ body {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 118px;
+  width: 124px;
   height: 64px;
-  margin: -32px 0 0 -59px;
-  transform: rotate(var(--angle)) translateX(122px) rotate(calc(-1 * var(--angle)));
+  margin: -32px 0 0 -62px;
+  transform: rotate(var(--angle)) translateX(150px) rotate(calc(-1 * var(--angle)));
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   border-radius: 6px;
@@ -357,6 +372,26 @@ body {
 .wheel-slot.selected {
   background: rgba(255, 255, 255, 0.92);
   color: #111;
+}
+
+.wheel-slot .slot-info {
+  font: 700 14px 'Rajdhani', sans-serif;
+  letter-spacing: 0;
+  opacity: 0.85;
+}
+
+.wheel-slot.locked {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.wheel-slot.locked .slot-info {
+  color: #ffca28;
+  opacity: 1;
+}
+
+.wheel-slot.locked.selected {
+  background: rgba(255, 202, 40, 0.25);
+  color: #fff;
 }
 
 #wheel-center {
@@ -453,4 +488,355 @@ body {
   #controls-help {
     grid-template-columns: 1fr;
   }
+}
+
+/* ---------- Dinero y botín ---------- */
+#money {
+  font-family: 'Anton', sans-serif;
+  font-size: 34px;
+  color: #7cc96a;
+  letter-spacing: 1px;
+  -webkit-text-stroke: 1.5px #0b2a08;
+  font-variant-numeric: tabular-nums;
+}
+
+#money-delta {
+  font-family: 'Anton', sans-serif;
+  font-size: 22px;
+  color: #a5e08f;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+#money-delta.show {
+  opacity: 1;
+  transform: none;
+}
+
+#money-delta.negative {
+  color: #ef5350;
+}
+
+#loot {
+  font-family: 'Anton', sans-serif;
+  font-size: 20px;
+  color: #ffca28;
+  letter-spacing: 1px;
+  animation: loot-pulse 1s ease-in-out infinite;
+}
+
+@keyframes loot-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+#vehicle-name {
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+/* ---------- Misiones ---------- */
+#mission-timer {
+  position: absolute;
+  top: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'Anton', sans-serif;
+  font-size: 38px;
+  text-shadow: 3px 3px 0 #000;
+  font-variant-numeric: tabular-nums;
+  display: none;
+}
+
+#mission-timer.show {
+  display: block;
+}
+
+#mission-timer.urgent {
+  color: #ff5252;
+}
+
+#objective {
+  position: absolute;
+  bottom: 118px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(640px, 90vw);
+  padding: 8px 18px;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 3px;
+  font-size: 20px;
+  font-weight: 700;
+  text-align: center;
+  color: #ffe082;
+  display: none;
+}
+
+#objective.show {
+  display: block;
+}
+
+#subtitle {
+  position: absolute;
+  bottom: 170px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(760px, 92vw);
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+  text-shadow: 2px 2px 0 #000, -1px -1px 0 #000;
+  display: none;
+}
+
+#subtitle.show {
+  display: block;
+}
+
+#progress {
+  position: absolute;
+  top: 62%;
+  left: 50%;
+  width: 340px;
+  transform: translateX(-50%);
+  text-align: center;
+  display: none;
+}
+
+#progress.show {
+  display: block;
+}
+
+#progress-label {
+  font-family: 'Anton', sans-serif;
+  font-size: 20px;
+  letter-spacing: 2px;
+  text-shadow: 2px 2px 0 #000;
+  margin-bottom: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+#progress-track {
+  height: 10px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid #000;
+}
+
+#progress-fill {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, #7cc96a, #ffca28);
+}
+
+#mission-banner {
+  position: absolute;
+  top: 30%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.4s;
+  pointer-events: none;
+}
+
+#mission-banner.show {
+  opacity: 1;
+}
+
+#banner-title {
+  font-family: 'Anton', sans-serif;
+  font-size: 64px;
+  letter-spacing: 3px;
+  color: #ffca28;
+  text-shadow: 4px 4px 0 #000;
+}
+
+#banner-sub {
+  font-family: 'Anton', sans-serif;
+  font-size: 28px;
+  letter-spacing: 2px;
+  text-shadow: 3px 3px 0 #000;
+}
+
+/* ---------- Menú de tiendas ---------- */
+#shop {
+  position: absolute;
+  top: 90px;
+  left: 28px;
+  width: min(430px, calc(100vw - 56px));
+  background: rgba(8, 10, 14, 0.88);
+  border-top: 5px solid #7cb342;
+  pointer-events: auto;
+}
+
+#shop-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 14px 18px 4px;
+}
+
+#shop-title {
+  font-family: 'Anton', sans-serif;
+  font-size: 30px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+#shop-money {
+  font-family: 'Anton', sans-serif;
+  font-size: 22px;
+  color: #7cc96a;
+}
+
+#shop-sub {
+  padding: 0 18px 10px;
+  font-size: 15px;
+  opacity: 0.75;
+}
+
+#shop-sub.warn {
+  color: #ffca28;
+  opacity: 1;
+}
+
+#shop-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 52vh;
+  overflow-y: auto;
+}
+
+.shop-item {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 18px;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font: 500 17px 'Rajdhani', sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+
+.shop-item small {
+  display: block;
+  font-size: 13px;
+  opacity: 0.65;
+}
+
+.shop-item.selected {
+  background: #f2f2f2;
+  color: #111;
+}
+
+.shop-item.disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.shop-key {
+  font-weight: 700;
+  opacity: 0.6;
+}
+
+.shop-price {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.shop-item.owned .shop-price {
+  color: #7cc96a;
+}
+
+.shop-item.selected.owned .shop-price {
+  color: #2e7d32;
+}
+
+#shop-help {
+  padding: 10px 18px 12px;
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+#shop-help kbd {
+  display: inline-block;
+  padding: 0 6px;
+  margin: 0 1px;
+  border-radius: 3px;
+  background: #fff;
+  color: #000;
+  font: 700 13px/18px 'Rajdhani', sans-serif;
+}
+
+/* ---------- Menú principal ---------- */
+#mode-select {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.mode-btn {
+  pointer-events: auto;
+  cursor: pointer;
+  width: min(460px, 86vw);
+  padding: 14px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-radius: 3px;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+
+.mode-btn:hover,
+.mode-btn:focus-visible {
+  background: rgba(124, 179, 66, 0.18);
+  border-color: #7cb342;
+  transform: translateX(4px);
+  outline: none;
+}
+
+.mode-title {
+  font-family: 'Anton', sans-serif;
+  font-size: 28px;
+  letter-spacing: 2px;
+}
+
+.mode-desc {
+  font-size: 16px;
+  opacity: 0.8;
+}
+
+#pause-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.link-btn {
+  pointer-events: auto;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  color: rgba(255, 255, 255, 0.6);
+  font: 500 15px 'Rajdhani', sans-serif;
+  text-decoration: underline;
+}
+
+.link-btn:hover {
+  color: #fff;
 }

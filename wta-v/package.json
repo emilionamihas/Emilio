@@ -1,0 +1,13 @@
+{
+  "name": "wta-v",
+  "private": true,
+  "description": "WTA V: el juego no necesita build; estas dependencias solo sirven para las pruebas de física en Node.",
+  "type": "module",
+  "scripts": {
+    "test:vehicles": "node tools/vehicle-test.mjs"
+  },
+  "devDependencies": {
+    "cannon-es": "0.20.0",
+    "three": "0.160.0"
+  }
+}

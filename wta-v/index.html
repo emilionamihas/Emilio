@@ -27,7 +27,7 @@
   <canvas id="game-canvas"></canvas>
 
   <div id="hud" class="hidden">
-    <!-- Superior derecha: estrellas, reloj y arma -->
+    <!-- Superior derecha: arma, reloj, estrellas y dinero -->
     <div id="top-right">
       <div id="weapon-info">
         <span id="weapon-name">PUÑOS</span>
@@ -37,17 +37,24 @@
       <div id="wanted-stars">
         <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span>
       </div>
+      <div id="money">$0</div>
+      <div id="money-delta"></div>
+      <div id="loot"></div>
     </div>
 
-    <!-- Inferior izquierda: minimapa circular + barra de vida -->
+    <!-- Inferior izquierda: radar + vida + chaleco -->
     <div id="radar">
       <canvas id="minimap" width="220" height="220"></canvas>
       <div id="radar-north">N</div>
-      <div id="health-bar"><div id="health-fill"></div></div>
+      <div id="bars">
+        <div id="health-bar"><div id="health-fill"></div></div>
+        <div id="armor-bar"><div id="armor-fill"></div></div>
+      </div>
     </div>
 
     <!-- Inferior derecha: velocímetro -->
     <div id="speedometer" class="hidden">
+      <div id="vehicle-name"></div>
       <div id="speed-value">0</div>
       <div id="speed-unit">KM/H</div>
       <div id="speed-bar"><div id="speed-fill"></div></div>
@@ -60,25 +67,62 @@
     <div id="prompt"></div>
     <div id="notification"></div>
 
-    <!-- Rueda de armas (mantener TAB) -->
+    <!-- Misión: objetivo, cronómetro, subtítulos y barra de atraco -->
+    <div id="mission-timer"></div>
+    <div id="objective"></div>
+    <div id="subtitle"></div>
+    <div id="progress">
+      <div id="progress-label"></div>
+      <div id="progress-track"><div id="progress-fill"></div></div>
+    </div>
+    <div id="mission-banner">
+      <div id="banner-title"></div>
+      <div id="banner-sub"></div>
+    </div>
+
+    <!-- Rueda de armas (mantener TAB); las casillas las genera HUD.js -->
     <div id="weapon-wheel" class="hidden">
-      <div class="wheel-slot" data-slot="0" style="--angle: -90deg"><span>PUÑOS</span></div>
-      <div class="wheel-slot" data-slot="1" style="--angle: 0deg"><span>PISTOLA</span></div>
-      <div class="wheel-slot" data-slot="2" style="--angle: 90deg"><span>SUBFUSIL</span></div>
-      <div class="wheel-slot" data-slot="3" style="--angle: 180deg"><span>ESCOPETA</span></div>
       <div id="wheel-center">ARMAS</div>
+    </div>
+
+    <!-- Menú de tiendas / negocios / casa -->
+    <div id="shop" class="hidden">
+      <div id="shop-head">
+        <div id="shop-title"></div>
+        <div id="shop-money"></div>
+      </div>
+      <div id="shop-sub"></div>
+      <div id="shop-list"></div>
+      <div id="shop-help"><kbd>W</kbd><kbd>S</kbd> elegir · <kbd>E</kbd> comprar · <kbd>1-9</kbd> directo · <kbd>Q</kbd> salir</div>
     </div>
   </div>
 
   <div id="big-message"></div>
 
-  <!-- Pantalla de inicio / pausa -->
+  <!-- Menú principal / pausa -->
   <div id="overlay">
     <div id="overlay-box">
       <h1>WTA <span>V</span></h1>
       <h2>World Theft Auto</h2>
-      <div id="loading">Cargando ciudad…</div>
-      <button id="play-btn" class="hidden">CLIC PARA JUGAR</button>
+      <div id="loading">Cargando Puerto Sombra…</div>
+
+      <div id="mode-select" class="hidden">
+        <button class="mode-btn" id="btn-story" type="button">
+          <span class="mode-title">MODO HISTORIA</span>
+          <span class="mode-desc" id="story-desc">9 misiones: de robar tu primer coche a vaciar la Reserva Federal.</span>
+        </button>
+        <button class="mode-btn" id="btn-free" type="button">
+          <span class="mode-title">MODO LIBRE</span>
+          <span class="mode-desc" id="free-desc">Toda la ciudad abierta desde el principio y $60.000 para empezar.</span>
+        </button>
+        <button class="link-btn hidden" id="btn-reset" type="button">Borrar partida de historia</button>
+      </div>
+
+      <div id="pause-actions" class="hidden">
+        <button id="play-btn" type="button">CONTINUAR</button>
+        <button class="link-btn" id="btn-menu" type="button">Volver al menú principal</button>
+      </div>
+
       <div id="controls-help">
         <div><b>WASD</b> moverse / conducir</div>
         <div><b>Mouse</b> cámara y apuntar</div>
@@ -87,9 +131,11 @@
         <div><b>Clic izq.</b> disparar</div>
         <div><b>Clic der.</b> apuntar</div>
         <div><b>F</b> entrar / salir del vehículo</div>
-        <div><b>TAB</b> rueda de armas (o teclas 1-4)</div>
+        <div><b>E</b> tiendas, atracos, misiones</div>
+        <div><b>TAB</b> rueda de armas (o teclas 1-6)</div>
         <div><b>R</b> recargar / enderezar auto</div>
         <div><b>T</b> acelerar el tiempo</div>
+        <div><b>Enter</b> saltar diálogo</div>
         <div><b>Esc</b> pausa</div>
       </div>
     </div>
