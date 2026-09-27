@@ -413,6 +413,7 @@ function step(dt) {
   world.step(FIXED_STEP, dt, 4);
 
   // 3. Sincronizar mallas con cuerpos físicos
+  for (const v of game.vehicles) v.sync();
   game.player.animate(dt);
 
   // 4. Cámara, entorno, efectos y HUD
