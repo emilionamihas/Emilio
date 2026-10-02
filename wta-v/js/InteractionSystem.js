@@ -63,7 +63,10 @@ export class InteractionSystem {
         const v = this.vehicle;
         VehicleController.readPlayerInput(input, v.input);
         if (input.wasPressed('KeyR') && (v.isFlipped() || Math.abs(v.getForwardSpeed()) < 2)) v.resetUpright();
-        if (input.wasPressed('KeyF')) this.beginExit();
+        if (input.wasPressed('KeyF')) {
+          if (v.spec.plane && (v.airborne || Math.abs(v.getForwardSpeed()) > 4)) game.hud.notify('Aterriza y para antes de bajarte.', 2);
+          else this.beginExit();
+        }
         if (v.destroyed && !this.warnedDestroyed) {
           this.warnedDestroyed = true;
           game.hud.notify('El vehículo está destrozado. Pulsa F para salir.');
@@ -102,7 +105,7 @@ export class InteractionSystem {
     // a la altura del coche (montaña, puentes): nunca por debajo del terreno
     const x = v.position.x + local.x;
     const z = v.position.z + local.z;
-    const ground = this.game.env.groundHeight ? this.game.env.groundHeight(x, z) : 0;
+    const ground = this.game.env.groundHeight ? this.game.env.groundHeight(x, z, v.position.y) : 0;
     return out.set(x, Math.max(ground, v.position.y - 0.45), z);
   }
 
@@ -164,6 +167,7 @@ export class InteractionSystem {
       v.input.handbrake = false;
       this.state = 'driving';
       this.game.hud.showSpeedometer(true);
+      if (v.spec.plane) this.game.hud.notify('Avioneta: W/S potencia · A/D girar · Espacio subir (despega a unos 80 km/h) · Shift bajar.', 7);
     }
   }
 

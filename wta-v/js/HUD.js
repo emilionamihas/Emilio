@@ -1,3 +1,4 @@
+import { SURFACE_NAMES } from './Environment.js';
 import { WEAPONS } from './PlayerController.js';
 import { formatMoney } from './GameState.js';
 
@@ -199,7 +200,10 @@ export class HUD {
       this.speedFill.style.width = `${Math.min(100, (kmh / (v.spec.maxSpeed * 3.6)) * 100)}%`;
       this.driftTag.classList.toggle('on', v.drifting);
       this.vehHealth.style.width = `${Math.max(0, (v.health / v.maxHealth) * 100)}%`;
-      if (this.vehName.textContent !== v.label) this.vehName.textContent = v.label;
+      let name = v.label;
+      if (v.spec.plane) name += ` · ALT ${Math.max(0, Math.round(v.position.y - 1))} m · ${Math.round(v.thr * 100)} %`;
+      else if (v.surface) name += ` · ${SURFACE_NAMES[v.surface]}`;
+      if (this.vehName.textContent !== name) this.vehName.textContent = name;
     }
 
     if (this.notifyTimer > 0) {

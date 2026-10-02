@@ -143,7 +143,7 @@ function testType(type) {
 }
 
 const only = process.argv[2];
-const types = only ? [only] : Object.keys(CATALOG).filter((k) => k !== 'civil');
+const types = only ? [only] : Object.keys(CATALOG).filter((k) => k !== 'civil' && !CATALOG[k].plane);
 let failures = 0;
 console.log('tipo      0-100  punta  fren100  curvaUp slalomUp  hbGiro hbVel  recGiro recVel  resultado');
 for (const type of types) {

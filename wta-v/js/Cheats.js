@@ -5,7 +5,8 @@ import { STORY } from './Missions.js';
 
 export const CHEAT_CODE = 'WTASECRET';
 export const OLDSTYLE_CODE = 'OLDSTYLE';
-const MAX_CODE = Math.max(CHEAT_CODE.length, OLDSTYLE_CODE.length);
+export const FLY_CODE = 'WTAFLY';
+const MAX_CODE = Math.max(CHEAT_CODE.length, OLDSTYLE_CODE.length, FLY_CODE.length);
 const BONUS = 10000000;
 
 /**
@@ -38,6 +39,9 @@ export class Cheats {
         } else if (this.buffer.endsWith(OLDSTYLE_CODE)) {
           this.buffer = '';
           this.oldStyle();
+        } else if (this.buffer.endsWith(FLY_CODE)) {
+          this.buffer = '';
+          this.fly();
         }
       },
       true
@@ -84,6 +88,7 @@ export class Cheats {
       this.closePrompt();
       if (code === CHEAT_CODE) this.activate();
       else if (code === OLDSTYLE_CODE) this.oldStyle();
+      else if (code === FLY_CODE) this.fly();
       else this.game.hud.notify('Código incorrecto.', 2);
     }
   }
@@ -103,6 +108,29 @@ export class Cheats {
     st.save();
     game.hud.missionBanner('OLD STYLE', 'Colores secretos desbloqueados');
     game.hud.notify('Azul navy y beige ya están en tu vestidor, y el conjunto "Old Style" en Conjuntos.', 6);
+  }
+
+  /**
+   * WTAFLY: una avioneta propia en tu garaje (P › Mis coches) y aparcada en la calle más cercana.
+   */
+  fly() {
+    const game = this.game;
+    const st = game.state;
+    if (!st) return;
+    let car = st.cars.find((c) => c.type === 'avioneta');
+    if (!car) car = st.addCar({ type: 'avioneta', color: 0xf2f2f2, finish: 'brillo' });
+    st.save();
+    if (game.interior || game.interaction.state !== 'foot') {
+      game.hud.missionBanner('WTAFLY', 'Avioneta en tu garaje');
+      game.hud.notify('Tienes una avioneta: pídela desde P › Mis coches cuando estés a pie en la calle.', 6);
+      return;
+    }
+    const { pos, heading } = game.env.parkingNear(game.player.mesh.position);
+    game.locations.spawnOwnedCar(car, pos, heading);
+    game.waypoint = { pos: pos.clone(), label: 'Tu avioneta' };
+    game.map.refreshRoute && game.map.refreshRoute();
+    game.hud.missionBanner('WTAFLY', 'Tu avioneta te espera en la calle');
+    game.hud.notify('Avioneta Gaviota aparcada en la calle más cercana (ruta en el GPS). Sube con F.', 6);
   }
 
   activate() {
@@ -125,7 +153,7 @@ export class Cheats {
     // Un coche de cada modelo (propios: nunca cuentan como robo)
     const have = new Set(st.cars.map((c) => c.type));
     for (const [type, spec] of Object.entries(CATALOG)) {
-      if (type === 'civil' || have.has(type)) continue;
+      if (type === 'civil' || spec.plane || have.has(type)) continue; // la avioneta es de WTAFLY
       have.add(type);
       st.addCar({ type, color: spec.colors ? spec.colors[0] : null, finish: 'metalizado' });
     }

@@ -608,8 +608,16 @@ export class ThirdPersonCamera {
       if (this.freeLookTimer <= 0) this.freeLookOffset *= Math.exp(-3 * dt);
       const follow = 1 - Math.exp(-(speed > 2 ? 5 : 2) * dt);
       this.yaw = lerpAngle(this.yaw, carYaw + this.freeLookOffset, this.freeLookTimer > 0 ? 1 : follow);
-      if (this.freeLookTimer <= 0) this.pitch += (-0.18 - this.pitch) * (1 - Math.exp(-2 * dt));
-      distance = 7 + Math.min(speed, 45) * 0.06;
+      // Avioneta: más lejos y siguiendo el cabeceo (al subir, la cámara baja detrás)
+      const plane = v.spec.plane;
+      let pitchTarget = -0.18;
+      if (plane) {
+        const fy = v.getForward().y;
+        pitchTarget = -0.16 + Math.asin(Math.max(-1, Math.min(1, fy))) * 0.7;
+        pivot.y += 0.8;
+      }
+      if (this.freeLookTimer <= 0) this.pitch += (pitchTarget - this.pitch) * (1 - Math.exp(-(plane ? 4 : 2) * dt));
+      distance = plane ? 12 + Math.min(speed, 60) * 0.05 : 7 + Math.min(speed, 45) * 0.06;
       fov = 68 + Math.min(speed, 50) * 0.3;
       stiffness = THREE.MathUtils.lerp(3, 14, settle);
     }
@@ -628,7 +636,7 @@ export class ThirdPersonCamera {
 
     const desired = shoulderPivot.clone().addScaledVector(dir, -d);
     // nunca por debajo del suelo (también en la montaña)
-    const groundY = !game.interior && game.env.groundHeight ? game.env.groundHeight(desired.x, desired.z) : 0;
+    const groundY = !game.interior && game.env.groundHeight ? game.env.groundHeight(desired.x, desired.z, pivot.y) : 0;
     desired.y = Math.max(desired.y, groundY + 0.6);
     // Dentro de un edificio la cámara no atraviesa el techo
     if (game.interior) desired.y = Math.min(desired.y, game.interior.inst.ceiling - 0.3);

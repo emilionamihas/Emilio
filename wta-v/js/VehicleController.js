@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { GROUPS } from './Environment.js';
+import { GROUPS, SURFACE_GRIP } from './Environment.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 /**
@@ -102,6 +102,15 @@ export const CATALOG = {
     body: { w: 0.24, l: 1.0, h: 0.5 }, cabin: null,
     wheel: { r: 0.32, x: 0.2, zf: 0.74, zr: -0.72, rest: 0.24 },
     style: 'sportbike', bike: true, colors: [0xd50000, 0x111111, 0x1e88e5, 0x76ff03, 0xff6d00],
+  },
+  // Avioneta: solo con el código WTAFLY. En tierra rueda con su tren; en el aire, vuelo arcade
+  avioneta: {
+    label: 'Gaviota', kind: 'Avioneta', price: 0, mass: 900, drive: 'rwd', power: 0, maxSpeed: 62,
+    brakeDecel: 6, handbrakeDecel: 4, maxSteer: 0.4, gripFront: 1.6, gripRear: 1.7, drift: 1,
+    stiffness: 30, damping: [2.4, 4.2], health: 130,
+    body: { w: 0.6, l: 3.0, h: 1.1 }, cabin: null,
+    wheel: { r: 0.3, x: 1.25, xf: 0.12, zf: 2.1, zr: -0.25, rest: 0.4 },
+    style: 'plane', plane: true, thrust: 9000, flyMax: 62, colors: [0xf2f2f2, 0xc62828, 0x1565c0, 0xf9c80e],
   },
   police: {
     label: 'Patrulla', kind: 'Policía', price: 0, mass: 1300, drive: 'rwd', power: 8600, maxSpeed: 56,
@@ -216,6 +225,13 @@ const _q = new THREE.Quaternion();
 const _bodyQ = new THREE.Quaternion();
 const _v3 = new THREE.Vector3();
 const _zAxis = new THREE.Vector3(0, 0, 1);
+// Límites del mundo para la avioneta (los mismos muros que el mapa)
+const WORLD_FLY = { minX: -530, maxX: 530, minZ: -545, maxZ: 560 };
+const _pv1 = new CANNON.Vec3();
+const _pv2 = new CANNON.Vec3();
+const _pf = new CANNON.Vec3();
+const _pl = new CANNON.Vec3();
+const _pu = new CANNON.Vec3();
 
 function derive(spec) {
   if (spec._derived) return spec;
@@ -295,7 +311,10 @@ export class VehicleController {
     // El origen del cuerpo es el centro de masas. Las cajas de colisión se colocan por encima,
     // así el centro de masas queda bajo (a la altura de los ejes) y el coche es estable.
     const b = s.body;
-    chassis.addShape(new CANNON.Box(new CANNON.Vec3(b.w, b.h / 2, b.l)), new CANNON.Vec3(0, b.h / 2, 0));
+    if (s.plane) {
+      // Fuselaje más corto y elevado: la cola no roza la pista al rotar para despegar
+      chassis.addShape(new CANNON.Box(new CANNON.Vec3(b.w, b.h / 2, 2.4)), new CANNON.Vec3(0, b.h / 2 + 0.3, 0.4));
+    } else chassis.addShape(new CANNON.Box(new CANNON.Vec3(b.w, b.h / 2, b.l)), new CANNON.Vec3(0, b.h / 2, 0));
     if (s.cabin) {
       chassis.addShape(
         new CANNON.Box(new CANNON.Vec3(b.w * 0.85, s.cabin.h / 2, s.cabin.l / 2)),
@@ -334,9 +353,10 @@ export class VehicleController {
       useCustomSlidingRotationalSpeed: true,
     };
     // Orden: 0 del. izq., 1 del. der., 2 tras. izq., 3 tras. der. (+X local es la IZQUIERDA)
+    const xf = w.xf ?? w.x;
     const positions = [
-      [w.x, w.zf],
-      [-w.x, w.zf],
+      [xf, w.zf],
+      [-xf, w.zf],
       [w.x, w.zr],
       [-w.x, w.zr],
     ];
@@ -356,6 +376,11 @@ export class VehicleController {
 
   createMeshes(color) {
     const s = this.spec;
+    if (s.plane) {
+      this.createPlaneMeshes(color);
+      VehicleController.mergeByMaterial(this.mesh);
+      return;
+    }
     if (s.bike) {
       this.createBikeMeshes(color);
       VehicleController.mergeByMaterial(this.mesh, new Set([this.roofMesh]));
@@ -576,6 +601,248 @@ export class VehicleController {
     }
   }
 
+  /** Avioneta de ala alta: fuselaje, cabina, alas, cola, hélice, tren triciclo y luces de navegación. */
+  createPlaneMeshes(color) {
+    const s = this.spec;
+    const group = new THREE.Group();
+    group.userData.vehicle = this;
+    const paint = color ?? s.colors[0];
+    this.paintMat = coat(new THREE.MeshPhysicalMaterial({ color: paint, metalness: 0.4, roughness: 0.3, clearcoat: 0.8, clearcoatRoughness: 0.15 }));
+    const accent = new THREE.MeshStandardMaterial({ color: 0xc62828, roughness: 0.4 });
+    const glass = new THREE.MeshStandardMaterial({ color: 0x0e1419, metalness: 0.9, roughness: 0.05, envMapIntensity: 1.4 });
+    this.headMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff4d6, emissiveIntensity: 0.6 });
+    this.tailMat = new THREE.MeshStandardMaterial({ color: 0x550000, emissive: 0xff1a1a, emissiveIntensity: 1 });
+    this.reverseMat = this.tailMat;
+    this.navGreen = new THREE.MeshStandardMaterial({ color: 0x003300, emissive: 0x2bff5a, emissiveIntensity: 1 });
+    const add = (geo, mat, x = 0, y = 0, z = 0) => {
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(x, y, z);
+      m.castShadow = true;
+      group.add(m);
+      return m;
+    };
+    const box = (w, h, d, mat, x, y, z) => add(new THREE.BoxGeometry(w, h, d), mat, x, y, z);
+    const y0 = 0.1; // base del fuselaje sobre el origen del chasis
+    // Fuselaje: perfil lateral extruido
+    add(
+      extrudeProfile(
+        [[3.0, y0 + 0.55], [2.75, y0 + 0.25], [1.2, y0 + 0.05], [-1.5, y0 + 0.35], [-3.1, y0 + 0.75], [-3.3, y0 + 1.0], [-1.6, y0 + 1.1], [0.3, y0 + 1.35], [1.6, y0 + 1.25], [2.75, y0 + 0.95]],
+        1.1,
+        0.12
+      ),
+      this.paintMat
+    );
+    // Cabina acristalada
+    add(extrudeProfile([[1.55, y0 + 1.22], [0.45, y0 + 1.75], [-0.6, y0 + 1.75], [-0.9, y0 + 1.3]], 1.0, 0.06), glass);
+    // Alas (ala alta) con franja y puntas con luces de navegación
+    box(9, 0.14, 1.5, this.paintMat, 0, y0 + 1.82, 0.1);
+    box(9.02, 0.15, 0.25, accent, 0, y0 + 1.83, -0.45);
+    box(0.12, 0.18, 0.3, this.tailMat, -4.5, y0 + 1.82, 0.1); // derecha (+X es la izquierda)
+    box(0.12, 0.18, 0.3, this.navGreen, 4.5, y0 + 1.82, 0.1);
+    for (const sx of [-1, 1]) box(0.06, 1.0, 0.08, SHARED.trim, sx * 1.6, y0 + 1.3, 0.3); // montantes
+    // Cola
+    box(3.2, 0.1, 0.9, this.paintMat, 0, y0 + 1.0, -3.0);
+    box(0.1, 1.2, 1.0, this.paintMat, 0, y0 + 1.55, -3.05);
+    box(0.11, 0.4, 0.6, accent, 0, y0 + 1.95, -3.2);
+    // Capó del motor y buje
+    box(0.95, 0.75, 0.6, SHARED.trim, 0, y0 + 0.6, 2.85);
+    box(0.2, 0.15, 0.06, this.headMat, 0, y0 + 0.35, 3.18);
+    // Hélice (gira según la potencia)
+    this.prop = new THREE.Group();
+    this.prop.position.set(0, y0 + 0.6, 3.2);
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.9, 0.05), SHARED.trim);
+    const hub = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.35, 10), SHARED.chrome);
+    hub.rotation.x = Math.PI / 2;
+    hub.position.z = 0.12;
+    this.prop.add(blade, hub);
+    group.add(this.prop);
+    // Tren de aterrizaje
+    const w = s.wheel;
+    for (const sx of [-1, 1]) box(0.08, 0.5, 0.08, SHARED.trim, sx * w.x, 0.0, w.zr);
+    box(0.08, 0.5, 0.08, SHARED.trim, 0, 0.0, w.zf);
+    const wheelGeo = new THREE.CylinderGeometry(w.r, w.r, 0.16, 16);
+    wheelGeo.rotateZ(Math.PI / 2);
+    this.wheelMeshes = [0, 1, 2, 3].map(() => {
+      const wm = new THREE.Group();
+      const tire = new THREE.Mesh(wheelGeo, SHARED.tire);
+      tire.castShadow = true;
+      wm.add(tire);
+      wm.userData.vehicle = this;
+      return wm;
+    });
+    this.mesh = group;
+    this.dims = { W: 1.1, L: 6.3, H: 1.3 };
+    this.stripes = new THREE.Group();
+    group.add(this.stripes);
+    this.thr = 0;
+    this.airborne = false;
+    this.airTime = 0;
+    this.airSpeed = 0;
+  }
+
+  /**
+   * Avioneta.
+   *  En tierra: el motor empuja (no las ruedas), la rueda de morro gira y la sustentación crece con
+   *  la velocidad; con Espacio por encima de ~80 km/h levanta el morro y despega.
+   *  En el aire: vuelo arcade. W/S potencia, A/D alabeo (gira inclinándose), Espacio sube, Shift baja.
+   *  Por debajo de ~70 km/h entra en pérdida y pica. Aterrizar suave conserva el avión.
+   */
+  updatePlane(dt) {
+    const s = this.spec;
+    const v = this.vehicle;
+    const inp = this.input;
+    const body = this.chassisBody;
+    const q = body.quaternion;
+    const f = q.vmult(_pv1.set(0, 0, 1), _pf);
+    const left = q.vmult(_pv1.set(1, 0, 0), _pl);
+    const up = q.vmult(_pv1.set(0, 1, 0), _pu);
+    const speed = this.getForwardSpeed();
+    const grounded = this.groundedWheels() >= 2;
+    const piloted = !this.destroyed && !!this.driver;
+    if (piloted && inp.throttle) this.thr = Math.min(1, this.thr + dt * 0.7);
+    if (piloted && inp.reverse) this.thr = Math.max(0, this.thr - dt * 0.9);
+    if (!piloted) this.thr = Math.max(0, this.thr - dt * 0.5);
+    this.prop.rotation.z += dt * (4 + this.thr * 55) * (this.destroyed ? 0 : 1);
+    const night = this.game.env ? this.game.env.night : 0;
+    this.headMat.emissiveIntensity = 0.4 + night * 2.5;
+    const blink = Math.floor(performance.now() / 600) % 2;
+    this.tailMat.emissiveIntensity = 1 + blink * 2;
+    const mass = body.mass;
+    const vel = body.velocity;
+
+    if (!this.airborne) {
+      // ---- En tierra ----
+      const thrust = this.thr * s.thrust;
+      body.applyForce(_pv2.set(f.x * thrust, f.y * thrust, f.z * thrust), _zero);
+      const vmag = vel.length();
+      const k = s.thrust / (s.flyMax * s.flyMax);
+      if (vmag > 0.1) body.applyForce(_pv2.set(-vel.x * vmag * k, -vel.y * vmag * k, -vel.z * vmag * k), _zero);
+      const braking = piloted && inp.reverse && this.thr === 0 && speed > 0.5;
+      const brake = braking ? s.brakeImpulse : this.thr === 0 && !piloted ? s.brakeImpulse * 0.7 : this.thr === 0 ? s.brakeImpulse * 0.04 : 0;
+      for (let i = 0; i < 4; i++) {
+        v.setBrake(brake, i);
+        v.applyEngineForce(0, i);
+      }
+      // frenos de pista + aerofrenos: de 110 km/h a parado en ~120 m
+      if (braking && vmag > 0.5 && grounded) {
+        const d = (mass * 4) / vmag;
+        body.applyForce(_pv2.set(-vel.x * d, 0, -vel.z * d), _zero);
+      }
+      // marcha atrás lenta para maniobrar (S parado y sin potencia)
+      if (piloted && inp.reverse && this.thr === 0 && speed < 0.5 && speed > -2.2) {
+        v.applyEngineForce(1500, 2);
+        v.applyEngineForce(1500, 3);
+      }
+      const steer = (inp.steer * s.maxSteer) / (1 + Math.abs(speed) * 0.08);
+      this.steerValue += (steer - this.steerValue) * Math.min(1, dt * 6);
+      v.setSteeringValue(this.steerValue, 0);
+      v.setSteeringValue(this.steerValue, 1);
+      // sustentación: a ~100 km/h supera el peso (antes con Espacio)
+      // sin Espacio no llega a levantarla: así no rebota al aterrizar ni despega sola
+      const liftK = Math.min(1.3, Math.max(0, (speed - 18) / 10)) * (piloted && inp.up ? 1 : 0.6);
+      const lift = liftK * mass * 9.82;
+      body.applyForce(_pv2.set(up.x * lift, up.y * lift, up.z * lift), _zero);
+      // rotación de despegue (hasta ~7° de morro)
+      const pitchNow = Math.asin(Math.max(-1, Math.min(1, f.y)));
+      if (piloted && inp.up && speed > 22 && pitchNow < 0.12) {
+        const w = body.angularVelocity;
+        const pc = w.dot(left);
+        const target = -0.35;
+        w.x += left.x * (target - pc);
+        w.y += left.y * (target - pc);
+        w.z += left.z * (target - pc);
+      }
+      if (!grounded && speed > 18) {
+        this.airTime += dt;
+        if (this.airTime > 0.25) {
+          this.airborne = true;
+          this.airSpeed = speed;
+          this.steerValue = 0;
+          v.setSteeringValue(0, 0);
+          v.setSteeringValue(0, 1);
+        }
+      } else this.airTime = 0;
+      this.stabilize(dt);
+      return;
+    }
+
+    // ---- En el aire (vuelo arcade) ----
+    for (let i = 0; i < 4; i++) {
+      v.setBrake(0, i);
+      v.applyEngineForce(0, i);
+    }
+    const pitch = Math.asin(Math.max(-1, Math.min(1, f.y))); // morro arriba > 0
+    const roll = Math.asin(Math.max(-1, Math.min(1, left.y))); // ala derecha abajo > 0
+    const stallSpeed = 19;
+    // En el aire empuja menos que en la carrera de despegue: crucero ~170 km/h, subida ~14 m/s
+    const airAcc = 6;
+    // en picado gana menos velocidad (resistencia del morro) y nunca pasa de ~250 km/h
+    const sinP = Math.sin(pitch);
+    let a = this.thr * airAcc - airAcc * (this.airSpeed / s.flyMax) ** 2 - 9.82 * sinP * (sinP < 0 ? 0.55 : 1);
+    if (this.destroyed) a -= 6;
+    this.airSpeed = Math.max(0, Math.min(s.flyMax * 1.1, this.airSpeed + a * dt));
+    const stall = this.airSpeed < stallSpeed;
+    const pitchIn = piloted ? (inp.up ? 1 : 0) - (inp.down ? 1 : 0) : 0;
+    // sin tocar Espacio/Shift el morro vuelve solo a horizontal (también al girar)
+    let pitchRate = pitchIn ? pitchIn * 0.9 : piloted ? -pitch * 0.9 : -0.3;
+    if (stall) pitchRate -= 0.7;
+    // Techo de vuelo
+    if (body.position.y > 200) pitchRate = Math.min(pitchRate, 0);
+    if (body.position.y > 220) pitchRate = Math.min(pitchRate, -0.3);
+    if (pitch > 0.5 && pitchRate > 0) pitchRate = 0;
+    if (pitch < -0.7 && pitchRate < 0) pitchRate = 0;
+    // Aterrizaje asistido: cerca del suelo endereza el morro y limita la caída
+    const p0 = body.position;
+    const agl = p0.y - (this.game.env && this.game.env.groundHeight ? this.game.env.groundHeight(p0.x, p0.z, p0.y) : 0);
+    const sink = Math.max(0, -vel.y);
+    const nearGround = agl < 7 + sink * 1.2 && !(piloted && inp.up);
+    if (nearGround && pitch < 0.04) pitchRate = Math.max(pitchRate, (0.04 - pitch) * 2.5);
+    // flaps: cerca del suelo y con poca potencia frena hasta ~110 km/h para tomar tierra
+    if (agl < 25 && this.thr < 0.4 && this.airSpeed > stallSpeed + 12) this.airSpeed -= 5 * dt;
+    let steerIn = piloted ? inp.steer : 0;
+    // Límite del mapa: cerca del borde gira sola hacia el centro
+    const M = 160;
+    const out = p0.x < WORLD_FLY.minX + M || p0.x > WORLD_FLY.maxX - M || p0.z < WORLD_FLY.minZ + M || p0.z > WORLD_FLY.maxZ - M;
+    if (out) {
+      const dx = -p0.x, dz = 40 - p0.z;
+      const cross = f.z * dx - f.x * dz;
+      const dot = f.x * dx + f.z * dz;
+      steerIn = dot > 0 && Math.abs(cross) < 0.15 * Math.hypot(dx, dz) ? steerIn * 0.3 : Math.sign(cross || 1);
+      if (piloted && this.driver === 'player' && !this.edgeWarned) {
+        this.edgeWarned = true;
+        this.game.hud.notify('Límite del mapa: la avioneta vuelve hacia la ciudad.', 2.5);
+      }
+    } else this.edgeWarned = false;
+    const rollTarget = -steerIn * 0.85;
+    const rollRate = (rollTarget - roll) * 2.5;
+    const yawRate = -Math.sin(roll) * 1.15 * Math.min(1.2, Math.max(0.4, this.airSpeed / 30));
+    const w = body.angularVelocity;
+    w.set(left.x * -pitchRate + f.x * rollRate, left.y * -pitchRate + f.y * rollRate + yawRate, left.z * -pitchRate + f.z * rollRate);
+    // Velocidad: hacia donde apunta el morro; en pérdida, cae
+    let tx = f.x * this.airSpeed;
+    let ty = f.y * this.airSpeed;
+    let tz = f.z * this.airSpeed;
+    if (stall) ty -= (stallSpeed - this.airSpeed) * 0.9;
+    if (nearGround) ty = Math.max(-2.5, Math.min(ty, agl > 3 ? -2 : -1.2)); // se posa sola, sin flotar (Espacio para seguir rasante)
+    const kv = Math.min(1, dt * 6);
+    vel.y += 9.82 * dt * (stall ? 0.3 : 1); // compensa la gravedad del mundo
+    vel.x += (tx - vel.x) * kv;
+    vel.y += (ty - vel.y) * kv;
+    vel.z += (tz - vel.z) * kv;
+    // muro invisible por si acaso (no debería llegar con el giro automático)
+    if (p0.x < WORLD_FLY.minX + 4 || p0.x > WORLD_FLY.maxX - 4) { p0.x = Math.max(WORLD_FLY.minX + 4, Math.min(WORLD_FLY.maxX - 4, p0.x)); vel.x = 0; }
+    if (p0.z < WORLD_FLY.minZ + 4 || p0.z > WORLD_FLY.maxZ - 4) { p0.z = Math.max(WORLD_FLY.minZ + 4, Math.min(WORLD_FLY.maxZ - 4, p0.z)); vel.z = 0; }
+    // Toma de contacto
+    if (grounded) {
+      const soft = vel.y > -6 && Math.abs(roll) < 0.4 && pitch > -0.35;
+      this.airborne = false;
+      this.airTime = 0;
+      if (vel.y > 0) vel.y = 0;
+      if (!soft) this.damage(60);
+      else if (this.driver === 'player') this.game.hud.notify('Aterrizaje correcto.', 1.5);
+    }
+  }
+
   /** Moto: depósito, carenado, asiento, motor, horquilla, manillar y dos ruedas finas. */
   createBikeMeshes(color) {
     const s = this.spec;
@@ -670,7 +937,7 @@ export class VehicleController {
 
     // Dibujo: se reconstruye cada vez (las motos solo cambian pintura y acabado)
     for (const c of [...this.stripes.children]) this.stripes.remove(c);
-    if (this.spec.bike) return;
+    if (this.spec.bike || this.spec.plane) return;
     if (this.roofMesh) this.roofMesh.material = m;
     const second = coat(new THREE.MeshPhysicalMaterial({ color: car.color2 ?? 0x111111, metalness: finish[0], roughness: finish[1], clearcoat: finish[2] }));
     const { W, L, H } = this.dims;
@@ -726,7 +993,7 @@ export class VehicleController {
     const b = this.chassisBody;
     const w = this.spec.wheel;
     // apoyado sobre el terreno (montaña, isla) o el suelo plano
-    const ground = this.game.env && this.game.env.groundHeight ? this.game.env.groundHeight(x, z) : 0;
+    const ground = this.game.env && this.game.env.groundHeight ? this.game.env.groundHeight(x, z, b.position.y) : 0;
     b.position.set(x, ground + w.r + w.rest - this.spec.connY + 0.05, z);
     b.quaternion.setFromEuler(0, heading, 0);
     b.velocity.setZero();
@@ -804,10 +1071,17 @@ export class VehicleController {
     const right = input.isDown('KeyD') || input.isDown('ArrowRight') ? 1 : 0;
     out.steer = left - right; // positivo = izquierda
     out.handbrake = input.isDown('Space');
+    // avioneta: Espacio sube, Shift baja
+    out.up = input.isDown('Space');
+    out.down = input.isDown('ShiftLeft') || input.isDown('ShiftRight');
   }
 
   update(dt) {
     if (!this.inWorld) return;
+    if (this.spec.plane) {
+      this.updatePlane(dt);
+      return;
+    }
     const s = this.spec;
     const v = this.vehicle;
     const inp = this.input;
@@ -852,9 +1126,21 @@ export class VehicleController {
     v.setBrake(frontBrake, 0);
     v.setBrake(frontBrake, 1);
 
-    // Freno de mano: bloquea las traseras y reduce su agarre -> sobreviraje / derrape
+    // Superficie (solo para el coche del jugador): tierra, arena, grava o hierba agarran menos
     const wr = v.wheelInfos;
-    const targetRearGrip = inp.handbrake ? s.gripRear * s.drift : s.gripRear;
+    let grip = 1;
+    if (this.driver === 'player' && this.game.env && this.game.env.surfaceAt) {
+      const p = this.chassisBody.position;
+      this.surface = this.game.env.surfaceAt(p.x, p.z, p.y);
+      grip = this.surface ? SURFACE_GRIP[this.surface] : 1;
+      if (this.surface && absSpeed > 6 && this.surface !== 'hierba' && Math.random() < 0.35) {
+        const hp = wr[2 + Math.floor(Math.random() * 2)].raycastResult.hitPointWorld;
+        this.game.effects.spawnSmoke(new THREE.Vector3(hp.x, hp.y + 0.3, hp.z), new THREE.Vector3(0, 0.8, 0), 0.8);
+      }
+    } else this.surface = null;
+    wr[0].frictionSlip = wr[1].frictionSlip = s.gripFront * grip;
+    // Freno de mano: bloquea las traseras y reduce su agarre -> sobreviraje / derrape
+    const targetRearGrip = (inp.handbrake ? s.gripRear * s.drift : s.gripRear) * grip;
     const gripLerp = 1 - Math.exp(-dt * (inp.handbrake ? 12 : 2.5));
     wr[2].frictionSlip += (targetRearGrip - wr[2].frictionSlip) * gripLerp;
     wr[3].frictionSlip = wr[2].frictionSlip;
@@ -943,7 +1229,7 @@ export class VehicleController {
     const pitch = w.dot(right);
     const bike = this.spec.bike ? 3 : 1;
     const kr = Math.min(1, 6 * bike * dt);
-    const kp = Math.min(1, 3 * dt);
+    const kp = this.spec.plane ? 0 : Math.min(1, 3 * dt);
     w.x -= fwd.x * roll * kr + right.x * pitch * kp;
     w.y -= fwd.y * roll * kr + right.y * pitch * kp;
     w.z -= fwd.z * roll * kr + right.z * pitch * kp;

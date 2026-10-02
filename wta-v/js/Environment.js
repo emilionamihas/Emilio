@@ -41,6 +41,25 @@ export const RIDGE = { xc: -18, zc: -320, H: 40, px: 60, fx: 170, pz: 35, fz: 45
 export const GORGE = { x: -110, half: 18, depth: 20 };
 /** Carretera de la cumbre (no es parte de la red de tráfico): de la Carretera del Oeste a la del Nordeste. */
 export const SUMMIT_ROAD = [[-262, -250], [-235, -290], [-205, -312], [-170, -320], [150, -320], [185, -312], [215, -290], [232, -268]];
+/**
+ * Colinas onduladas en las franjas de campo que quedan fuera de la circunvalación, con un
+ * circuito cerrado cada una. Superficie: agarre relativo al asfalto (1).
+ */
+export const ROLLING = [
+  {
+    name: 'Las Dunas', x0: -528, x1: -452, z0: -290, z1: 150, amp: 5, seed: 0,
+    ground: 'arena', track: 'tierra', colors: [[0.78, 0.69, 0.5], [0.7, 0.6, 0.42]],
+    loop: [[-472, -270], [-466, -180], [-476, -90], [-466, 0], [-476, 90], [-470, 135], [-508, 135], [-514, 60], [-504, -20], [-516, -110], [-506, -200], [-510, -270]],
+  },
+  {
+    name: 'Los Cerros', x0: 456, x1: 528, z0: -268, z1: 138, amp: 6, seed: 2.1,
+    ground: 'hierba', track: 'grava', colors: [[0.33, 0.47, 0.24], [0.27, 0.4, 0.2]],
+    loop: [[472, -250], [466, -170], [476, -80], [466, 10], [474, 118], [508, 122], [514, 40], [504, -50], [516, -140], [508, -248]],
+  },
+];
+export const SURFACE_GRIP = { arena: 0.68, tierra: 0.8, hierba: 0.82, grava: 0.86 };
+export const SURFACE_NAMES = { arena: 'Arena', tierra: 'Tierra', hierba: 'Hierba', grava: 'Grava' };
+
 /** Isla del Faro, unida a La Playa por un puente. */
 export const ISLAND = { x: 120, z: 485, r: 42, top: 0.25 };
 export const BAY_BRIDGE = { x: 120, z0: 318, z1: 356, z2: 432, z3: 465, deck: 8, w: 10 };
@@ -151,6 +170,8 @@ export const DISTRICT_LABELS = [
   ['LAS LOMAS', 330, 140],
   ['MONTE SOMBRA', -60, -355],
   ['ISLA FARO', 120, 535],
+  ['LAS DUNAS', -490, -320],
+  ['LOS CERROS', 492, -295],
 ];
 
 /** Parámetros de solar por barrio (medidas en metros). */
@@ -195,6 +216,7 @@ export class Environment {
     this.createSummitRoad();
     this.createIsland();
     this.createStuntRamps();
+    this.createRollingHills();
     this.createBoundaries();
     this.createSkyAndLights();
     this.update(0, new THREE.Vector3());
@@ -1040,6 +1062,18 @@ export class Environment {
     SUMMIT_ROAD.forEach(([x, z], i) => (i ? ctx.lineTo(toPx(x), toPx(z)) : ctx.moveTo(toPx(x), toPx(z))));
     ctx.stroke();
 
+    // Colinas onduladas y sus circuitos
+    for (const Z of ROLLING) {
+      ctx.fillStyle = Z.ground === 'arena' ? 'rgba(201,178,128,0.85)' : 'rgba(70,104,52,0.85)';
+      ctx.fillRect(toPx(Z.x0 + 10), toPx(Z.z0 + 10), (Z.x1 - Z.x0 - 20) * s, (Z.z1 - Z.z0 - 20) * s);
+      ctx.strokeStyle = Z.track === 'tierra' ? '#7a5a3a' : '#a39d92';
+      ctx.lineWidth = 8 * s;
+      ctx.beginPath();
+      Z.loop.forEach(([x, z], i) => (i ? ctx.lineTo(toPx(x), toPx(z)) : ctx.moveTo(toPx(x), toPx(z))));
+      ctx.closePath();
+      ctx.stroke();
+    }
+
     // Parches de asfalto y manchas de aceite
     for (let k = 0; k < 1600; k++) {
       const e = this.edges[Math.floor(this.rand() * this.edges.length)];
@@ -1473,9 +1507,12 @@ export class Environment {
   }
 
   /** Altura del suelo en (x, z): montaña, isla o cero. Para colocar coches y la cámara. */
-  groundHeight(x, z) {
+  groundHeight(x, z, refY = Infinity) {
     if (Math.hypot(x - ISLAND.x, z - ISLAND.z) < ISLAND.r) return ISLAND.top;
-    return hillHeight(x, z);
+    // Dentro del túnel el suelo es la calzada (y = 0), no la montaña que hay encima.
+    // refY = altura de quien pregunta: por debajo de la losa del túnel, estás dentro.
+    if (refY < 9 && Math.abs(x) < RIDGE.corridor + 1.5 && Math.abs(z - RIDGE.zc) < RIDGE.tunnelHalf + 2) return 0;
+    return Math.max(hillHeight(x, z), this.rollingHeight ? this.rollingHeight(x, z) : 0);
   }
 
   /** ¿Es mar abierto (ni isla, ni bajo el puente con los pies en él)? */
@@ -1697,6 +1734,162 @@ export class Environment {
       this.reserved.push({ minX: x - 9, maxX: x + 9, minZ: z - 9, maxZ: z + 9 });
     }
     this.world.addBody(body);
+  }
+
+  /** Cinta de calzada que sigue el terreno (carreteras de la montaña y circuitos). */
+  terrainRibbon(points, { closed = false, width = 9, tex, skip = () => false, heightFn = (x, z) => this.groundHeight(x, z) } = {}) {
+    const curve = new THREE.CatmullRomCurve3(points.map(([x, z]) => new THREE.Vector3(x, 0, z)), closed, 'centripetal');
+    const pts = curve.getSpacedPoints(Math.ceil(curve.getLength() / 2));
+    const half = width / 2;
+    const pos = [];
+    const uv = [];
+    const idx = [];
+    let v = 0;
+    let prevSkip = false;
+    pts.forEach((p, i) => {
+      const n = pts[Math.min(pts.length - 1, i + 1)];
+      const pr = pts[Math.max(0, i - 1)];
+      const t = new THREE.Vector3().subVectors(n, pr).normalize();
+      const r = new THREE.Vector3(-t.z, 0, t.x);
+      const sk = skip(p.x, p.z);
+      for (const sgn of [-1, 1]) {
+        const x = p.x + r.x * half * sgn;
+        const z = p.z + r.z * half * sgn;
+        pos.push(x, heightFn(x, z) + 0.07, z);
+        uv.push(sgn < 0 ? 0 : 1, i * 0.25);
+      }
+      if (i > 0 && !sk && !prevSkip) idx.push(v - 2, v - 1, v, v - 1, v + 1, v);
+      prevSkip = sk;
+      v += 2;
+    });
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.receiveShadow = true;
+    this.scene.add(mesh);
+    return curve;
+  }
+
+  /** Zona ondulada que contiene (x, z), o null. */
+  rollingZone(x, z) {
+    for (const Z of ROLLING) if (x > Z.x0 && x < Z.x1 && z > Z.z0 && z < Z.z1) return Z;
+    return null;
+  }
+
+  /** Altura de las colinas onduladas (0 junto a la circunvalación y en los bordes). */
+  rollingHeight(x, z) {
+    const Z = this.rollingZone(x, z);
+    if (!Z) return 0;
+    const edge = Math.min(x - Z.x0, Z.x1 - x, z - Z.z0, Z.z1 - z);
+    let f = smooth(0, 16, edge);
+    if (f <= 0) return 0;
+    const clear = this.clearance(x, z);
+    f *= smooth(3, 14, clear);
+    if (f <= 0) return 0;
+    const k = Z.seed;
+    const w = 0.55 + 0.25 * Math.sin(x / 13 + z / 29 + k) * Math.cos(z / 21 - x / 37 + k) + 0.2 * Math.sin(z / 9.5 + k * 3);
+    return Z.amp * f * Math.max(0, w);
+  }
+
+  /** Distancia al circuito de una zona (en metros). */
+  distToLoop(Z, x, z) {
+    let best = Infinity;
+    const L = Z.loop;
+    for (let i = 0; i < L.length; i++) {
+      const [ax, az] = L[i];
+      const [bx, bz] = L[(i + 1) % L.length];
+      const dx = bx - ax;
+      const dz = bz - az;
+      const t = Math.min(1, Math.max(0, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz)));
+      best = Math.min(best, Math.hypot(ax + dx * t - x, az + dz * t - z));
+    }
+    return best;
+  }
+
+  /** Superficie bajo (x, z): null = asfalto. Para el agarre de los coches y el HUD. */
+  surfaceAt(x, z, y = 0) {
+    const Z = this.rollingZone(x, z);
+    if (Z) {
+      if (this.rollingHeight(x, z) < 0.15 && this.clearance(x, z) < 1) return null;
+      return this.distToLoop(Z, x, z) < 4.5 ? Z.track : Z.ground;
+    }
+    if (y > 1 && hillHeight(x, z) > 0.5 && this.distToSummitRoad(x, z) > 4.8) return 'hierba';
+    return null;
+  }
+
+  createRollingHills() {
+    const makeTex = (base, speck) =>
+      toTexture(
+        makeCanvas(64, 128, (ctx, W, H) => {
+          ctx.fillStyle = base;
+          ctx.fillRect(0, 0, W, H);
+          for (let i = 0; i < 260; i++) {
+            ctx.fillStyle = speck[i % speck.length];
+            ctx.fillRect(this.rand() * W, this.rand() * H, 1 + this.rand() * 2, 1 + this.rand() * 2);
+          }
+          // rodadas
+          ctx.fillStyle = 'rgba(0,0,0,0.12)';
+          ctx.fillRect(W * 0.22, 0, 7, H);
+          ctx.fillRect(W * 0.68, 0, 7, H);
+          addNoise(ctx, W, H, 16, this.rand);
+        })
+      );
+    const trackTex = { tierra: makeTex('#7a5a3a', ['#8d6b47', '#5f4329', '#9c7b55']), grava: makeTex('#9a948a', ['#c8c2b6', '#6f6a62', '#b0a99c']) };
+    for (const Z of ROLLING) {
+      // Malla con la misma rejilla de 4 m que la física
+      const es = 4;
+      const nx = Math.round((Z.x1 - Z.x0) / es);
+      const nz = Math.round((Z.z1 - Z.z0) / es);
+      const geo = new THREE.PlaneGeometry(nx * es, nz * es, nx, nz);
+      geo.rotateX(-Math.PI / 2);
+      const pos = geo.attributes.position;
+      const colors = new Float32Array(pos.count * 3);
+      const cx = Z.x0 + (nx * es) / 2;
+      const cz = Z.z0 + (nz * es) / 2;
+      const [c1, c2] = Z.colors;
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i) + cx;
+        const z = pos.getZ(i) + cz;
+        const h = this.rollingHeight(x, z);
+        pos.setXYZ(i, x, h - 0.3 * (1 - smooth(0.2, 2, h)), z);
+        const n = this.rand() * 0.06;
+        const k = Math.min(1, h / Z.amp);
+        colors[i * 3] = c1[0] + (c2[0] - c1[0]) * k + n;
+        colors[i * 3 + 1] = c1[1] + (c2[1] - c1[1]) * k + n;
+        colors[i * 3 + 2] = c1[2] + (c2[2] - c1[2]) * k + n;
+      }
+      geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      geo.computeVertexNormals();
+      const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }));
+      mesh.receiveShadow = true;
+      this.scene.add(mesh);
+      this.shootables.push(mesh);
+
+      // Física en trozos casi cuadrados: cannon-es calcula mal la caja envolvente de un
+      // Heightfield muy alargado y los rayos de las ruedas lo atravesaban
+      const chunk = nx; // trozos cuadrados (nx × nx celdas); el último se solapa con el anterior
+      for (let k = 0; k * chunk < nz; k++) {
+        const cz0 = Math.min(k * chunk, nz - chunk);
+        const cz1 = cz0 + chunk;
+        const data = [];
+        for (let i = 0; i <= nx; i++) {
+          const col = [];
+          for (let j = cz0; j <= cz1; j++) col.push(this.rollingHeight(Z.x0 + i * es, Z.z0 + nz * es - j * es));
+          data.push(col);
+        }
+        const body = new CANNON.Body({ mass: 0, material: this.groundMaterial, collisionFilterGroup: GROUPS.STATIC });
+        body.addShape(new CANNON.Heightfield(data, { elementSize: es }));
+        body.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+        body.position.set(Z.x0, 0, Z.z0 + nz * es - cz0 * es);
+        this.world.addBody(body);
+      }
+
+      this.terrainRibbon(Z.loop, { closed: true, width: 8, tex: trackTex[Z.track], heightFn: (x, z) => this.rollingHeight(x, z) });
+    }
   }
 
   createBoundaries() {
@@ -2094,7 +2287,9 @@ export class Environment {
       const want = { suburb: 0.5, hills: 0.7, rural: 0.45, beach: 0.08 }[d];
       if (!want || this.rand() > want) continue;
       if (this.clearance(x, z) < 3 || this.isInsideBuilding(x, z, 2.5) || reservedNear(x, z, 3)) continue;
-      trees.push([x, 0, z, true]);
+      const Z = this.rollingZone(x, z);
+      if (Z && (this.distToLoop(Z, x, z) < 8 || this.rand() < 0.6)) continue; // colinas más despejadas
+      trees.push([x, Z ? this.rollingHeight(x, z) - 0.3 : 0, z, true]);
     }
     // Palmeras de la isla
     for (let k = 0; k < 14; k++) {
