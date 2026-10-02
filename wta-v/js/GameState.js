@@ -13,12 +13,12 @@ export const START = {
 /** Aspecto inicial del personaje (vestidor de casa). */
 export const DEFAULT_LOOK = {
   top: 'polo',
-  topColor: 0xeeeeee,
+  topColor: 0xf2f2f2,
   hat: 'none',
-  hatColor: 0x1a237e,
+  hatColor: 0x151515,
   bottom: 'largo',
-  bottomColor: 0x2c3e66,
-  shoes: 0x1b1b1b,
+  bottomColor: 0x1f4e9a,
+  shoes: 0x151515,
   skin: 0xc68642,
   hair: 0x1b1b1b,
   hairStyle: 'short',
@@ -68,6 +68,7 @@ export class GameState {
     this.stats = { robberies: 0, banks: 0, earned: 0, cars: 0 };
     this.infiniteAmmo = false;
     this.cheated = false;
+    this.secrets = []; // códigos secretos desbloqueados (p. ej. 'oldstyle')
   }
 
   static hasSave(mode) {
@@ -111,6 +112,7 @@ export class GameState {
     this.stats = { ...this.stats, ...(d.stats || {}) };
     this.infiniteAmmo = !!d.infiniteAmmo;
     this.cheated = !!d.cheated;
+    this.secrets = Array.isArray(d.secrets) ? d.secrets : [];
     return true;
   }
 
@@ -132,6 +134,7 @@ export class GameState {
       stats: this.stats,
       infiniteAmmo: this.infiniteAmmo,
       cheated: this.cheated,
+      secrets: this.secrets,
       savedAt: Date.now(),
     };
     safeStorage((ls) => ls.setItem(SAVE_KEYS[this.mode], JSON.stringify(d)));

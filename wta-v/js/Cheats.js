@@ -1,9 +1,11 @@
 import { WEAPONS } from './PlayerController.js';
 import { CATALOG } from './VehicleController.js';
-import { BUSINESSES, LEVELS } from './Properties.js';
+import { BUSINESSES, LEVELS, OLDSTYLE_LOOK } from './Properties.js';
 import { STORY } from './Missions.js';
 
 export const CHEAT_CODE = 'WTASECRET';
+export const OLDSTYLE_CODE = 'OLDSTYLE';
+const MAX_CODE = Math.max(CHEAT_CODE.length, OLDSTYLE_CODE.length);
 const BONUS = 10000000;
 
 /**
@@ -29,10 +31,13 @@ export class Cheats {
           return;
         }
         if (!game.started || !game.running || !e.code.startsWith('Key')) return;
-        this.buffer = (this.buffer + e.code.slice(3)).slice(-CHEAT_CODE.length);
-        if (this.buffer === CHEAT_CODE) {
+        this.buffer = (this.buffer + e.code.slice(3)).slice(-MAX_CODE);
+        if (this.buffer.endsWith(CHEAT_CODE)) {
           this.buffer = '';
           this.activate();
+        } else if (this.buffer.endsWith(OLDSTYLE_CODE)) {
+          this.buffer = '';
+          this.oldStyle();
         }
       },
       true
@@ -78,8 +83,26 @@ export class Cheats {
       const code = this.input.value.trim().toUpperCase().replace(/\s+/g, '');
       this.closePrompt();
       if (code === CHEAT_CODE) this.activate();
+      else if (code === OLDSTYLE_CODE) this.oldStyle();
       else this.game.hud.notify('Código incorrecto.', 2);
     }
+  }
+
+  /**
+   * OLDSTYLE: te viste con los colores secretos (gorra beige hacia atrás, polo azul navy,
+   * pantalón beige y zapatillas blancas) y los deja disponibles en el vestidor.
+   */
+  oldStyle() {
+    const game = this.game;
+    const st = game.state;
+    if (!st) return;
+    if (!st.secrets.includes('oldstyle')) st.secrets.push('oldstyle');
+    Object.assign(st.look, OLDSTYLE_LOOK);
+    st.outfit = 'custom';
+    game.player.applyLook(st.look);
+    st.save();
+    game.hud.missionBanner('OLD STYLE', 'Colores secretos desbloqueados');
+    game.hud.notify('Azul navy y beige ya están en tu vestidor, y el conjunto "Old Style" en Conjuntos.', 6);
   }
 
   activate() {

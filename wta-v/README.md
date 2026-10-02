@@ -70,11 +70,13 @@ Cada uno se puede reformar (x1,6) y llevar a lujo (x2,4). Mientras no juegas sig
 
 **Tus coches.** Empiezas con un sedán propio aparcado frente a casa. Los coches propios (el de serie y los que compras en Autos Velasco) no son robo: subir a ellos nunca da estrellas; solo robar uno ajeno. Puedes tener varios, incluso del mismo modelo, y cada uno con su diseño: pintura (16 colores), segundo color, dibujo (liso, franjas dobles, racing o bicolor) y acabado (brillo, metalizado o mate), 300 por cambio desde *P › Mis coches*. Desde el ordenador de casa te lo sacan a la puerta gratis; en la calle, un mecánico te lo trae por 250.
 
-**Vestidor.** En tu casa: parte de arriba (camiseta, polo, camisa, sudadera o tirantes), gorro (gorra, gorra hacia atrás, gorro de lana o sombrero), pantalón largo o short, zapatillas, tono de piel, peinado y color de pelo, cada uno con su color. También hay conjuntos completos.
+**Vestidor.** En tu casa: parte de arriba (camiseta, polo, camisa, sudadera o tirantes), gorro (gorra, gorra hacia atrás, gorro de lana o sombrero), pantalón largo o short, zapatillas, tono de piel, peinado y color de pelo, cada uno con su color. La ropa usa una paleta corta de nueve colores que combinan (blanco, negro, dos grises, rojo, granate, verde bosque, azul y marrón); los colores chillones quedan solo para pintar coches. También hay conjuntos completos.
 
 **Mapa y GPS.** La tecla **M** abre el mapa de la ciudad. Elige un destino de la lista (W/S y E) o haz clic en cualquier punto: la ruta se calcula por las calles y se dibuja en morado en el radar, con la distancia debajo.
 
 **Código secreto.** En el ordenador de tu casa, la última opción del menú (`>_`) abre una terminal. Escribe `WTASECRET` y pulsa Enter. También funciona tecleándolo de corrido mientras juegas. Da 10 millones de dólares, todas las armas con munición infinita, un vehículo de cada modelo, motos incluidas (propios, sin estrellas), los doce negocios al nivel máximo, salud y chaleco llenos y, en el modo historia, la historia completada con todos los bancos abiertos.
+
+Hay un segundo código, `OLDSTYLE`, que se mete igual. Te viste con gorra beige hacia atrás, polo azul navy, pantalón beige y zapatillas blancas. Esos dos colores, azul navy y beige, no están en el vestidor normal: al usar el código quedan desbloqueados en todas las prendas, junto al conjunto "Old Style".
 
 **Armas.** Puños, pistola (400), subfusil (2.200), escopeta (3.200), rifle de asalto (6.500) y lanzacohetes (25.000). Cada arma viene con dos cargadores; luego la munición se compra por cajas. El chaleco (600) absorbe el 70 % del daño. A partir de tres estrellas la policía dispara.
 

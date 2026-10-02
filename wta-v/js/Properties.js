@@ -19,13 +19,22 @@ export const BUSINESSES = {
   nautico: { name: 'Club Náutico', price: 420000, income: 42000, zone: 'La Playa' },
 };
 
-/** Colores de pintura y de ropa (nombre, hex). */
+/** Colores de pintura de los coches (nombre, hex). */
 export const PALETTE = [
   ['Blanco', 0xf2f2f2], ['Negro', 0x111111], ['Plata', 0xa9b0b6], ['Gris', 0x4a4f55],
   ['Rojo', 0xc62828], ['Granate', 0x6d1b1b], ['Naranja', 0xef6c00], ['Amarillo', 0xf9c80e],
   ['Verde', 0x2e7d32], ['Lima', 0x76ff03], ['Azul', 0x1565c0], ['Celeste', 0x4fc3f7],
   ['Morado', 0x6a1b9a], ['Rosa', 0xec407a], ['Marrón', 0x5d4037], ['Beige', 0xc8b28c],
 ];
+/** Colores de ropa: solo los que combinan (los chillones solo quedan para los coches). */
+export const CLOTHES = [
+  ['Blanco', 0xf2f2f2], ['Negro', 0x151515], ['Gris oscuro', 0x3c4046], ['Gris claro', 0xa9adb2],
+  ['Rojo', 0xb71c1c], ['Granate', 0x5e1a1a], ['Verde bosque', 0x2e5d32], ['Azul', 0x1f4e9a], ['Marrón', 0x5d4037],
+];
+/** Colores secretos: se desbloquean con el código OLDSTYLE. */
+export const SECRET_CLOTHES = [['Azul navy', 0x1a2540], ['Beige', 0xcdb891]];
+export const OLDSTYLE_LOOK = { top: 'polo', topColor: 0x1a2540, hat: 'gorraAtras', hatColor: 0xcdb891, bottom: 'largo', bottomColor: 0xcdb891, shoes: 0xf4f4f4 };
+
 const SKINS = [['Clara', 0xffdbac], ['Media clara', 0xf1c27d], ['Media', 0xe0ac69], ['Morena', 0xc68642], ['Oscura', 0x8d5524], ['Muy oscura', 0x5c3a1e]];
 const HAIRS = [['Negro', 0x1b1b1b], ['Castaño oscuro', 0x3b2314], ['Castaño', 0x6b4423], ['Pelirrojo', 0xa0522d], ['Rubio', 0xd6b370], ['Canoso', 0x9e9e9e], ['Azul', 0x1e88e5], ['Rosa', 0xf06292]];
 const CAR_DESIGNS = [['liso', 'Liso'], ['franjas', 'Franjas dobles'], ['racing', 'Racing (franja ancha y laterales)'], ['bicolor', 'Bicolor (techo y faldón)']];
@@ -363,10 +372,13 @@ export class Properties {
 
   wardrobeMenu() {
     const look = this.state.look;
-    const colorList = (field, title, list = PALETTE) => () => ({
+    const oldstyle = () => this.state.secrets.includes('oldstyle');
+    // Ropa: paleta corta y, si has metido el código, los dos colores secretos al final
+    const clothes = () => (oldstyle() ? [...CLOTHES, ...SECRET_CLOTHES.map(([n, h]) => [`${n} · secreto`, h])] : CLOTHES);
+    const colorList = (field, title, list = clothes) => () => ({
       title,
       subtitle: 'Elige un color',
-      items: () => list.map(([name, hex]) => ({ label: `${swatch(hex)}${name}`, tag: look[field] === hex ? 'PUESTO' : '', action: () => this.setLook({ [field]: hex }) })),
+      items: () => (typeof list === 'function' ? list() : list).map(([name, hex]) => ({ label: `${swatch(hex)}${name}`, tag: look[field] === hex ? 'PUESTO' : '', action: () => this.setLook({ [field]: hex }) })),
     });
     const styleList = (field, title, options) => () => ({
       title,
@@ -394,8 +406,11 @@ export class Properties {
           submenu: () => ({
             title: 'Conjuntos',
             subtitle: 'Ropa completa ya combinada',
-            items: () =>
-              WARDROBE.map((id) => ({
+            items: () => [
+              ...(oldstyle()
+                ? [{ label: 'Old Style', detail: 'Gorra beige hacia atrás, polo azul navy, pantalón beige y zapatillas blancas', tag: 'SECRETO', action: () => (this.setLook({ ...OLDSTYLE_LOOK }), 'Te has puesto: Old Style.') }]
+                : []),
+              ...WARDROBE.map((id) => ({
                 label: OUTFITS[id].name,
                 detail: id === 'golpe' ? 'Mono y pasamontañas para los atracos' : '',
                 tag: player.outfitId === id ? 'PUESTO' : '',
@@ -407,6 +422,7 @@ export class Properties {
                   return `Te has puesto: ${OUTFITS[id].name}.`;
                 },
               })),
+            ],
           }),
         },
       ],
