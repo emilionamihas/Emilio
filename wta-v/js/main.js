@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { Environment, CITY } from './Environment.js';
+import { Environment, CITY, coastZ } from './Environment.js';
 import { Input } from './Input.js';
 import { Effects } from './Effects.js';
 import { PlayerController, ThirdPersonCamera } from './PlayerController.js';
@@ -214,6 +214,39 @@ function endLife(text, cls, kind) {
 game.onPlayerDeath = () => endLife('WASTED', 'wasted', 'wasted');
 game.onBusted = () => endLife('BUSTED', 'busted', 'busted');
 
+// ----------------------------------------------------------------------
+// Al agua: si caes al mar (del puente, del malecón...) te rescatan en la orilla.
+// El coche se hunde; si es tuyo, se puede volver a pedir desde P › Mis coches.
+// ----------------------------------------------------------------------
+let splashTimer = 0;
+function checkWater(dt) {
+  if (game.interior || respawnTimer > 0) return;
+  const driving = game.interaction.isDriving;
+  const p = driving ? game.interaction.vehicle.position : game.player.body.position;
+  if (splashTimer > 0) {
+    splashTimer -= dt;
+    if (splashTimer <= 0) rescueFromWater(p.x);
+    return;
+  }
+  if (p.y < 1.6 && game.env.inSea(p.x, p.z)) {
+    splashTimer = 1.2;
+    const at = new THREE.Vector3(p.x, 0.3, p.z);
+    for (let i = 0; i < 12; i++) game.effects.spawnSmoke(at, new THREE.Vector3((Math.random() - 0.5) * 4, 3 + Math.random() * 3, (Math.random() - 0.5) * 4), 1.2);
+    game.hud.notify('¡Al agua!', 2);
+  }
+}
+function rescueFromWater(x) {
+  const v = game.interaction.isDriving ? game.interaction.vehicle : null;
+  if (v) {
+    game.interaction.forceExit();
+    v.removeFromWorld();
+  }
+  const sx = Math.max(-500, Math.min(500, x));
+  game.player.teleport({ x: sx, y: 0, z: coastZ(sx) - 8 });
+  game.player.facing = Math.PI;
+  game.hud.notify(v && v.ownedCar ? 'Te han sacado del agua. Tu coche se ha hundido: pídelo otra vez en P › Mis coches.' : 'Te han sacado del agua.', 4);
+}
+
 function respawn() {
   const st = game.state;
   const lostLoot = game.heists.onPlayerDown();
@@ -415,6 +448,7 @@ function step(dt) {
   // 3. Sincronizar mallas con cuerpos físicos
   for (const v of game.vehicles) v.sync();
   game.player.animate(dt);
+  checkWater(dt);
 
   // 4. Cámara, entorno, efectos y HUD
   game.cameraRig.update(dt);

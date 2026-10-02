@@ -6,7 +6,7 @@ import { formatMoney } from './GameState.js';
 import { BUSINESSES, LEVELS } from './Properties.js';
 import { Environment } from './Environment.js';
 import * as CANNON from 'cannon-es';
-import { GROUPS } from './Environment.js';
+import { GROUPS, ISLAND } from './Environment.js';
 import { stoneTexture, wallTexture, signTexture, makeCanvas, toTexture, addNoise } from './Textures.js';
 
 const INTERACT_RADIUS = 2.2;
@@ -108,8 +108,15 @@ export class Locations {
 
     const env = game.env;
     // `where`: [manzana i, manzana j, lado] en el centro, o { at: [x, z], road } en cualquier calle
+    // o { pos: [x, y, z], normal: [nx, nz] } para sitios fuera de la red de calles (la isla)
+    const manual = (w) => {
+      const pos = new THREE.Vector3(...w.pos);
+      const normal = new THREE.Vector3(w.normal[0], 0, w.normal[1]);
+      const park = pos.clone().addScaledVector(normal, 5);
+      return { pos, normal, park, heading: Math.atan2(normal.z, -normal.x) };
+    };
     const add = (type, name, where, data = {}) => {
-      const spot = Array.isArray(where) ? sidewalkSpot(...where) : env.spotAt(where.at[0], where.at[1], where.road);
+      const spot = Array.isArray(where) ? sidewalkSpot(...where) : where.pos ? manual(where) : env.spotAt(where.at[0], where.at[1], where.road);
       const poi = { id: data.id || name, type, name, ...spot, ...data, style: TYPE_STYLE[type] };
       this.pois.push(poi);
       return poi;
@@ -126,11 +133,17 @@ export class Locations {
     add('store', '24/7 Oeste', [0, 2, 'E'], { id: 'tienda5' });
     add('store', '24/7 Puerto', { at: [-152, 245], road: 'puertoOeste' }, { id: 'tienda6' });
     add('store', '24/7 Jardines', { at: [230, -150], road: 'jardines' }, { id: 'tienda7' });
+    add('store', '24/7 Isla', { pos: [100, ISLAND.top, 470], normal: [0, -1] }, { id: 'tienda8' });
+    add('store', '24/7 Polígono', { at: [-300, -88], road: 'industria' }, { id: 'tienda9' });
+    add('store', '24/7 Colinas', { at: [-180, -464], road: 'viejo' }, { id: 'tienda10' });
     add('bank', BANKS.puerto.name, [4, 3, 'W'], { id: 'puerto' });
     add('bank', BANKS.colinas.name, { at: [60, -470], road: 'mirador' }, { id: 'colinas' });
     add('bank', BANKS.central.name, [2, 1, 'N'], { id: 'central' });
     add('bank', BANKS.reserva.name, [5, 0, 'W'], { id: 'reserva' });
     add('business', BUSINESSES.cafeteria.name, { at: [252, 238], road: 'paseo' }, { id: 'cafeteria' });
+    add('business', BUSINESSES.chiringuito.name, { pos: [140, ISLAND.top, 470], normal: [0, -1] }, { id: 'chiringuito' });
+    add('business', BUSINESSES.lavadero.name, { at: [230, 12], road: 'avEste' }, { id: 'lavadero' });
+    add('business', BUSINESSES.gimnasio.name, { at: [282, 100], road: 'lomas' }, { id: 'gimnasio' });
     add('business', BUSINESSES.lavanderia.name, [1, 3, 'E'], { id: 'lavanderia' });
     add('business', BUSINESSES.taller.name, [4, 4, 'N'], { id: 'taller' });
     add('business', BUSINESSES.gasolinera.name, { at: [-262, -12], road: 'oeste' }, { id: 'gasolinera' });
@@ -605,7 +618,7 @@ export class Locations {
     group.updateMatrixWorld(true);
     const body = new CANNON.Body({ mass: 0, collisionFilterGroup: GROUPS.STATIC });
     body.addShape(new CANNON.Box(new CANNON.Vec3(W / 2, H / 2, D / 2)));
-    body.position.set(center.x, H / 2, center.z);
+    body.position.set(center.x, center.y + H / 2, center.z);
     body.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), yaw);
     env.registerStructure(meshes, rect, body);
     poi.facade = group;

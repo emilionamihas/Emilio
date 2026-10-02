@@ -6,12 +6,15 @@ import { OUTFITS } from './HumanModel.js';
 /** Negocios: ingresos por MINUTO de juego (nivel 1). Se cobran en dos pagos, cada 30 s. */
 export const BUSINESSES = {
   cafeteria: { name: 'Café Brisa', price: 5000, income: 700, zone: 'La Playa' },
+  chiringuito: { name: 'Chiringuito La Isla', price: 12000, income: 1400, zone: 'Isla Faro' },
+  lavadero: { name: 'Lavadero Burbuja', price: 18000, income: 2100, zone: 'Avenida del Este' },
   lavanderia: { name: 'Lavandería Espuma', price: 8000, income: 1000, zone: 'Centro' },
   taller: { name: 'Taller Pistón', price: 15000, income: 1800, zone: 'Centro' },
   gasolinera: { name: 'Gasolinera Ruta 9', price: 22000, income: 2600, zone: 'Avenida Oeste' },
   club: { name: 'Club Neón', price: 30000, income: 3600, zone: 'Centro' },
   almacen: { name: 'Almacenes del Puerto', price: 45000, income: 5200, zone: 'El Puerto' },
   hotel: { name: 'Hotel Marina', price: 60000, income: 7000, zone: 'Centro' },
+  gimnasio: { name: 'Gimnasio Titán', price: 70000, income: 8000, zone: 'Las Lomas' },
   restaurante: { name: 'Restaurante Vista', price: 85000, income: 9800, zone: 'Colinas' },
   fabrica: { name: 'Fábrica Hierro', price: 110000, income: 12500, zone: 'Polígono' },
   casino: { name: 'Casino Sombra', price: 150000, income: 16000, zone: 'Centro' },

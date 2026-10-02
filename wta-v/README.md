@@ -26,16 +26,16 @@ De fondo, la cámara sobrevuela la ciudad en 3D en una órbita lenta. En el cent
 
 ## La ciudad
 
-Puerto Sombra mide algo más de un kilómetro de lado. El **Centro** conserva su cuadrícula de rascacielos, pero con una glorieta en medio y una avenida en diagonal que corta las manzanas. Alrededor hay una **circunvalación** de curvas amplias que conecta los barrios: el **Polígono** (naves industriales), **Jardines** y **Las Lomas** (casas con tejado a dos aguas y calles sinuosas), **Colinas** (mansiones) y la costa, con **El Puerto** (contenedores y almacenes) y **La Playa**, junto al mar. Entre el centro y Colinas está **La Meseta**, una colina con bosque que la Avenida Norte atraviesa por un **túnel** de 90 metros. Los cruces entre avenidas tienen semáforo y paso de cebra, y el tráfico, la policía y el GPS siguen la red de calles, respetando el sentido de la glorieta.
+Puerto Sombra mide algo más de un kilómetro de lado. El **Centro** conserva su cuadrícula de rascacielos, pero con una glorieta en medio y una avenida en diagonal que corta las manzanas. Alrededor hay una **circunvalación** de curvas amplias que conecta los barrios: el **Polígono** (naves industriales), **Jardines** y **Las Lomas** (casas con tejado a dos aguas y calles sinuosas), **Colinas** (mansiones) y la costa, con **El Puerto** (contenedores y almacenes) y **La Playa**, junto al mar. Entre el centro y Colinas se levanta el **Monte Sombra**, una montaña de 40 metros que se puede conducir: la **carretera de la cumbre** sube desde la Carretera del Oeste por una rampa larga, recorre la cresta, cruza un barranco por un **puente** de arco rojo, pasa por encima del túnel de la Avenida Norte y baja hasta la Carretera del Nordeste. Las laderas norte y sur son empinadas (se baja rodando, no se sube) y el bosque tiene árboles sólidos. Frente a La Playa, un **puente colgante** de 150 metros lleva a la **Isla Faro**, con faro, palmeras, tienda y chiringuito. Hay **rampas de salto** en la playa, el puerto, el polígono y la cumbre. Si caes al mar, te rescatan en la orilla (el coche se hunde; si era tuyo, se pide otra vez desde *Mis coches*). El tamaño del mapa no cambia. Los cruces entre avenidas tienen semáforo y paso de cebra, y el tráfico, la policía y el GPS siguen la red de calles, respetando el sentido de la glorieta.
 
 | Radar | Lugar | Qué haces allí |
 |---|---|---|
 | H | Tu casa | Se entra: cama (guardar y dormir), ordenador (negocios y coches) y vestidor |
 | A | Armería Plomo y Armería Costa | Comprar armas, munición y chaleco antibalas |
 | C | Autos Velasco | Comprar coches (no cuentan como robo y quedan en tu garaje) |
-| T | Siete tiendas 24/7 | Se entra: encañonas al dependiente y vacías la caja en 3 segundos (900 a 2.000 dólares, 1 estrella) |
+| T | Diez tiendas 24/7 | Se entra: encañonas al dependiente y vacías la caja en 3 segundos (900 a 2.000 dólares, 1 estrella) |
 | $ | Cuatro bancos | Se entra: atraco con guardias, taladro y carros de dinero |
-| N | Doce negocios | Pagan cada 30 segundos y se pueden mejorar dos veces |
+| N | Quince negocios | Pagan cada 30 segundos y se pueden mejorar dos veces |
 | + / P | Hospital y comisaría | Donde reapareces si te matan o te arrestan |
 
 **Bancos.** El atraco empieza cuando apuntas a un cajero, disparas dentro o pulsas E en las ventanillas. Salta la alarma y los clientes se tiran al suelo. Coloca el taladro en la puerta de la cámara acorazada y quédate a su lado; en unos segundos se abre y los carros de dinero (en la Reserva Federal, también lingotes) se vacían con una pulsación de E. Un atraco completo dura menos de diez segundos si vas directo. Mientras estás dentro la policía aún no ha llegado: los guardias disparan poco y los agentes a pie solo entran si te entretienes más de 25 segundos. Al salir tienes **20 segundos de ventaja** sin patrullas. El botín va a la bolsa y pasa a ser tuyo cuando pierdes a la policía; si te matan o te arrestan antes, lo pierdes.
@@ -54,12 +54,15 @@ La policía también es más llevadera que antes: menos patrullas por estrella, 
 | Negocio | Zona | Precio | Por minuto |
 |---|---|---|---|
 | Café Brisa | La Playa | 5.000 | 700 |
+| Chiringuito La Isla | Isla Faro | 12.000 | 1.400 |
+| Lavadero Burbuja | Avenida del Este | 18.000 | 2.100 |
 | Lavandería Espuma | Centro | 8.000 | 1.000 |
 | Taller Pistón | Centro | 15.000 | 1.800 |
 | Gasolinera Ruta 9 | Avenida Oeste | 22.000 | 2.600 |
 | Club Neón | Centro | 30.000 | 3.600 |
 | Almacenes del Puerto | El Puerto | 45.000 | 5.200 |
 | Hotel Marina | Centro | 60.000 | 7.000 |
+| Gimnasio Titán | Las Lomas | 70.000 | 8.000 |
 | Restaurante Vista | Colinas | 85.000 | 9.800 |
 | Fábrica Hierro | Polígono | 110.000 | 12.500 |
 | Casino Sombra | Centro | 150.000 | 16.000 |
@@ -74,7 +77,7 @@ Cada uno se puede reformar (x1,6) y llevar a lujo (x2,4). Mientras no juegas sig
 
 **Mapa y GPS.** La tecla **M** abre el mapa de la ciudad. Elige un destino de la lista (W/S y E) o haz clic en cualquier punto: la ruta se calcula por las calles y se dibuja en morado en el radar, con la distancia debajo.
 
-**Código secreto.** En el ordenador de tu casa, la última opción del menú (`>_`) abre una terminal. Escribe `WTASECRET` y pulsa Enter. También funciona tecleándolo de corrido mientras juegas. Da 10 millones de dólares, todas las armas con munición infinita, un vehículo de cada modelo, motos incluidas (propios, sin estrellas), los doce negocios al nivel máximo, salud y chaleco llenos y, en el modo historia, la historia completada con todos los bancos abiertos.
+**Código secreto.** En el ordenador de tu casa, la última opción del menú (`>_`) abre una terminal. Escribe `WTASECRET` y pulsa Enter. También funciona tecleándolo de corrido mientras juegas. Da 10 millones de dólares, todas las armas con munición infinita, un vehículo de cada modelo, motos incluidas (propios, sin estrellas), los quince negocios al nivel máximo, salud y chaleco llenos y, en el modo historia, la historia completada con todos los bancos abiertos.
 
 Hay un segundo código, `OLDSTYLE`, que se mete igual. Te viste con gorra beige hacia atrás, polo azul navy, pantalón beige y zapatillas blancas. Esos dos colores, azul navy y beige, no están en el vestidor normal: al usar el código quedan desbloqueados en todas las prendas, junto al conjunto "Old Style".
 
@@ -183,4 +186,4 @@ Para depurar: `?autostart=story` o `?autostart=free` arranca directamente (añad
 
 ## Limitaciones
 
-No hay audio. Las motos no aparecen en el tráfico (no hay pilotos de IA en moto). El suelo es plano: la colina se cruza por el túnel o se rodea, no se sube. Solo tienen interior tu casa, las tiendas y los bancos; la armería, el concesionario y los negocios se usan desde la puerta. En los cruces el tráfico no siempre ve a quien llega por los lados y a veces choca. La ciudad ocupa unas cinco veces más superficie que la primera versión; con muchos peatones y un banco lleno de NPC, un ordenador modesto puede bajar de 60 FPS.
+No hay audio. Las motos no aparecen en el tráfico (no hay pilotos de IA en moto). La montaña, los puentes y la isla están fuera de la red de calles: el tráfico, la policía y el GPS no suben (la policía te espera abajo). Solo tienen interior tu casa, las tiendas y los bancos; la armería, el concesionario y los negocios se usan desde la puerta. En los cruces el tráfico no siempre ve a quien llega por los lados y a veces choca. La ciudad ocupa unas cinco veces más superficie que la primera versión; con muchos peatones y un banco lleno de NPC, un ordenador modesto puede bajar de 60 FPS.

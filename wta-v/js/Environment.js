@@ -32,8 +32,18 @@ const ROAD_TYPES = {
   roundabout: { w: 12, lane: 0, park: 1.7 },
 };
 
-/** Colina del norte: meseta atravesada por el túnel de la Avenida Norte (x = 0). */
-export const RIDGE = { xc: -18, zc: -320, H: 34, px: 150, fx: 70, pz: 35, fz: 45, tunnelHalf: 45, corridor: 13 };
+/**
+ * Monte Sombra: cresta conducible atravesada por el túnel de la Avenida Norte (x = 0).
+ * Rampas largas (pendiente máx. ~16°) a este y oeste, laderas norte y sur empinadas
+ * y un barranco que cruza la cresta (con puente).
+ */
+export const RIDGE = { xc: -18, zc: -320, H: 40, px: 60, fx: 170, pz: 35, fz: 45, tunnelHalf: 45, corridor: 13 };
+export const GORGE = { x: -110, half: 18, depth: 20 };
+/** Carretera de la cumbre (no es parte de la red de tráfico): de la Carretera del Oeste a la del Nordeste. */
+export const SUMMIT_ROAD = [[-262, -250], [-235, -290], [-205, -312], [-170, -320], [150, -320], [185, -312], [215, -290], [232, -268]];
+/** Isla del Faro, unida a La Playa por un puente. */
+export const ISLAND = { x: 120, z: 485, r: 42, top: 0.25 };
+export const BAY_BRIDGE = { x: 120, z0: 318, z1: 356, z2: 432, z3: 465, deck: 8, w: 10 };
 
 const WORLD = { minX: -530, maxX: 530, minZ: -545, maxZ: 560 };
 const DAY_LENGTH = 480; // segundos reales por día de juego
@@ -46,15 +56,28 @@ const smooth = (e0, e1, x) => {
   return t * t * (3 - 2 * t);
 };
 
-/** Altura de la colina en (x, z). El corredor del túnel queda excavado fuera del túnel. */
-export function hillHeight(x, z) {
+/** Altura de la montaña sin el barranco (para apoyar el puente de la cumbre). */
+export function mountainBase(x, z) {
   const R = RIDGE;
-  const ax = 1 - smooth(R.px, R.px + R.fx, Math.abs(x - R.xc));
+  // Rampa casi lineal en x (pendiente constante, cómoda para conducir) con los extremos suavizados
+  const t = Math.min(1, Math.max(0, (Math.abs(x - R.xc) - R.px) / R.fx));
+  const ax = 1 - (0.6 * t + 0.4 * t * t * (3 - 2 * t));
   const az = 1 - smooth(R.pz, R.pz + R.fz, Math.abs(z - R.zc));
   if (ax <= 0 || az <= 0) return 0;
-  if (Math.abs(x) < R.corridor && Math.abs(z - R.zc) > R.tunnelHalf) return 0;
-  const bumps = 1 + 0.12 * Math.sin(x * 0.045) * Math.cos(z * 0.06) + 0.08 * Math.sin(x * 0.11 + z * 0.07);
+  // Relieve irregular solo en las laderas: la cresta (donde va la carretera) queda lisa
+  const rough = smooth(10, 30, Math.abs(z - R.zc));
+  const bumps = 1 + rough * (0.08 * Math.sin(x * 0.045) * Math.cos(z * 0.06) + 0.05 * Math.sin(x * 0.11 + z * 0.07));
   return R.H * ax * az * bumps;
+}
+
+/** Altura del terreno de la montaña en (x, z). El corredor del túnel queda excavado fuera del túnel. */
+export function hillHeight(x, z) {
+  const R = RIDGE;
+  if (Math.abs(x) < R.corridor && Math.abs(z - R.zc) > R.tunnelHalf) return 0;
+  const h = mountainBase(x, z);
+  if (h <= 0) return 0;
+  const g = GORGE.depth * (1 - smooth(GORGE.half * 0.35, GORGE.half, Math.abs(x - GORGE.x)));
+  return Math.max(0, h - g * Math.min(1, h / 12));
 }
 
 /** Línea de costa: al sur de ella está el mar. */
@@ -126,7 +149,8 @@ export const DISTRICT_LABELS = [
   ['LA PLAYA', 220, 330],
   ['JARDINES', 330, -80],
   ['LAS LOMAS', 330, 140],
-  ['LA MESETA', -20, -320],
+  ['MONTE SOMBRA', -60, -355],
+  ['ISLA FARO', 120, 535],
 ];
 
 /** Parámetros de solar por barrio (medidas en metros). */
@@ -168,6 +192,9 @@ export class Environment {
     this.createMarkings();
     this.createHillAndTunnel();
     this.createSea();
+    this.createSummitRoad();
+    this.createIsland();
+    this.createStuntRamps();
     this.createBoundaries();
     this.createSkyAndLights();
     this.update(0, new THREE.Vector3());
@@ -995,6 +1022,24 @@ export class Environment {
     ctx.arc(toPx(0), toPx(0), 5 * s, 0, Math.PI * 2);
     ctx.fill();
 
+    // Isla, puente de la bahía y carretera de la cumbre (también salen en el mapa)
+    ctx.fillStyle = '#d9c79b';
+    ctx.beginPath();
+    ctx.arc(toPx(ISLAND.x), toPx(ISLAND.z), (ISLAND.r + 4) * s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#5b8a3f';
+    ctx.beginPath();
+    ctx.arc(toPx(ISLAND.x + 4), toPx(ISLAND.z + 8), (ISLAND.r - 10) * s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#55585e';
+    ctx.fillRect(toPx(BAY_BRIDGE.x - BAY_BRIDGE.w / 2), toPx(BAY_BRIDGE.z0), BAY_BRIDGE.w * s, (BAY_BRIDGE.z3 - BAY_BRIDGE.z0) * s);
+    ctx.strokeStyle = '#4a4c52';
+    ctx.lineWidth = 9 * s;
+    ctx.lineJoin = ctx.lineCap = 'round';
+    ctx.beginPath();
+    SUMMIT_ROAD.forEach(([x, z], i) => (i ? ctx.lineTo(toPx(x), toPx(z)) : ctx.moveTo(toPx(x), toPx(z))));
+    ctx.stroke();
+
     // Parches de asfalto y manchas de aceite
     for (let k = 0; k < 1600; k++) {
       const e = this.edges[Math.floor(this.rand() * this.edges.length)];
@@ -1180,7 +1225,8 @@ export class Environment {
       const x = pos.getX(i) + (x0 + x1) / 2;
       const z = pos.getZ(i) + (z0 + z1) / 2;
       const h = hillHeight(x, z);
-      pos.setXYZ(i, x, h - 0.3, z);
+      // a ras de la física donde se conduce; hundido en el borde para no parpadear con el suelo
+      pos.setXYZ(i, x, h - 0.3 * (1 - smooth(0.2, 2, h)), z);
       const slope = Math.hypot(hillHeight(x + 2, z) - hillHeight(x - 2, z), hillHeight(x, z + 2) - hillHeight(x, z - 2)) / 4;
       const n = this.rand();
       if (slope > 1.1 && h > 1) col.setRGB(0.42 + n * 0.08, 0.39 + n * 0.06, 0.34 + n * 0.05);
@@ -1205,15 +1251,35 @@ export class Environment {
     this.scene.add(hill);
     this.shootables.push(hill);
 
-    // Cuerpo físico: dos bloques a ambos lados del corredor (las laderas no se escalan en coche)
-    const hillBody = new CANNON.Body({ mass: 0, collisionFilterGroup: GROUPS.STATIC });
-    const hz = R.pz + R.fz * 0.8;
-    const west = [R.xc - (R.px + R.fx * 0.8), -R.corridor];
-    const east = [R.corridor, R.xc + R.px + R.fx * 0.8];
-    for (const [a, b] of [west, east]) {
-      hillBody.addShape(new CANNON.Box(new CANNON.Vec3((b - a) / 2, 20, hz)), new CANNON.Vec3((a + b) / 2, 20, R.zc));
+    // Física: dos Heightfield (a ambos lados del corredor del túnel) con la misma rejilla de 4 m
+    // que la malla. Sobre el túnel, una losa cubre el corredor para cruzar la cresta.
+    const hf = (xa, xb) => {
+      const es = 4;
+      const nx = Math.round((xb - xa) / es);
+      const nz = Math.round((z1 - z0) / es);
+      const data = [];
+      for (let i = 0; i <= nx; i++) {
+        const col = [];
+        for (let j = 0; j <= nz; j++) col.push(hillHeight(xa + i * es, z1 - j * es));
+        data.push(col);
+      }
+      const shape = new CANNON.Heightfield(data, { elementSize: es });
+      const b = new CANNON.Body({ mass: 0, material: this.groundMaterial, collisionFilterGroup: GROUPS.STATIC });
+      b.addShape(shape);
+      b.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+      b.position.set(xa, 0, z1);
+      this.world.addBody(b);
+    };
+    hf(x0, -12);
+    hf(12, x1);
+    const cover = new CANNON.Body({ mass: 0, material: this.groundMaterial, collisionFilterGroup: GROUPS.STATIC });
+    const topIn = hillHeight(14, R.zc);
+    const topEdge = hillHeight(14, R.zc + R.tunnelHalf - 2);
+    cover.addShape(new CANNON.Box(new CANNON.Vec3(13, (topIn - 9.4) / 2, R.pz)), new CANNON.Vec3(0, 9.4 + (topIn - 9.4) / 2, R.zc));
+    for (const dz of [-1, 1]) {
+      cover.addShape(new CANNON.Box(new CANNON.Vec3(13, (topEdge - 9.4) / 2, (R.tunnelHalf - R.pz) / 2)), new CANNON.Vec3(0, 9.4 + (topEdge - 9.4) / 2, R.zc + dz * (R.pz + (R.tunnelHalf - R.pz) / 2)));
     }
-    this.world.addBody(hillBody);
+    this.world.addBody(cover);
 
     // Túnel: muros, techo, luces y bocas
     const len = R.tunnelHalf * 2;
@@ -1317,9 +1383,19 @@ export class Environment {
     // Malecón: muro bajo y sólido a lo largo de la costa (un solo cuerpo con muchas piezas)
     const wall = new CANNON.Body({ mass: 0, collisionFilterGroup: GROUPS.STATIC });
     const pieces = [];
+    // Tramos de 20 m con un hueco para el puente de la bahía
+    const gap = [BAY_BRIDGE.x - BAY_BRIDGE.w / 2 - 0.6, BAY_BRIDGE.x + BAY_BRIDGE.w / 2 + 0.6];
+    const spans = [];
     for (let x = -size / 2; x < size / 2; x += 20) {
-      const a = new THREE.Vector3(x, 0, coastZ(x) - 1);
-      const b = new THREE.Vector3(x + 20, 0, coastZ(x + 20) - 1);
+      if (x + 20 <= gap[0] || x >= gap[1]) spans.push([x, x + 20]);
+      else {
+        if (x < gap[0]) spans.push([x, gap[0]]);
+        if (x + 20 > gap[1]) spans.push([gap[1], x + 20]);
+      }
+    }
+    for (const [xa, xb] of spans) {
+      const a = new THREE.Vector3(xa, 0, coastZ(xa) - 1);
+      const b = new THREE.Vector3(xb, 0, coastZ(xb) - 1);
       const len = a.distanceTo(b);
       const ang = Math.atan2(b.x - a.x, b.z - a.z);
       const c = a.clone().add(b).multiplyScalar(0.5);
@@ -1365,6 +1441,262 @@ export class Environment {
       this.scene.add(g);
       this.boats.push({ g, phase: this.rand() * 6 });
     }
+  }
+
+  // ------------------------------------------------------------------
+  // Relieve conducible: carretera de la cumbre, puentes, isla y rampas
+  // ------------------------------------------------------------------
+  /**
+   * Losa entre dos puntos 3D (su cara superior va de `a` a `b`): pieza visible + forma física.
+   * `side` desplaza la losa en horizontal (barandillas); `up` la sube sobre la superficie.
+   */
+  slab(body, a, b, { width = 10, thick = 0.6, mat = this.concreteMat, side = 0, up = 0, collide = true, shadow = true } = {}) {
+    const d = new THREE.Vector3().subVectors(b, a);
+    const len = d.length();
+    const yaw = Math.atan2(d.x, d.z);
+    const pitch = -Math.atan2(d.y, Math.hypot(d.x, d.z));
+    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(pitch, yaw, 0, 'YXZ'));
+    const normal = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
+    const lateral = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
+    const c = a.clone().add(b).multiplyScalar(0.5).addScaledVector(normal, up - thick / 2).addScaledVector(lateral, side);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(width, thick, len), mat);
+    m.position.copy(c);
+    m.quaternion.copy(q);
+    m.castShadow = shadow;
+    m.receiveShadow = true;
+    this.scene.add(m);
+    this.allColliders.push(m);
+    this.shootables.push(m);
+    (this.fixedColliders ||= []).push(m);
+    if (collide) body.addShape(new CANNON.Box(new CANNON.Vec3(width / 2, thick / 2, len / 2)), new CANNON.Vec3(c.x, c.y, c.z), new CANNON.Quaternion(q.x, q.y, q.z, q.w));
+    return m;
+  }
+
+  /** Altura del suelo en (x, z): montaña, isla o cero. Para colocar coches y la cámara. */
+  groundHeight(x, z) {
+    if (Math.hypot(x - ISLAND.x, z - ISLAND.z) < ISLAND.r) return ISLAND.top;
+    return hillHeight(x, z);
+  }
+
+  /** ¿Es mar abierto (ni isla, ni bajo el puente con los pies en él)? */
+  inSea(x, z) {
+    return z > coastZ(x) + 0.5 && Math.hypot(x - ISLAND.x, z - ISLAND.z) > ISLAND.r + 1;
+  }
+
+  /** Distancia horizontal a la carretera de la cumbre. */
+  distToSummitRoad(x, z) {
+    let best = Infinity;
+    for (let i = 0; i < SUMMIT_ROAD.length - 1; i++) {
+      const [ax, az] = SUMMIT_ROAD[i];
+      const [bx, bz] = SUMMIT_ROAD[i + 1];
+      const dx = bx - ax;
+      const dz = bz - az;
+      const t = Math.min(1, Math.max(0, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz)));
+      best = Math.min(best, Math.hypot(ax + dx * t - x, az + dz * t - z));
+    }
+    return best;
+  }
+
+  /** Carretera asfaltada que sigue el terreno por la cresta y puente sobre el barranco. */
+  createSummitRoad() {
+    const road = new THREE.CatmullRomCurve3(SUMMIT_ROAD.map(([x, z]) => new THREE.Vector3(x, 0, z)), false, 'centripetal');
+    const pts = road.getSpacedPoints(Math.ceil(road.getLength() / 2));
+    const half = 4.5;
+    const pos = [];
+    const uv = [];
+    const idx = [];
+    let v = 0;
+    let skip = false;
+    pts.forEach((p, i) => {
+      const n = pts[Math.min(pts.length - 1, i + 1)];
+      const pr = pts[Math.max(0, i - 1)];
+      const t = new THREE.Vector3().subVectors(n, pr).normalize();
+      const r = new THREE.Vector3(-t.z, 0, t.x);
+      // sobre el barranco no hay asfalto: va el puente
+      const overGorge = mountainBase(p.x, p.z) - hillHeight(p.x, p.z) > 0.5;
+      for (const sgn of [-1, 1]) {
+        const x = p.x + r.x * half * sgn;
+        const z = p.z + r.z * half * sgn;
+        pos.push(x, hillHeight(x, z) + 0.07, z);
+        uv.push(sgn < 0 ? 0 : 1, i * 0.25);
+      }
+      if (i > 0 && !overGorge && !skip) idx.push(v - 2, v - 1, v, v - 1, v + 1, v);
+      skip = overGorge;
+      v += 2;
+    });
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    const tex = toTexture(
+      makeCanvas(64, 128, (ctx, W, H) => {
+        ctx.fillStyle = '#4a4c52';
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#e2e2de';
+        ctx.fillRect(2, 0, 3, H);
+        ctx.fillRect(W - 5, 0, 3, H);
+        ctx.fillStyle = '#dcae2e';
+        ctx.fillRect(W / 2 - 1.5, 0, 3, H * 0.5);
+        addNoise(ctx, W, H, 14, this.rand);
+      })
+    );
+    const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.receiveShadow = true;
+    this.scene.add(mesh);
+
+    // Puente sobre el barranco: tablero apoyado en la cresta a ambos lados, barandillas y pilas
+    const body = new CANNON.Body({ mass: 0, material: this.groundMaterial, collisionFilterGroup: GROUPS.STATIC });
+    const z = RIDGE.zc;
+    const xa = GORGE.x - GORGE.half - 2;
+    const xb = GORGE.x + GORGE.half + 2;
+    const a = new THREE.Vector3(xa, mountainBase(xa, z) + 0.05, z);
+    const b = new THREE.Vector3(xb, mountainBase(xb, z) + 0.05, z);
+    const red = new THREE.MeshStandardMaterial({ color: 0xa3352b, roughness: 0.55, metalness: 0.4 });
+    this.slab(body, a, b, { width: 10, thick: 0.8 });
+    for (const sd of [-1, 1]) this.slab(body, a, b, { width: 0.3, thick: 1.1, up: 1.1, side: sd * 5.1, mat: red });
+    const mid = a.clone().add(b).multiplyScalar(0.5);
+    const floor = hillHeight(GORGE.x, z);
+    for (const dz of [-3.5, 3.5]) {
+      const pillar = new THREE.Mesh(new THREE.BoxGeometry(1.4, mid.y - floor, 1.4), this.concreteMat);
+      pillar.position.set(mid.x, floor + (mid.y - floor) / 2 - 0.8, z + dz);
+      pillar.castShadow = true;
+      this.scene.add(pillar);
+      body.addShape(new CANNON.Box(new CANNON.Vec3(0.7, (mid.y - floor) / 2, 0.7)), new CANNON.Vec3(pillar.position.x, pillar.position.y, pillar.position.z));
+    }
+    // Arco de acero bajo el tablero
+    const arch = new THREE.Mesh(new THREE.TorusGeometry((xb - xa) / 2 - 2, 0.45, 8, 24, Math.PI), red);
+    arch.position.set(mid.x, mid.y - 0.9, z);
+    arch.rotation.z = Math.PI;
+    arch.scale.y = 0.55;
+    this.scene.add(arch);
+    this.world.addBody(body);
+  }
+
+  /** Isla del Faro y el puente colgante de la bahía. */
+  createIsland() {
+    const I = ISLAND;
+    const B = BAY_BRIDGE;
+    const sand = new THREE.MeshStandardMaterial({ color: 0xd9c79b, roughness: 1 });
+    const island = new THREE.Mesh(new THREE.CylinderGeometry(I.r, I.r + 6, 2, 40), sand);
+    island.position.set(I.x, I.top - 1, I.z);
+    island.receiveShadow = true;
+    this.scene.add(island);
+    const grass = new THREE.Mesh(new THREE.CircleGeometry(I.r - 10, 32), new THREE.MeshStandardMaterial({ color: 0x5b8a3f, roughness: 1, polygonOffset: true, polygonOffsetFactor: -1 }));
+    grass.rotation.x = -Math.PI / 2;
+    grass.position.set(I.x + 4, I.top + 0.02, I.z + 8);
+    grass.receiveShadow = true;
+    this.scene.add(grass);
+    const body = new CANNON.Body({ mass: 0, material: this.groundMaterial, collisionFilterGroup: GROUPS.STATIC });
+    body.addShape(new CANNON.Cylinder(I.r, I.r + 6, 2, 24), new CANNON.Vec3(I.x, I.top - 1, I.z));
+
+    // Faro
+    const white = new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.6 });
+    const redM = new THREE.MeshStandardMaterial({ color: 0xc62828, roughness: 0.6 });
+    const fx = I.x + 18;
+    const fz = I.z + 22;
+    for (let k = 0; k < 4; k++) {
+      const seg = new THREE.Mesh(new THREE.CylinderGeometry(2.6 - k * 0.3, 2.9 - k * 0.3, 4.5, 16), k % 2 ? redM : white);
+      seg.position.set(fx, I.top + 2.25 + k * 4.5, fz);
+      seg.castShadow = true;
+      this.scene.add(seg);
+    }
+    this.lighthouseLamp = new THREE.MeshStandardMaterial({ color: 0xfff6d0, emissive: 0xffe08a, emissiveIntensity: 0.4 });
+    const lamp = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 2.2, 12), this.lighthouseLamp);
+    lamp.position.set(fx, I.top + 19.1, fz);
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(2, 1.6, 12), redM);
+    cap.position.set(fx, I.top + 21, fz);
+    this.scene.add(lamp, cap);
+    body.addShape(new CANNON.Cylinder(2.9, 2.9, 20, 10), new CANNON.Vec3(fx, I.top + 10, fz));
+
+    // Puente: rampa de subida desde el paseo, tablero sobre el agua y rampa de bajada a la isla
+    const p0 = new THREE.Vector3(B.x, 0.03, B.z0);
+    const p1 = new THREE.Vector3(B.x, B.deck, B.z1);
+    const p2 = new THREE.Vector3(B.x, B.deck, B.z2);
+    const p3 = new THREE.Vector3(B.x, I.top + 0.03, B.z3);
+    const deckMat = new THREE.MeshStandardMaterial({ color: 0x55585e, roughness: 0.85 });
+    const rail = new THREE.MeshStandardMaterial({ color: 0xd8dde2, roughness: 0.4, metalness: 0.6 });
+    for (const [a, b] of [[p0, p1], [p1, p2], [p2, p3]]) {
+      this.slab(body, a, b, { width: B.w, thick: 0.7, mat: deckMat });
+      for (const sd of [-1, 1]) this.slab(body, a, b, { width: 0.25, thick: 1.1, up: 1.1, side: sd * (B.w / 2 + 0.1), mat: rail });
+    }
+    // Torres y cables (decorado)
+    const tower = new THREE.MeshStandardMaterial({ color: 0xb23a2e, roughness: 0.5, metalness: 0.3 });
+    const towers = [B.z1 + 14, B.z2 - 14];
+    for (const tz of towers) {
+      for (const sd of [-1, 1]) {
+        const t = new THREE.Mesh(new THREE.BoxGeometry(1.2, 24, 1.2), tower);
+        t.position.set(B.x + sd * (B.w / 2 + 0.8), B.deck + 12 - 4, tz);
+        t.castShadow = true;
+        this.scene.add(t);
+        body.addShape(new CANNON.Box(new CANNON.Vec3(0.6, 12, 0.6)), new CANNON.Vec3(t.position.x, t.position.y, t.position.z));
+      }
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(B.w + 3, 1.2, 1.2), tower);
+      beam.position.set(B.x, B.deck + 19, tz);
+      this.scene.add(beam);
+    }
+    const cableMat = new THREE.MeshStandardMaterial({ color: 0x30343a, roughness: 0.5, metalness: 0.7 });
+    for (const sd of [-1, 1]) {
+      const x = B.x + sd * (B.w / 2 + 0.8);
+      const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(x, B.deck + 19, towers[0]), new THREE.Vector3(x, B.deck + 3, (towers[0] + towers[1]) / 2), new THREE.Vector3(x, B.deck + 19, towers[1]));
+      this.scene.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 24, 0.12, 5), cableMat));
+      for (const [from, to] of [[new THREE.Vector3(x, B.deck + 19, towers[0]), new THREE.Vector3(x, B.deck + 1, B.z1)], [new THREE.Vector3(x, B.deck + 19, towers[1]), new THREE.Vector3(x, B.deck + 1, B.z2)]]) {
+        this.scene.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(from, to), 1, 0.1, 5), cableMat));
+      }
+    }
+    // Pilas en el agua
+    for (const pz of [B.z1 + 8, (B.z1 + B.z2) / 2, B.z2 - 8]) {
+      const pile = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.3, B.deck, 10), this.concreteMat);
+      pile.position.set(B.x, B.deck / 2 - 0.7, pz);
+      this.scene.add(pile);
+    }
+    this.world.addBody(body);
+    // Sin edificios ni árboles en el arranque del puente
+    this.reserved.push({ minX: B.x - B.w, maxX: B.x + B.w, minZ: B.z0 - 12, maxZ: B.z1 });
+  }
+
+  /** Rampas de salto con franjas amarillas y negras. */
+  createStuntRamps() {
+    const tex = toTexture(
+      makeCanvas(64, 64, (ctx, W, H) => {
+        for (let i = -64; i < 128; i += 16) {
+          ctx.fillStyle = '#f9c80e';
+          ctx.beginPath();
+          ctx.moveTo(i, 0);
+          ctx.lineTo(i + 8, 0);
+          ctx.lineTo(i + 8 + 64, H);
+          ctx.lineTo(i + 64, H);
+          ctx.fill();
+        }
+        ctx.globalCompositeOperation = 'destination-over';
+        ctx.fillStyle = '#151515';
+        ctx.fillRect(0, 0, W, H);
+      })
+    );
+    tex.repeat.set(2, 3);
+    const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 });
+    const body = new CANNON.Body({ mass: 0, material: this.groundMaterial, collisionFilterGroup: GROUPS.STATIC });
+    // [x, z, rumbo (rad), altura]
+    const ramps = [
+      [235, 322, Math.PI / 2, 2.2],
+      [40, 330, -Math.PI / 2, 1.8],
+      [-410, -150, 0, 2.4],
+      [70, -334, Math.PI / 2, 2],
+      [-205, 330, -Math.PI / 2, 1.8],
+    ];
+    this.rampSpots = [];
+    for (const [x, z, h, rise] of ramps) {
+      const dir = new THREE.Vector3(Math.sin(h), 0, Math.cos(h));
+      const a = new THREE.Vector3(x, 0, z).addScaledVector(dir, -5);
+      const b = new THREE.Vector3(x, 0, z).addScaledVector(dir, 5);
+      a.y = this.groundHeight(a.x, a.z) + 0.02;
+      b.y = this.groundHeight(b.x, b.z) + rise;
+      this.slab(body, a, b, { width: 5, thick: rise + 0.4, mat });
+      this.rampSpots.push([x, z]);
+      this.reserved.push({ minX: x - 9, maxX: x + 9, minZ: z - 9, maxZ: z + 9 });
+    }
+    this.world.addBody(body);
   }
 
   createBoundaries() {
@@ -1764,13 +2096,24 @@ export class Environment {
       if (this.clearance(x, z) < 3 || this.isInsideBuilding(x, z, 2.5) || reservedNear(x, z, 3)) continue;
       trees.push([x, 0, z, true]);
     }
-    // Bosque de la colina (sin cuerpo: la ladera ya es sólida)
+    // Palmeras de la isla
+    for (let k = 0; k < 14; k++) {
+      const ang = this.rand() * Math.PI * 2;
+      const r = 12 + this.rand() * 22;
+      const x = ISLAND.x + Math.cos(ang) * r;
+      const z = ISLAND.z + Math.sin(ang) * r;
+      if (z < ISLAND.z - 10 && Math.abs(x - ISLAND.x) < 30) continue; // plaza de la tienda y el chiringuito
+      if (Math.hypot(x - ISLAND.x - 18, z - ISLAND.z - 22) < 6) continue; // faro
+      trees.push([x, ISLAND.top, z, true]);
+    }
+    // Bosque de la montaña: fuera de la carretera de la cumbre y del barranco; con cuerpo (se puede conducir por ahí)
     for (let k = 0; k < 900; k++) {
       const x = RIDGE.xc - 215 + this.rand() * 430;
       const z = RIDGE.zc - 85 + this.rand() * 170;
       const h = hillHeight(x, z);
-      if (h < 2 || Math.abs(x) < RIDGE.corridor + 4) continue;
-      trees.push([x, h - 0.4, z, false]);
+      if (h < 2 || Math.abs(x) < RIDGE.corridor + 4 || this.distToSummitRoad(x, z) < 9) continue;
+      if (Math.abs(x - GORGE.x) < GORGE.half + 3 || (this.rampSpots || []).some(([rx, rz]) => Math.hypot(rx - x, rz - z) < 10)) continue;
+      trees.push([x, h - 0.4, z, true]);
     }
 
     const trunkGeo = new THREE.CylinderGeometry(0.14, 0.22, 3, 6);
@@ -1816,7 +2159,7 @@ export class Environment {
         if (solid) {
           const body = new CANNON.Body({ mass: 0, collisionFilterGroup: GROUPS.STATIC });
           body.addShape(new CANNON.Cylinder(0.25, 0.25, 3, 6));
-          body.position.set(x, 1.5, z);
+          body.position.set(x, y + 1.5, z);
           this.addStreamed(body, x, z);
         }
       });
@@ -2077,6 +2420,7 @@ export class Environment {
     this.updateEnvironmentMap();
     if (this.lampHeadMat) this.lampHeadMat.emissiveIntensity = glow * 2.5;
 
+    if (this.lighthouseLamp) this.lighthouseLamp.emissiveIntensity = 0.4 + glow * 4;
     this.updateSignals();
     if (this.boats) {
       for (const b of this.boats) {

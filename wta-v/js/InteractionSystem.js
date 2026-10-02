@@ -99,7 +99,11 @@ export class InteractionSystem {
     const q = v.chassisBody.quaternion;
     const local = new THREE.Vector3(1.55 * side, 0, 0.35);
     local.applyQuaternion(new THREE.Quaternion(q.x, q.y, q.z, q.w));
-    return out.set(v.position.x + local.x, 0, v.position.z + local.z);
+    // a la altura del coche (montaña, puentes): nunca por debajo del terreno
+    const x = v.position.x + local.x;
+    const z = v.position.z + local.z;
+    const ground = this.game.env.groundHeight ? this.game.env.groundHeight(x, z) : 0;
+    return out.set(x, Math.max(ground, v.position.y - 0.45), z);
   }
 
   // ------------------------------------------------------------------

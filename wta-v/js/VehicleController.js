@@ -725,7 +725,9 @@ export class VehicleController {
   place(x, z, heading) {
     const b = this.chassisBody;
     const w = this.spec.wheel;
-    b.position.set(x, w.r + w.rest - this.spec.connY + 0.05, z);
+    // apoyado sobre el terreno (montaña, isla) o el suelo plano
+    const ground = this.game.env && this.game.env.groundHeight ? this.game.env.groundHeight(x, z) : 0;
+    b.position.set(x, ground + w.r + w.rest - this.spec.connY + 0.05, z);
     b.quaternion.setFromEuler(0, heading, 0);
     b.velocity.setZero();
     b.angularVelocity.setZero();
@@ -946,10 +948,13 @@ export class VehicleController {
     w.y -= fwd.y * roll * kr + right.y * pitch * kp;
     w.z -= fwd.z * roll * kr + right.z * pitch * kp;
 
-    // Par corrector: eje = up × vertical
+    // Par corrector: eje = up × vertical, solo la componente de balanceo (alrededor del eje
+    // longitudinal). Así no lucha contra el cabeceo en las cuestas de la montaña.
     const k = this.spec.mass * 30 * bike;
-    body.torque.x += -up.z * k;
-    body.torque.z += up.x * k;
+    const along = -up.z * k * fwd.x + up.x * k * fwd.z;
+    body.torque.x += fwd.x * along;
+    body.torque.y += fwd.y * along;
+    body.torque.z += fwd.z * along;
 
     const inp = this.input;
     if (Math.abs(inp.steer) < 0.1 && !inp.handbrake) {

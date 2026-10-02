@@ -627,7 +627,9 @@ export class ThirdPersonCamera {
     const d = hit ? Math.max(0.6, hit.distance - 0.35) : distance;
 
     const desired = shoulderPivot.clone().addScaledVector(dir, -d);
-    desired.y = Math.max(desired.y, 0.35);
+    // nunca por debajo del suelo (también en la montaña)
+    const groundY = !game.interior && game.env.groundHeight ? game.env.groundHeight(desired.x, desired.z) : 0;
+    desired.y = Math.max(desired.y, groundY + 0.6);
     // Dentro de un edificio la cámara no atraviesa el techo
     if (game.interior) desired.y = Math.min(desired.y, game.interior.inst.ceiling - 0.3);
     const desiredLook = shoulderPivot.clone().addScaledVector(dir, 10);
