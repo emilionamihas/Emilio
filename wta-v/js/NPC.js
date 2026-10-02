@@ -41,6 +41,8 @@ export class NPC {
   }
 
   sync() {
+    // Peatones en la calle: siguen el terreno (cuestas); dentro de los edificios hay límites y suelo llano
+    if (!this.bounds && this.game.env.groundHeight) this.pos.y = this.game.env.groundHeight(this.pos.x, this.pos.z, this.pos.y + 2);
     this.root.position.copy(this.pos);
     this.root.rotation.y = this.facing;
   }

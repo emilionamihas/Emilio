@@ -9,6 +9,7 @@ export const GROUPS = {
   STATIC: 1,
   PLAYER: 2,
   VEHICLE: 4,
+  TERRAIN: 8, // cuestas y circuito (Heightfield): los coches de la IA con las 4 ruedas en el suelo no lo comprueban
 };
 
 /**
@@ -42,27 +43,63 @@ export const GORGE = { x: -110, half: 18, depth: 20 };
 /** Carretera de la cumbre (no es parte de la red de tráfico): de la Carretera del Oeste a la del Nordeste. */
 export const SUMMIT_ROAD = [[-262, -250], [-235, -290], [-205, -312], [-170, -320], [150, -320], [185, -312], [215, -290], [232, -268]];
 /**
- * Colinas onduladas en las franjas de campo que quedan fuera de la circunvalación, con un
- * circuito cerrado cada una. Superficie: agarre relativo al asfalto (1).
+ * Barrios con cuestas dentro de la ciudad: el suelo, las calles, los edificios y el tráfico
+ * suben y bajan. amp = desnivel máximo (m); edge = ancho de la transición a llano (m).
+ * Las zonas no se solapan con el centro, la montaña ni la playa.
  */
-export const ROLLING = [
-  {
-    name: 'Las Dunas', x0: -528, x1: -452, z0: -290, z1: 150, amp: 5, seed: 0,
-    ground: 'arena', track: 'tierra', colors: [[0.78, 0.69, 0.5], [0.7, 0.6, 0.42]],
-    loop: [[-472, -270], [-466, -180], [-476, -90], [-466, 0], [-476, 90], [-470, 135], [-508, 135], [-514, 60], [-504, -20], [-516, -110], [-506, -200], [-510, -270]],
-  },
-  {
-    name: 'Los Cerros', x0: 456, x1: 528, z0: -268, z1: 138, amp: 6, seed: 2.1,
-    ground: 'hierba', track: 'grava', colors: [[0.33, 0.47, 0.24], [0.27, 0.4, 0.2]],
-    loop: [[472, -250], [466, -170], [476, -80], [466, 10], [474, 118], [508, 122], [514, 40], [504, -50], [516, -140], [508, -248]],
-  },
+export const CITY_HILLS = [
+  { name: 'Las Lomas', x0: 196, x1: 462, z0: -222, z1: 298, amp: 9, edge: 50, k: 1 / 30, ph: [0.6, 2.1, 4] },
+  { name: 'Colinas', x0: -352, x1: 356, z0: -548, z1: -402, amp: 8, edge: 44, k: 1 / 27, ph: [1.7, 0.3, 2.6] },
+  { name: 'Cuesta del Sur', x0: -130, x1: 124, z0: 194, z1: 320, amp: 7, edge: 48, k: 1 / 34, ph: [0, 1.57, 1] },
 ];
-export const SURFACE_GRIP = { arena: 0.68, tierra: 0.8, hierba: 0.82, grava: 0.86 };
-export const SURFACE_NAMES = { arena: 'Arena', tierra: 'Tierra', hierba: 'Hierba', grava: 'Grava' };
+
+/** Altura de las cuestas de la ciudad en (x, z) (0 fuera de las zonas). */
+export function cityHill(x, z) {
+  for (const Z of CITY_HILLS) {
+    if (x <= Z.x0 || x >= Z.x1 || z <= Z.z0 || z >= Z.z1) continue;
+    const f = smooth(0, Z.edge, x - Z.x0) * smooth(0, Z.edge, Z.x1 - x) * smooth(0, Z.edge, z - Z.z0) * smooth(0, Z.edge, Z.z1 - z);
+    if (f <= 0) return 0;
+    const [a, b, c] = Z.ph;
+    const w = 0.55 + 0.27 * Math.sin(x * Z.k + a) * Math.cos(z * Z.k * 0.85 + b) + 0.18 * Math.sin((x - z) * Z.k * 0.7 + c);
+    return Z.amp * f * Math.max(0, w);
+  }
+  return 0;
+}
+
+/**
+ * Circuito de motocross (donde antes estaban Las Dunas): pista de tierra cerrada con curvas de
+ * herradura, peraltes, saltos, mesetas, "whoops" y una subida grande. Ocupa la franja de campo
+ * al oeste de la circunvalación. Las alturas se precalculan en una rejilla de 1 m.
+ */
+export const MOTOCROSS = { name: 'Motocross Las Dunas', x0: -528, x1: -452, z0: -262, z1: 150, es: 1, half: 3.6 };
+
+export const SURFACE_GRIP = { tierra: 0.8, hierba: 0.82 };
+export const SURFACE_NAMES = { tierra: 'Tierra', hierba: 'Hierba' };
 
 /** Isla del Faro, unida a La Playa por un puente. */
 export const ISLAND = { x: 120, z: 485, r: 42, top: 0.25 };
-export const BAY_BRIDGE = { x: 120, z0: 318, z1: 356, z2: 432, z3: 465, deck: 8, w: 10 };
+export const BAY_BRIDGE = { x: 120, z0: 316, z1: 360, z2: 430, z3: 466, deck: 6, arch: 1.4, w: 10, towers: [366, 424], anchors: [327, 457], top: 31 };
+
+/** Rampa suave 0→1: tramo recto con los extremos redondeados (pendiente máx. = 1,33·h/L). */
+function easeRamp(t) {
+  const a = 0.25;
+  if (t <= 0) return 0;
+  if (t >= 1) return 1;
+  if (t < a) return (t * t) / (2 * a * (1 - a));
+  if (t > 1 - a) return 1 - ((1 - t) * (1 - t)) / (2 * a * (1 - a));
+  return (t - a / 2) / (1 - a);
+}
+
+/** Cota de la calzada del puente de la bahía en z (sin escalones: rampa, arco suave y rampa). */
+export function bayDeckY(z) {
+  const B = BAY_BRIDGE;
+  const top = ISLAND.top + 0.03;
+  if (z <= B.z0) return 0.03;
+  if (z >= B.z3) return top;
+  if (z < B.z1) return 0.03 + (B.deck - 0.03) * easeRamp((z - B.z0) / (B.z1 - B.z0));
+  if (z <= B.z2) return B.deck + B.arch * Math.sin((Math.PI * (z - B.z1)) / (B.z2 - B.z1));
+  return top + (B.deck - top) * (1 - easeRamp((z - B.z2) / (B.z3 - B.z2)));
+}
 
 const WORLD = { minX: -530, maxX: 530, minZ: -545, maxZ: 560 };
 const DAY_LENGTH = 480; // segundos reales por día de juego
@@ -70,6 +107,7 @@ const PHASE = 11; // segundos por fase de semáforo (9 verde + 2 ámbar)
 const STREAM_IN = 170; // radio en el que los colisionadores estáticos están en el mundo físico
 const STREAM_OUT = 215;
 
+const _col = new THREE.Color();
 const smooth = (e0, e1, x) => {
   const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
   return t * t * (3 - 2 * t);
@@ -170,8 +208,7 @@ export const DISTRICT_LABELS = [
   ['LAS LOMAS', 330, 140],
   ['MONTE SOMBRA', -60, -355],
   ['ISLA FARO', 120, 535],
-  ['LAS DUNAS', -490, -320],
-  ['LOS CERROS', 492, -295],
+  ['MOTOCROSS', -490, -280],
 ];
 
 /** Parámetros de solar por barrio (medidas en metros). */
@@ -208,15 +245,17 @@ export class Environment {
     this.finalized = false;
 
     this.buildNetwork();
+    this.buildMotocrossTerrain();
     this.createMaterials();
     this.createGround();
+    this.createCityHills();
     this.createMarkings();
     this.createHillAndTunnel();
     this.createSea();
     this.createSummitRoad();
     this.createIsland();
     this.createStuntRamps();
-    this.createRollingHills();
+    this.createMotocross();
     this.createBoundaries();
     this.createSkyAndLights();
     this.update(0, new THREE.Vector3());
@@ -922,6 +961,25 @@ export class Environment {
     this.concreteMat.map.repeat.set(4, 2);
 
     this.poleMaterial = new THREE.MeshStandardMaterial({ color: 0x2b2f33, roughness: 0.5, metalness: 0.6 });
+    // Zócalo de mampostería para los edificios de las cuestas (UV en metros, 3 m por tesela)
+    this.plinthMat = new THREE.MeshStandardMaterial({
+      map: toTexture(
+        makeCanvas(128, 128, (ctx, W, H) => {
+          ctx.fillStyle = '#6f675c';
+          ctx.fillRect(0, 0, W, H);
+          for (let y = 0; y < H; y += 16) {
+            const off = (y / 16) % 2 ? 0 : 14;
+            for (let x = -off; x < W; x += 28) {
+              const v = 140 + Math.floor(this.rand() * 50);
+              ctx.fillStyle = `rgb(${v},${v - 8},${v - 20})`;
+              ctx.fillRect(x + 1, y + 1, 26, 14);
+            }
+          }
+          addNoise(ctx, W, H, 16, this.rand);
+        })
+      ),
+      roughness: 0.95,
+    });
   }
 
   /** Suelo: una textura de canvas con parcelas, parques, playa, aceras y asfalto. También es el mapa. */
@@ -1029,6 +1087,21 @@ export class Environment {
     ctx.fillStyle = '#8d8b85';
     ctx.fillRect(toPx(-RIDGE.corridor), toPx(RIDGE.zc - RIDGE.pz - RIDGE.fz), RIDGE.corridor * 2 * s, (RIDGE.pz + RIDGE.fz) * 2 * s);
 
+    // Cuestas de la ciudad: sombreado según la pendiente (luz del noroeste), debajo de las calles
+    for (const Z of CITY_HILLS) {
+      for (let z = Z.z0; z < Z.z1; z += 4) {
+        for (let x = Z.x0; x < Z.x1; x += 4) {
+          const h = cityHill(x, z);
+          if (h < 0.2) continue;
+          const gx = cityHill(x + 2, z) - cityHill(x - 2, z);
+          const gz = cityHill(x, z + 2) - cityHill(x, z - 2);
+          const lit = (-gx - gz) * 0.9; // pendiente que mira al noroeste: más clara
+          ctx.fillStyle = lit > 0 ? `rgba(255,250,230,${Math.min(0.22, lit * 0.25)})` : `rgba(20,30,10,${Math.min(0.3, -lit * 0.3)})`;
+          ctx.fillRect(toPx(x - 2), toPx(z - 2), 4.2 * s, 4.2 * s);
+        }
+      }
+    }
+
     // Aceras (o arcén) y asfalto, tramo a tramo
     for (const e of this.edges) strokeEdge(e, e.sidewalk ? e.w + CITY.SIDEWALK * 2 : e.w + 2, e.sidewalk ? '#a3a39c' : '#6b6b63');
     flush();
@@ -1062,14 +1135,16 @@ export class Environment {
     SUMMIT_ROAD.forEach(([x, z], i) => (i ? ctx.lineTo(toPx(x), toPx(z)) : ctx.moveTo(toPx(x), toPx(z))));
     ctx.stroke();
 
-    // Colinas onduladas y sus circuitos
-    for (const Z of ROLLING) {
-      ctx.fillStyle = Z.ground === 'arena' ? 'rgba(201,178,128,0.85)' : 'rgba(70,104,52,0.85)';
-      ctx.fillRect(toPx(Z.x0 + 10), toPx(Z.z0 + 10), (Z.x1 - Z.x0 - 20) * s, (Z.z1 - Z.z0 - 20) * s);
-      ctx.strokeStyle = Z.track === 'tierra' ? '#7a5a3a' : '#a39d92';
-      ctx.lineWidth = 8 * s;
+    // Circuito de motocross: campo de tierra y la pista
+    {
+      const M = MOTOCROSS;
+      ctx.fillStyle = 'rgba(176,150,104,0.9)';
+      ctx.fillRect(toPx(M.x0 + 4), toPx(M.z0 + 4), (M.x1 - M.x0 - 8) * s, (M.z1 - M.z0 - 8) * s);
+      ctx.strokeStyle = '#6e4c2c';
+      ctx.lineWidth = M.half * 2 * s;
+      ctx.lineJoin = ctx.lineCap = 'round';
       ctx.beginPath();
-      Z.loop.forEach(([x, z], i) => (i ? ctx.lineTo(toPx(x), toPx(z)) : ctx.moveTo(toPx(x), toPx(z))));
+      this.mxTrack.samples.forEach((p, i) => (i ? ctx.lineTo(toPx(p.x), toPx(p.z)) : ctx.moveTo(toPx(p.x), toPx(p.z))));
       ctx.closePath();
       ctx.stroke();
     }
@@ -1110,11 +1185,36 @@ export class Environment {
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = this.game.renderer.capabilities.getMaxAnisotropy();
-    const cityGround = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.92, envMapIntensity: 0.4 }));
-    cityGround.rotation.x = -Math.PI / 2;
-    cityGround.receiveShadow = true;
-    this.scene.add(cityGround);
-    this.shootables.push(cityGround);
+    // Suelo en losetas de 140 m: las que tienen cuestas van en rejilla de 4 m (la misma que su física)
+    // desplazada con la altura; las llanas son un solo quad. Así hay recorte por cámara y pocos triángulos.
+    const groundMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.92, envMapIntensity: 0.4 });
+    const tile = 140;
+    const tiles = [];
+    for (let tz = -size / 2; tz < size / 2; tz += tile) {
+      for (let tx = -size / 2; tx < size / 2; tx += tile) {
+        let hilly = false;
+        for (let z = tz; z <= tz + tile && !hilly; z += 4) for (let x = tx; x <= tx + tile && !hilly; x += 4) if (cityHill(x, z) > 0) hilly = true;
+        const seg = hilly ? tile / 4 : 1;
+        const geo = new THREE.PlaneGeometry(tile, tile, seg, seg);
+        geo.rotateX(-Math.PI / 2);
+        geo.translate(tx + tile / 2, 0, tz + tile / 2);
+        const gp = geo.attributes.position;
+        const guv = geo.attributes.uv;
+        for (let i = 0; i < gp.count; i++) {
+          const x = gp.getX(i);
+          const z = gp.getZ(i);
+          if (hilly) gp.setY(i, cityHill(x, z));
+          guv.setXY(i, (x + size / 2) / size, 1 - (z + size / 2) / size);
+        }
+        geo.computeVertexNormals();
+        const mesh = new THREE.Mesh(geo, groundMat);
+        mesh.receiveShadow = true;
+        this.scene.add(mesh);
+        this.shootables.push(mesh);
+        tiles.push(mesh);
+      }
+    }
+    this.groundTiles = tiles;
 
     const outer = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshStandardMaterial({ color: 0x3f5a31, roughness: 1 }));
     outer.rotation.x = -Math.PI / 2;
@@ -1158,7 +1258,19 @@ export class Environment {
     const strip = (list, x1, z1, x2, z2, width) => {
       const len = Math.hypot(x2 - x1, z2 - z1);
       if (len < 0.05) return;
-      list.push([(x1 + x2) / 2, (z1 + z2) / 2, Math.atan2(x2 - x1, z2 - z1), width, len]);
+      // En las cuestas se parte en tramos de ≤ 2 m que siguen la pendiente
+      const hilly = cityHill(x1, z1) > 0 || cityHill(x2, z2) > 0 || cityHill((x1 + x2) / 2, (z1 + z2) / 2) > 0;
+      const n = hilly ? Math.ceil(len / 2) : 1;
+      for (let k = 0; k < n; k++) {
+        const ax = x1 + ((x2 - x1) * k) / n;
+        const az = z1 + ((z2 - z1) * k) / n;
+        const bx = x1 + ((x2 - x1) * (k + 1)) / n;
+        const bz = z1 + ((z2 - z1) * (k + 1)) / n;
+        const ya = hilly ? cityHill(ax, az) : 0;
+        const yb = hilly ? cityHill(bx, bz) : 0;
+        const l = len / n;
+        list.push([(ax + bx) / 2, (az + bz) / 2, Math.atan2(x2 - x1, z2 - z1), width, Math.hypot(l, yb - ya), (ya + yb) / 2, -Math.atan2(yb - ya, l)]);
+      }
     };
     // Recorre una línea desplazada `off` del eje de la calle; dash = [trazo, hueco] o null (continua)
     const line = (road, list, off, width, dash) => {
@@ -1229,9 +1341,11 @@ export class Environment {
       const up = new THREE.Vector3(0, 1, 0);
       const sc = new THREE.Vector3();
       const p = new THREE.Vector3();
-      list.forEach(([x, z, ang, w, len], i) => {
-        q.setFromAxisAngle(up, ang);
-        m.compose(p.set(x, 0.025, z), q, sc.set(w, 1, len));
+      const e = new THREE.Euler(0, 0, 0, 'YXZ');
+      list.forEach(([x, z, ang, w, len, y = 0, pitch = 0], i) => {
+        if (pitch) q.setFromEuler(e.set(pitch, ang, 0, 'YXZ'));
+        else q.setFromAxisAngle(up, ang);
+        m.compose(p.set(x, y + 0.025, z), q, sc.set(w, 1, len));
         im.setMatrixAt(i, m);
       });
       im.receiveShadow = true;
@@ -1506,13 +1620,13 @@ export class Environment {
     return m;
   }
 
-  /** Altura del suelo en (x, z): montaña, isla o cero. Para colocar coches y la cámara. */
+  /** Altura del suelo en (x, z): montaña, cuestas de la ciudad, motocross, isla o cero. Para colocar coches y la cámara. */
   groundHeight(x, z, refY = Infinity) {
     if (Math.hypot(x - ISLAND.x, z - ISLAND.z) < ISLAND.r) return ISLAND.top;
     // Dentro del túnel el suelo es la calzada (y = 0), no la montaña que hay encima.
     // refY = altura de quien pregunta: por debajo de la losa del túnel, estás dentro.
     if (refY < 9 && Math.abs(x) < RIDGE.corridor + 1.5 && Math.abs(z - RIDGE.zc) < RIDGE.tunnelHalf + 2) return 0;
-    return Math.max(hillHeight(x, z), this.rollingHeight ? this.rollingHeight(x, z) : 0);
+    return Math.max(hillHeight(x, z), cityHill(x, z), this.motocrossHeight(x, z));
   }
 
   /** ¿Es mar abierto (ni isla, ni bajo el puente con los pies en él)? */
@@ -1583,31 +1697,91 @@ export class Environment {
     mesh.receiveShadow = true;
     this.scene.add(mesh);
 
-    // Puente sobre el barranco: tablero apoyado en la cresta a ambos lados, barandillas y pilas
+    // Puente sobre el barranco: tablero continuo apoyado en estribos de piedra a ambos lados y
+    // sostenido por dos arcos de acero que nacen de las paredes del barranco, con montantes cada 3 m
     const body = new CANNON.Body({ mass: 0, material: this.groundMaterial, collisionFilterGroup: GROUPS.STATIC });
     const z = RIDGE.zc;
-    const xa = GORGE.x - GORGE.half - 2;
-    const xb = GORGE.x + GORGE.half + 2;
-    const a = new THREE.Vector3(xa, mountainBase(xa, z) + 0.05, z);
-    const b = new THREE.Vector3(xb, mountainBase(xb, z) + 0.05, z);
-    const red = new THREE.MeshStandardMaterial({ color: 0xa3352b, roughness: 0.55, metalness: 0.4 });
-    this.slab(body, a, b, { width: 10, thick: 0.8 });
-    for (const sd of [-1, 1]) this.slab(body, a, b, { width: 0.3, thick: 1.1, up: 1.1, side: sd * 5.1, mat: red });
-    const mid = a.clone().add(b).multiplyScalar(0.5);
-    const floor = hillHeight(GORGE.x, z);
-    for (const dz of [-3.5, 3.5]) {
-      const pillar = new THREE.Mesh(new THREE.BoxGeometry(1.4, mid.y - floor, 1.4), this.concreteMat);
-      pillar.position.set(mid.x, floor + (mid.y - floor) / 2 - 0.8, z + dz);
-      pillar.castShadow = true;
-      this.scene.add(pillar);
-      body.addShape(new CANNON.Box(new CANNON.Vec3(0.7, (mid.y - floor) / 2, 0.7)), new CANNON.Vec3(pillar.position.x, pillar.position.y, pillar.position.z));
+    const xa = GORGE.x - GORGE.half - 4;
+    const xb = GORGE.x + GORGE.half + 4;
+    const deckY = (x) => mountainBase(x, z) + 0.06;
+    const dpts = [];
+    for (let x = xa; x <= xb + 0.001; x += 2) dpts.push(new THREE.Vector3(x, deckY(x), z));
+    const deckTex = this.bridgeRoadTexture();
+    const red = new THREE.MeshStandardMaterial({ color: 0xa3352b, roughness: 0.5, metalness: 0.45 });
+    this.deckMesh(dpts, 10, 0.9, new THREE.MeshStandardMaterial({ map: deckTex, roughness: 0.85, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }), red);
+    // Física: losas cortas que siguen el tablero y pretiles
+    for (let i = 0; i < dpts.length - 1; i++) {
+      const a = dpts[i];
+      const b = dpts[i + 1];
+      const pitch = Math.atan2(b.y - a.y, b.x - a.x); // giro alrededor de Z (el puente va en X)
+      const q = new CANNON.Quaternion().setFromEuler(0, 0, pitch);
+      const c = a.clone().add(b).multiplyScalar(0.5);
+      const L = a.distanceTo(b);
+      body.addShape(new CANNON.Box(new CANNON.Vec3(L / 2 + 0.05, 0.4, 5)), new CANNON.Vec3(c.x + Math.sin(pitch) * 0.4, c.y - Math.cos(pitch) * 0.4, c.z), q);
+      for (const sd of [-1, 1]) body.addShape(new CANNON.Box(new CANNON.Vec3(L / 2 + 0.05, 0.6, 0.15)), new CANNON.Vec3(c.x, c.y + 0.6, c.z + sd * 4.85), q);
     }
-    // Arco de acero bajo el tablero
-    const arch = new THREE.Mesh(new THREE.TorusGeometry((xb - xa) / 2 - 2, 0.45, 8, 24, Math.PI), red);
-    arch.position.set(mid.x, mid.y - 0.9, z);
-    arch.rotation.z = Math.PI;
-    arch.scale.y = 0.55;
-    this.scene.add(arch);
+    // Barandilla: postes cada 2 m y dos pasamanos que siguen el tablero
+    const railMat = new THREE.MeshStandardMaterial({ color: 0xd8dde2, roughness: 0.35, metalness: 0.7 });
+    for (const sd of [-1, 1]) {
+      for (const hy of [0.55, 1.1]) this.deckMesh(dpts.map((p) => new THREE.Vector3(p.x, p.y + hy, z + sd * 4.85)), 0.1, 0.08, railMat, railMat);
+      for (const p of dpts) {
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.1, 0.1), railMat);
+        post.position.set(p.x, p.y + 0.55, z + sd * 4.85);
+        this.scene.add(post);
+      }
+    }
+    // Arcos: nacen en las paredes donde el terreno está ~11 m por debajo del tablero
+    const spring = (x0, dir) => {
+      let x = x0;
+      for (let k = 0; k < 40; k++, x += dir * 0.5) if (deckY(x) - hillHeight(x, z) > 11) break;
+      return new THREE.Vector3(x, hillHeight(x, z) + 0.3, z);
+    };
+    const s1 = spring(xa + 2, 1);
+    const s2 = spring(xb - 2, -1);
+    const midX = (s1.x + s2.x) / 2;
+    const apex = new THREE.Vector3(midX, deckY(midX) - 1.4, z);
+    const ctrl = apex.clone().multiplyScalar(2).sub(s1.clone().add(s2).multiplyScalar(0.5)); // la Bézier pasa por el ápice
+    const posts = [];
+    for (const dz of [-3.4, 3.4]) {
+      const curve = new THREE.QuadraticBezierCurve3(s1.clone().setZ(z + dz), ctrl.clone().setZ(z + dz), s2.clone().setZ(z + dz));
+      this.scene.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 40, 0.45, 8), red));
+      // montantes verticales del arco al tablero
+      for (let k = 1; k < 40; k++) {
+        const p = curve.getPoint(k / 40);
+        if (Math.abs(p.x - Math.round(p.x / 3) * 3) > 0.4) continue;
+        const top = deckY(p.x) - 0.9;
+        if (top - p.y > 0.4) posts.push([p.x, p.y, z + dz, top - p.y]);
+      }
+      // zapatas de hormigón en el arranque del arco
+      for (const sp of [s1, s2]) {
+        const shoe = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.6, 2), this.concreteMat);
+        shoe.position.set(sp.x, sp.y, z + dz);
+        this.scene.add(shoe);
+      }
+    }
+    // Riostras entre los dos arcos
+    for (let k = 2; k < 40; k += 4) {
+      const p = new THREE.QuadraticBezierCurve3(s1, ctrl, s2).getPoint(k / 40);
+      const brace = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 6.8), red);
+      brace.position.copy(p);
+      this.scene.add(brace);
+    }
+    const postGeo = new THREE.BoxGeometry(0.35, 1, 0.35);
+    postGeo.translate(0, 0.5, 0);
+    const pim = new THREE.InstancedMesh(postGeo, red, posts.length);
+    const mm = new THREE.Matrix4();
+    posts.forEach(([px, py, pz, ph], k) => pim.setMatrixAt(k, mm.makeScale(1, ph, 1).setPosition(px, py, pz)));
+    pim.castShadow = true;
+    this.scene.add(pim);
+    // Estribos de piedra en los extremos (tapan el corte entre la carretera y el tablero)
+    for (const ex of [xa, xb]) {
+      const g = hillHeight(ex, z);
+      const top = deckY(ex);
+      const ab = new THREE.Mesh(new THREE.BoxGeometry(3, top - g + 6, 11), this.plinthMat);
+      ab.position.set(ex + (ex === xa ? -0.5 : 0.5), (top - 0.9 + g - 6) / 2, z);
+      ab.castShadow = ab.receiveShadow = true;
+      this.scene.add(ab);
+    }
     this.world.addBody(body);
   }
 
@@ -1647,50 +1821,229 @@ export class Environment {
     this.scene.add(lamp, cap);
     body.addShape(new CANNON.Cylinder(2.9, 2.9, 20, 10), new CANNON.Vec3(fx, I.top + 10, fz));
 
-    // Puente: rampa de subida desde el paseo, tablero sobre el agua y rampa de bajada a la isla
-    const p0 = new THREE.Vector3(B.x, 0.03, B.z0);
-    const p1 = new THREE.Vector3(B.x, B.deck, B.z1);
-    const p2 = new THREE.Vector3(B.x, B.deck, B.z2);
-    const p3 = new THREE.Vector3(B.x, I.top + 0.03, B.z3);
-    const deckMat = new THREE.MeshStandardMaterial({ color: 0x55585e, roughness: 0.85 });
-    const rail = new THREE.MeshStandardMaterial({ color: 0xd8dde2, roughness: 0.4, metalness: 0.6 });
-    for (const [a, b] of [[p0, p1], [p1, p2], [p2, p3]]) {
-      this.slab(body, a, b, { width: B.w, thick: 0.7, mat: deckMat });
-      for (const sd of [-1, 1]) this.slab(body, a, b, { width: 0.25, thick: 1.1, up: 1.1, side: sd * (B.w / 2 + 0.1), mat: rail });
-    }
-    // Torres y cables (decorado)
-    const tower = new THREE.MeshStandardMaterial({ color: 0xb23a2e, roughness: 0.5, metalness: 0.3 });
-    const towers = [B.z1 + 14, B.z2 - 14];
-    for (const tz of towers) {
-      for (const sd of [-1, 1]) {
-        const t = new THREE.Mesh(new THREE.BoxGeometry(1.2, 24, 1.2), tower);
-        t.position.set(B.x + sd * (B.w / 2 + 0.8), B.deck + 12 - 4, tz);
-        t.castShadow = true;
-        this.scene.add(t);
-        body.addShape(new CANNON.Box(new CANNON.Vec3(0.6, 12, 0.6)), new CANNON.Vec3(t.position.x, t.position.y, t.position.z));
-      }
-      const beam = new THREE.Mesh(new THREE.BoxGeometry(B.w + 3, 1.2, 1.2), tower);
-      beam.position.set(B.x, B.deck + 19, tz);
-      this.scene.add(beam);
-    }
-    const cableMat = new THREE.MeshStandardMaterial({ color: 0x30343a, roughness: 0.5, metalness: 0.7 });
-    for (const sd of [-1, 1]) {
-      const x = B.x + sd * (B.w / 2 + 0.8);
-      const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(x, B.deck + 19, towers[0]), new THREE.Vector3(x, B.deck + 3, (towers[0] + towers[1]) / 2), new THREE.Vector3(x, B.deck + 19, towers[1]));
-      this.scene.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 24, 0.12, 5), cableMat));
-      for (const [from, to] of [[new THREE.Vector3(x, B.deck + 19, towers[0]), new THREE.Vector3(x, B.deck + 1, B.z1)], [new THREE.Vector3(x, B.deck + 19, towers[1]), new THREE.Vector3(x, B.deck + 1, B.z2)]]) {
-        this.scene.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(from, to), 1, 0.1, 5), cableMat));
-      }
-    }
-    // Pilas en el agua
-    for (const pz of [B.z1 + 8, (B.z1 + B.z2) / 2, B.z2 - 8]) {
-      const pile = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.3, B.deck, 10), this.concreteMat);
-      pile.position.set(B.x, B.deck / 2 - 0.7, pz);
-      this.scene.add(pile);
-    }
+    this.createBayBridge(body);
     this.world.addBody(body);
     // Sin edificios ni árboles en el arranque del puente
     this.reserved.push({ minX: B.x - B.w, maxX: B.x + B.w, minZ: B.z0 - 12, maxZ: B.z1 });
+  }
+
+  /**
+   * Tablero continuo a lo largo de una polilínea 3D (calzada arriba, cantos y fondo): sin las juntas
+   * ni los escalones de encadenar losas. side = [izq, der] desplazamientos laterales del borde.
+   */
+  deckMesh(points, width, thick, topMat, sideMat, vScale = 0.1) {
+    const pos = [];
+    const uv = [];
+    const idx = [];
+    const groups = [];
+    let len = 0;
+    const n = points.length;
+    const frames = points.map((p, i) => {
+      const a = points[Math.max(0, i - 1)];
+      const b = points[Math.min(n - 1, i + 1)];
+      const t = new THREE.Vector3().subVectors(b, a).normalize();
+      const r = new THREE.Vector3(-t.z, 0, t.x).normalize();
+      if (i > 0) len += p.distanceTo(points[i - 1]);
+      return { p, r, v: len * vScale };
+    });
+    const h = width / 2;
+    // 4 tiras: arriba (0), fondo (1), lado izq. (2), lado der. (3)
+    const strips = [
+      [(f) => f.p.clone().addScaledVector(f.r, -h), (f) => f.p.clone().addScaledVector(f.r, h), 0],
+      [(f) => f.p.clone().addScaledVector(f.r, h).setY(f.p.y - thick), (f) => f.p.clone().addScaledVector(f.r, -h).setY(f.p.y - thick), 1],
+      [(f) => f.p.clone().addScaledVector(f.r, -h).setY(f.p.y - thick), (f) => f.p.clone().addScaledVector(f.r, -h), 1],
+      [(f) => f.p.clone().addScaledVector(f.r, h), (f) => f.p.clone().addScaledVector(f.r, h).setY(f.p.y - thick), 1],
+    ];
+    for (const [A, B, mat] of strips) {
+      const start = idx.length;
+      const v0 = pos.length / 3;
+      frames.forEach((f, i) => {
+        const a = A(f);
+        const b = B(f);
+        pos.push(a.x, a.y, a.z, b.x, b.y, b.z);
+        uv.push(0, f.v, 1, f.v);
+        if (i > 0) {
+          const k = v0 + i * 2;
+          idx.push(k - 2, k - 1, k, k - 1, k + 1, k);
+        }
+      });
+      groups.push([start, idx.length - start, mat]);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setIndex(idx);
+    for (const [st, c, m] of groups) geo.addGroup(st, c, m);
+    geo.computeVertexNormals();
+    const mesh = new THREE.Mesh(geo, [topMat, sideMat]);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    this.scene.add(mesh);
+    this.shootables.push(mesh);
+    return mesh;
+  }
+
+  /** Textura de calzada de puente: dos carriles, bordes blancos y eje amarillo. */
+  bridgeRoadTexture() {
+    return toTexture(
+      makeCanvas(128, 128, (ctx, W, H) => {
+        ctx.fillStyle = '#4a4c52';
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#9a9890'; // bordillo
+        ctx.fillRect(0, 0, 7, H);
+        ctx.fillRect(W - 7, 0, 7, H);
+        ctx.fillStyle = '#e2e2de';
+        ctx.fillRect(10, 0, 3, H);
+        ctx.fillRect(W - 13, 0, 3, H);
+        ctx.fillStyle = '#dcae2e';
+        ctx.fillRect(W / 2 - 3, 0, 2, H);
+        ctx.fillRect(W / 2 + 1, 0, 2, H);
+        addNoise(ctx, W, H, 14, this.rand);
+      })
+    );
+  }
+
+  /**
+   * Puente colgante de la bahía: tablero continuo con rampas suaves, pretiles, dos torres pórtico
+   * con tres riostras, cables principales en catenaria anclados en tierra, péndolas cada 4 m,
+   * farolas y pilas en las rampas. La física son cajas cortas que siguen el perfil.
+   */
+  createBayBridge(body) {
+    const B = BAY_BRIDGE;
+    const x = B.x;
+    const half = B.w / 2;
+    // Perfil cada 2 m
+    const pts = [];
+    for (let z = B.z0 - 2; z <= B.z3 + 2.001; z += 2) pts.push(new THREE.Vector3(x, bayDeckY(z), z));
+    const roadTex = this.bridgeRoadTexture();
+    const topMat = new THREE.MeshStandardMaterial({ map: roadTex, roughness: 0.85, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+    const girder = new THREE.MeshStandardMaterial({ color: 0x9a3b2c, roughness: 0.55, metalness: 0.45 });
+    this.deckMesh(pts, B.w, 1.1, topMat, girder);
+    // Pretiles de hormigón con pasamanos
+    const parapet = new THREE.MeshStandardMaterial({ color: 0xc9c6bd, roughness: 0.8 });
+    const railMat = new THREE.MeshStandardMaterial({ color: 0xd8dde2, roughness: 0.35, metalness: 0.7 });
+    for (const sd of [-1, 1]) {
+      const edge = pts.map((p) => new THREE.Vector3(x + sd * (half - 0.2), p.y + 0.75, p.z));
+      this.deckMesh(edge, 0.4, 0.75, parapet, parapet);
+      const rail = pts.map((p) => new THREE.Vector3(x + sd * (half - 0.2), p.y + 1.15, p.z));
+      this.deckMesh(rail, 0.12, 0.08, railMat, railMat);
+    }
+    // Física: losas de 2 m (calzada) y pretiles bajos
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i];
+      const b = pts[i + 1];
+      const d = new THREE.Vector3().subVectors(b, a);
+      const L = d.length();
+      const pitch = -Math.atan2(d.y, Math.hypot(d.x, d.z));
+      const q = new CANNON.Quaternion().setFromEuler(pitch, 0, 0, 'YXZ');
+      const c = a.clone().add(b).multiplyScalar(0.5);
+      const nrm = new THREE.Vector3(0, 1, 0).applyAxisAngle(new THREE.Vector3(1, 0, 0), pitch);
+      body.addShape(new CANNON.Box(new CANNON.Vec3(half, 0.4, L / 2 + 0.05)), new CANNON.Vec3(c.x - nrm.x * 0.4, c.y - nrm.y * 0.4, c.z - nrm.z * 0.4), q);
+      for (const sd of [-1, 1]) body.addShape(new CANNON.Box(new CANNON.Vec3(0.2, 0.6, L / 2 + 0.05)), new CANNON.Vec3(c.x + sd * (half - 0.2), c.y + 0.6, c.z), q);
+    }
+
+    // Torres pórtico (color "naranja internacional"), sobre zócalos en el agua
+    const towerMat = new THREE.MeshStandardMaterial({ color: 0xc0412b, roughness: 0.5, metalness: 0.35 });
+    const cx = half + 1.3; // plano de los cables y de las patas
+    for (const tz of B.towers) {
+      const foot = new THREE.Mesh(new THREE.BoxGeometry(cx * 2 + 4, 4, 6), this.concreteMat);
+      foot.position.set(x, -1.2, tz);
+      foot.castShadow = foot.receiveShadow = true;
+      this.scene.add(foot);
+      for (const sd of [-1, 1]) {
+        const legH = B.top + 1;
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(1.5, legH, 1.9), towerMat);
+        leg.geometry.translate(0, legH / 2, 0);
+        // ligeramente más estrechas arriba
+        const lp = leg.geometry.attributes.position;
+        for (let i = 0; i < lp.count; i++) if (lp.getY(i) > legH / 2) lp.setXYZ(i, lp.getX(i) * 0.75, lp.getY(i), lp.getZ(i) * 0.8);
+        leg.geometry.computeVertexNormals();
+        leg.position.set(x + sd * cx, 0.8, tz);
+        leg.castShadow = true;
+        this.scene.add(leg);
+        body.addShape(new CANNON.Box(new CANNON.Vec3(0.75, legH / 2, 0.95)), new CANNON.Vec3(x + sd * cx, 0.8 + legH / 2, tz));
+      }
+      // Riostras: bajo el tablero, a media altura y arriba (con un remate en la cumbre)
+      for (const [y, hgt] of [[bayDeckY(tz) - 1.6, 1.4], [B.deck + 13, 1.6], [B.top - 0.6, 2.2]]) {
+        const beam = new THREE.Mesh(new THREE.BoxGeometry(cx * 2 + 1.2, hgt, 1.5), towerMat);
+        beam.position.set(x, y, tz);
+        beam.castShadow = true;
+        this.scene.add(beam);
+      }
+      for (const sd of [-1, 1]) {
+        const saddle = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.8, 2.6), this.poleMaterial);
+        saddle.position.set(x + sd * cx, B.top + 0.5, tz);
+        this.scene.add(saddle);
+      }
+    }
+    // Cables principales: anclaje → torre (tramo lateral) → vano central (parábola) → torre → anclaje
+    const [t1, t2] = B.towers;
+    const [a1, a2] = B.anchors;
+    const lowMid = bayDeckY((t1 + t2) / 2) + 2.2;
+    const cableY = (z) => {
+      if (z <= t1) {
+        const t = (z - a1) / (t1 - a1);
+        const y0 = bayDeckY(a1) + 1.5;
+        return y0 + (B.top + 0.9 - y0) * t - 2.5 * Math.sin(Math.PI * t);
+      }
+      if (z >= t2) {
+        const t = (a2 - z) / (a2 - t2);
+        const y0 = bayDeckY(a2) + 1.5;
+        return y0 + (B.top + 0.9 - y0) * t - 2.5 * Math.sin(Math.PI * t);
+      }
+      const u = (z - (t1 + t2) / 2) / ((t2 - t1) / 2);
+      return lowMid + (B.top + 0.9 - lowMid) * u * u;
+    };
+    const cableMat = new THREE.MeshStandardMaterial({ color: 0xb23a2a, roughness: 0.45, metalness: 0.5 });
+    const hangers = [];
+    for (const sd of [-1, 1]) {
+      const cp = [];
+      for (let z = a1; z <= a2 + 0.001; z += 1) cp.push(new THREE.Vector3(x + sd * cx, cableY(z), z));
+      this.scene.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(cp), cp.length, 0.28, 6), cableMat));
+      for (let z = a1 + 4; z < a2 - 2; z += 4) {
+        if (B.towers.some((tz) => Math.abs(tz - z) < 2)) continue;
+        const yTop = cableY(z);
+        const yBot = bayDeckY(z) + 0.2;
+        if (yTop - yBot > 0.5) hangers.push([x + sd * cx, yBot, z, yTop - yBot]);
+      }
+      // Bloques de anclaje en tierra y en la isla
+      for (const az of [a1, a2]) {
+        const blk = new THREE.Mesh(new THREE.BoxGeometry(2, 3.2, 5), this.concreteMat);
+        blk.position.set(x + sd * (cx + 0.3), bayDeckY(az) + 0.6, az + (az === a1 ? -1.5 : 1.5));
+        blk.castShadow = blk.receiveShadow = true;
+        this.scene.add(blk);
+        body.addShape(new CANNON.Box(new CANNON.Vec3(1, 1.6, 2.5)), new CANNON.Vec3(blk.position.x, blk.position.y, blk.position.z));
+      }
+    }
+    const hgGeo = new THREE.CylinderGeometry(0.06, 0.06, 1, 5);
+    hgGeo.translate(0, 0.5, 0);
+    const hg = new THREE.InstancedMesh(hgGeo, this.poleMaterial, hangers.length);
+    const m = new THREE.Matrix4();
+    hangers.forEach(([hx, hy, hz, hl], k) => hg.setMatrixAt(k, m.makeScale(1, hl, 1).setPosition(hx, hy, hz)));
+    this.scene.add(hg);
+    // Pilas bajo las rampas (donde el tablero va alto)
+    for (const pz of [342, 350, 440, 448]) {
+      const y = bayDeckY(pz) - 1.1;
+      if (y < 1) continue;
+      for (const sd of [-1, 1]) {
+        const pile = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.65, y + 2, 12), this.concreteMat);
+        pile.position.set(x + sd * 3, (y - 2) / 2, pz);
+        pile.castShadow = true;
+        this.scene.add(pile);
+      }
+    }
+    // Farolas a ambos lados cada 16 m
+    const lampMat = (this.bridgeLampMat = new THREE.MeshStandardMaterial({ color: 0x8a8a8a, emissive: 0xffd9a0, emissiveIntensity: 0 }));
+    for (let z = B.z0 + 10; z < B.z3 - 6; z += 16) {
+      for (const sd of [-1, 1]) {
+        const y = bayDeckY(z);
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 5, 6), this.poleMaterial);
+        pole.position.set(x + sd * (half - 0.2), y + 3.2, z);
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.12, 0.3), lampMat);
+        head.position.set(x + sd * (half - 0.6), y + 5.7, z);
+        this.scene.add(pole, head);
+      }
+    }
   }
 
   /** Rampas de salto con franjas amarillas y negras. */
@@ -1774,122 +2127,495 @@ export class Environment {
     return curve;
   }
 
-  /** Zona ondulada que contiene (x, z), o null. */
-  rollingZone(x, z) {
-    for (const Z of ROLLING) if (x > Z.x0 && x < Z.x1 && z > Z.z0 && z < Z.z1) return Z;
-    return null;
-  }
-
-  /** Altura de las colinas onduladas (0 junto a la circunvalación y en los bordes). */
-  rollingHeight(x, z) {
-    const Z = this.rollingZone(x, z);
-    if (!Z) return 0;
-    const edge = Math.min(x - Z.x0, Z.x1 - x, z - Z.z0, Z.z1 - z);
-    let f = smooth(0, 16, edge);
-    if (f <= 0) return 0;
-    const clear = this.clearance(x, z);
-    f *= smooth(3, 14, clear);
-    if (f <= 0) return 0;
-    const k = Z.seed;
-    const w = 0.55 + 0.25 * Math.sin(x / 13 + z / 29 + k) * Math.cos(z / 21 - x / 37 + k) + 0.2 * Math.sin(z / 9.5 + k * 3);
-    return Z.amp * f * Math.max(0, w);
-  }
-
-  /** Distancia al circuito de una zona (en metros). */
-  distToLoop(Z, x, z) {
-    let best = Infinity;
-    const L = Z.loop;
-    for (let i = 0; i < L.length; i++) {
-      const [ax, az] = L[i];
-      const [bx, bz] = L[(i + 1) % L.length];
-      const dx = bx - ax;
-      const dz = bz - az;
-      const t = Math.min(1, Math.max(0, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz)));
-      best = Math.min(best, Math.hypot(ax + dx * t - x, az + dz * t - z));
+  // ------------------------------------------------------------------
+  // Circuito de motocross
+  // ------------------------------------------------------------------
+  /**
+   * Trazado: cuatro rectas en serpentín unidas por curvas de herradura y una recta de salida,
+   * muestreado cada metro. Cada muestra lleva su altura de pista (saltos, mesetas, whoops,
+   * rodillos y una subida grande) y su curvatura (para los peraltes).
+   */
+  buildMotocrossTrack() {
+    const lanes = [-513, -496, -479, -462];
+    const zS = -232;
+    const pts = [];
+    const push = (x, z) => {
+      const l = pts[pts.length - 1];
+      if (!l || Math.hypot(l[0] - x, l[1] - z) > 0.05) pts.push([x, z]);
+    };
+    const arc = (cx, cz, r, a0, a1) => {
+      const n = Math.ceil((Math.abs(a1 - a0) * r) / 0.5);
+      for (let k = 0; k <= n; k++) {
+        const t = a0 + ((a1 - a0) * k) / n;
+        push(cx + Math.cos(t) * r, cz + Math.sin(t) * r);
+      }
+    };
+    // Rectas con un ligero eslalon (se anula cerca de las curvas)
+    const straight = (li, zA, zB) => {
+      const n = Math.ceil(Math.abs(zB - zA) / 0.5);
+      for (let k = 0; k <= n; k++) {
+        const z = zA + ((zB - zA) * k) / n;
+        const fade = smooth(0, 18, Math.abs(z - zA)) * smooth(0, 18, Math.abs(zB - z));
+        push(lanes[li] + 2.2 * Math.sin((z - li * 37) / 19) * fade, z);
+      }
+    };
+    const lap = [];
+    const mark = (name) => lap.push([name, pts.length]);
+    mark('salida');
+    push(-470, 118);
+    push(-505, 118);
+    arc(-505, 110, 8, Math.PI / 2, Math.PI);
+    mark('r0');
+    straight(0, 110, zS);
+    arc(-504.5, zS, 8.5, Math.PI, 2 * Math.PI);
+    mark('r1');
+    straight(1, zS, 92);
+    arc(-487.5, 92, 8.5, Math.PI, 0);
+    mark('r2');
+    straight(2, 92, zS);
+    arc(-470.5, zS, 8.5, Math.PI, 2 * Math.PI);
+    mark('r3');
+    straight(3, zS, 110);
+    arc(-470, 110, 8, 0, Math.PI / 2);
+    pts.pop(); // el último coincide con el primero (la curva es cerrada)
+    // Remuestreo uniforme cada metro
+    const curve = new THREE.CatmullRomCurve3(pts.map(([x, z]) => new THREE.Vector3(x, 0, z)), true, 'centripetal');
+    const L = curve.getLength();
+    const N = Math.round(L);
+    const samples = curve.getSpacedPoints(N).slice(0, N);
+    // Primera muestra de cada tramo (para colocar los obstáculos en metros desde su inicio)
+    const near = (x, z) => {
+      let best = 0;
+      let bd = Infinity;
+      samples.forEach((p, i) => {
+        const d = (p.x - x) ** 2 + (p.z - z) ** 2;
+        if (d < bd) {
+          bd = d;
+          best = i;
+        }
+      });
+      return best;
+    };
+    const start = {};
+    for (const [name, idx] of lap) {
+      const q = pts[Math.min(pts.length - 1, idx)];
+      start[name] = near(q[0], q[1]);
     }
-    return best;
+    // Perfil: lista de [inicio (m), función(u) -> altura]
+    const table = (h, up, top, down) => (u) => (u < 0 ? 0 : u < up ? h * smooth(0, 1, u / up) ** 0.7 : u < up + top ? h : u < up + top + down ? h * (1 - smooth(0, 1, (u - up - top) / down)) : 0);
+    const kicker = (h, up) => (u) => (u >= 0 && u < up ? h * (u / up) ** 1.3 : 0);
+    const landing = (h, down) => (u) => (u >= 0 && u < down ? h * (1 - smooth(0, 1, u / down)) : 0);
+    const roller = (h, len, n = 1) => (u) => (u >= 0 && u < len * n ? h * 0.5 * (1 - Math.cos((2 * Math.PI * u) / len)) : 0);
+    const F = [];
+    const at = (lane, u, f) => F.push([lane, u, f]);
+    // Recta 0: meseta, doble, whoops, escalón y rodillo
+    at('r0', 25, table(2, 7, 9, 10));
+    at('r0', 82, kicker(2.2, 7));
+    at('r0', 102, landing(2.2, 11));
+    at('r0', 150, roller(0.7, 5, 7));
+    at('r0', 210, table(2.5, 9, 26, 14));
+    at('r0', 292, roller(1.2, 14));
+    // Recta 1: rodillos, el salto grande y una meseta
+    at('r1', 28, roller(2.2, 22, 3));
+    at('r1', 128, kicker(2.8, 8));
+    at('r1', 152, landing(2.8, 13));
+    at('r1', 218, table(1.6, 6, 12, 9));
+    at('r1', 282, roller(1.2, 14));
+    // Recta 2: ritmo, whoops, La Cumbre (5 m) y meseta
+    at('r2', 22, roller(1.3, 9, 6));
+    at('r2', 104, roller(0.6, 4.5, 8));
+    at('r2', 160, roller(5, 64));
+    at('r2', 258, table(2.2, 7, 10, 10));
+    // Recta 3: doble, rodillos y meseta larga antes de la meta
+    at('r3', 28, kicker(2.4, 7));
+    at('r3', 47, landing(2.4, 11));
+    at('r3', 100, roller(1.6, 16, 4));
+    at('r3', 196, table(3, 12, 14, 13));
+    this.mxJumps = F.length;
+    const prof = new Float32Array(N);
+    for (const [lane, u0, f] of F) {
+      const i0 = start[lane];
+      for (let k = u0; k < u0 + 130; k++) {
+        const u = k - u0;
+        const h = f(u);
+        if (h > 0) {
+          const i = (i0 + k) % N;
+          prof[i] = Math.max(prof[i], h);
+        }
+      }
+    }
+    // Curvatura con signo (para el peralte del lado exterior)
+    const curv = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+      const a = samples[(i - 3 + N) % N];
+      const b = samples[i];
+      const c = samples[(i + 3) % N];
+      const t1 = Math.atan2(b.z - a.z, b.x - a.x);
+      const t2 = Math.atan2(c.z - b.z, c.x - b.x);
+      let d = t2 - t1;
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      curv[i] = d / 6;
+    }
+    this.mxTrack = { samples, prof, curv, N, startIdx: start.salida };
+    return this.mxTrack;
+  }
+
+  /** Rejilla de alturas del circuito (1 m) y marca de pista por nodo. */
+  buildMotocrossTerrain() {
+    const M = MOTOCROSS;
+    const T = this.buildMotocrossTrack();
+    const es = M.es;
+    const nx = Math.round((M.x1 - M.x0) / es);
+    const nz = Math.round((M.z1 - M.z0) / es);
+    const hash = new Map();
+    T.samples.forEach((p, i) => {
+      const k = `${Math.floor(p.x / 8)},${Math.floor(p.z / 8)}`;
+      if (!hash.has(k)) hash.set(k, []);
+      hash.get(k).push(i);
+    });
+    const H = new Float32Array((nx + 1) * (nz + 1));
+    const onTrack = new Uint8Array((nx + 1) * (nz + 1));
+    const half = M.half;
+    for (let j = 0; j <= nz; j++) {
+      for (let i = 0; i <= nx; i++) {
+        const x = M.x0 + i * es;
+        const z = M.z0 + j * es;
+        const edge = Math.min(x - M.x0, M.x1 - x, z - M.z0, M.z1 - z);
+        const fall = smooth(0, 7, edge);
+        // muestra de pista más cercana
+        let best = -1;
+        let bd = Infinity;
+        const cx = Math.floor(x / 8);
+        const cz = Math.floor(z / 8);
+        for (let a = -1; a <= 1; a++) {
+          for (let b = -1; b <= 1; b++) {
+            for (const idx of hash.get(`${cx + a},${cz + b}`) || []) {
+              const p = T.samples[idx];
+              const d = (p.x - x) ** 2 + (p.z - z) ** 2;
+              if (d < bd) {
+                bd = d;
+                best = idx;
+              }
+            }
+          }
+        }
+        const mounds = 0.3 * Math.max(0, Math.sin(x / 9 + 1.3) * Math.cos(z / 11));
+        let h = 0.25 + mounds;
+        if (best >= 0) {
+          const d = Math.sqrt(bd);
+          const p = T.samples[best];
+          const q = T.samples[(best + 1) % T.N];
+          const side = Math.sign((q.x - p.x) * (z - p.z) - (q.z - p.z) * (x - p.x)); // >0 a la izquierda
+          const k = T.curv[best];
+          const trackY = 0.4 + T.prof[best];
+          h = THREE.MathUtils.lerp(trackY, h, smooth(half, half + 4.5, d));
+          // Peralte: en el lado exterior de las curvas cerradas
+          if (Math.abs(k) > 1 / 25 && side === -Math.sign(k)) {
+            const bump = smooth(half - 2, half + 0.5, d) * (1 - smooth(half + 1.5, half + 4.5, d));
+            h += 1.6 * Math.min(1, Math.abs(k) * 7) * bump;
+          }
+          if (d < half + 0.6) onTrack[j * (nx + 1) + i] = 1;
+        }
+        H[j * (nx + 1) + i] = h * fall;
+      }
+    }
+    this.mx = { H, onTrack, nx, nz, es };
+  }
+
+  /** Altura del circuito de motocross (interpolada), 0 fuera. */
+  motocrossHeight(x, z) {
+    const M = MOTOCROSS;
+    const g = this.mx;
+    if (!g || x <= M.x0 || x >= M.x1 || z <= M.z0 || z >= M.z1) return 0;
+    const fx = (x - M.x0) / g.es;
+    const fz = (z - M.z0) / g.es;
+    const i = Math.min(g.nx - 1, Math.floor(fx));
+    const j = Math.min(g.nz - 1, Math.floor(fz));
+    const u = fx - i;
+    const v = fz - j;
+    const W = g.nx + 1;
+    const a = g.H[j * W + i];
+    const b = g.H[j * W + i + 1];
+    const c = g.H[(j + 1) * W + i];
+    const d = g.H[(j + 1) * W + i + 1];
+    return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
+  }
+
+  inMotocross(x, z, pad = 0) {
+    const M = MOTOCROSS;
+    return x > M.x0 - pad && x < M.x1 + pad && z > M.z0 - pad && z < M.z1 + pad;
   }
 
   /** Superficie bajo (x, z): null = asfalto. Para el agarre de los coches y el HUD. */
   surfaceAt(x, z, y = 0) {
-    const Z = this.rollingZone(x, z);
-    if (Z) {
-      if (this.rollingHeight(x, z) < 0.15 && this.clearance(x, z) < 1) return null;
-      return this.distToLoop(Z, x, z) < 4.5 ? Z.track : Z.ground;
+    if (this.inMotocross(x, z) && this.mx) {
+      const g = this.mx;
+      const i = Math.round((x - MOTOCROSS.x0) / g.es);
+      const j = Math.round((z - MOTOCROSS.z0) / g.es);
+      if (this.motocrossHeight(x, z) < 0.05) return null;
+      return g.onTrack[j * (g.nx + 1) + i] ? 'tierra' : 'hierba';
     }
     if (y > 1 && hillHeight(x, z) > 0.5 && this.distToSummitRoad(x, z) > 4.8) return 'hierba';
     return null;
   }
 
-  createRollingHills() {
-    const makeTex = (base, speck) =>
-      toTexture(
-        makeCanvas(64, 128, (ctx, W, H) => {
-          ctx.fillStyle = base;
-          ctx.fillRect(0, 0, W, H);
-          for (let i = 0; i < 260; i++) {
-            ctx.fillStyle = speck[i % speck.length];
-            ctx.fillRect(this.rand() * W, this.rand() * H, 1 + this.rand() * 2, 1 + this.rand() * 2);
+  /**
+   * Cuerpos Heightfield en trozos cuadrados de hasta 64 celdas: cannon-es calcula mal la caja de un
+   * Heightfield alargado y su rayo usa data.length como límite en los dos ejes (necesita datos cuadrados).
+   * fn(x, z) da la altura del nodo; (x0, z0) es la esquina de menor x y z.
+   */
+  addHeightfield(x0, z0, nx, nz, es, fn) {
+    const c = Math.min(nx, nz, 64);
+    const zTop = z0 + nz * es;
+    for (let a = 0; a * c < nx; a++) {
+      const i0 = Math.min(a * c, nx - c);
+      for (let b = 0; b * c < nz; b++) {
+        const j0 = Math.min(b * c, nz - c);
+        const data = [];
+        let any = false;
+        for (let i = 0; i <= c; i++) {
+          const col = [];
+          for (let j = 0; j <= c; j++) {
+            const h = fn(x0 + (i0 + i) * es, zTop - (j0 + j) * es);
+            if (h > 0.01) any = true;
+            col.push(h);
           }
-          // rodadas
-          ctx.fillStyle = 'rgba(0,0,0,0.12)';
-          ctx.fillRect(W * 0.22, 0, 7, H);
-          ctx.fillRect(W * 0.68, 0, 7, H);
-          addNoise(ctx, W, H, 16, this.rand);
-        })
-      );
-    const trackTex = { tierra: makeTex('#7a5a3a', ['#8d6b47', '#5f4329', '#9c7b55']), grava: makeTex('#9a948a', ['#c8c2b6', '#6f6a62', '#b0a99c']) };
-    for (const Z of ROLLING) {
-      // Malla con la misma rejilla de 4 m que la física
-      const es = 4;
-      const nx = Math.round((Z.x1 - Z.x0) / es);
-      const nz = Math.round((Z.z1 - Z.z0) / es);
-      const geo = new THREE.PlaneGeometry(nx * es, nz * es, nx, nz);
+          data.push(col);
+        }
+        if (!any) continue; // trozo llano: ya está el suelo infinito
+        const body = new CANNON.Body({ mass: 0, material: this.groundMaterial, collisionFilterGroup: GROUPS.TERRAIN });
+        body.addShape(new CANNON.Heightfield(data, { elementSize: es }));
+        body.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+        body.position.set(x0 + i0 * es, 0, zTop - j0 * es);
+        this.world.addBody(body);
+      }
+    }
+  }
+
+  /** Física de las cuestas de la ciudad (la malla es el propio suelo de la ciudad, desplazado). */
+  createCityHills() {
+    const es = 4;
+    for (const Z of CITY_HILLS) {
+      const x0 = Math.floor(Z.x0 / es) * es;
+      const z0 = Math.floor(Z.z0 / es) * es;
+      const nx = Math.ceil((Z.x1 - x0) / es);
+      const nz = Math.ceil((Z.z1 - z0) / es);
+      this.addHeightfield(x0, z0, nx, nz, es, cityHill);
+    }
+  }
+
+  createMotocross() {
+    const M = MOTOCROSS;
+    const g = this.mx;
+    const es = g.es;
+    // Malla con la misma rejilla que la física, en 4 trozos (recorte por cámara); color por vértice
+    const W = g.nx + 1;
+    const detail = toTexture(
+      makeCanvas(128, 128, (ctx, Wd, Hd) => {
+        ctx.fillStyle = '#d8d8d8';
+        ctx.fillRect(0, 0, Wd, Hd);
+        for (let k = 0; k < 900; k++) {
+          const v = 150 + Math.floor(this.rand() * 105);
+          ctx.fillStyle = `rgb(${v},${v},${v})`;
+          ctx.fillRect(this.rand() * Wd, this.rand() * Hd, 1 + this.rand() * 3, 1 + this.rand() * 2);
+        }
+        addNoise(ctx, Wd, Hd, 30, this.rand);
+      })
+    );
+    const mxMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: detail, roughness: 1 });
+    const parts = 4;
+    for (let part = 0; part < parts; part++) {
+      const j0 = Math.floor((g.nz * part) / parts);
+      const j1 = Math.floor((g.nz * (part + 1)) / parts);
+      const geo = new THREE.PlaneGeometry(g.nx * es, (j1 - j0) * es, g.nx, j1 - j0);
       geo.rotateX(-Math.PI / 2);
+      geo.translate(M.x0 + (g.nx * es) / 2, 0, M.z0 + ((j0 + j1) * es) / 2);
       const pos = geo.attributes.position;
+      const uv = geo.attributes.uv;
       const colors = new Float32Array(pos.count * 3);
-      const cx = Z.x0 + (nx * es) / 2;
-      const cz = Z.z0 + (nz * es) / 2;
-      const [c1, c2] = Z.colors;
-      for (let i = 0; i < pos.count; i++) {
-        const x = pos.getX(i) + cx;
-        const z = pos.getZ(i) + cz;
-        const h = this.rollingHeight(x, z);
-        pos.setXYZ(i, x, h - 0.3 * (1 - smooth(0.2, 2, h)), z);
-        const n = this.rand() * 0.06;
-        const k = Math.min(1, h / Z.amp);
-        colors[i * 3] = c1[0] + (c2[0] - c1[0]) * k + n;
-        colors[i * 3 + 1] = c1[1] + (c2[1] - c1[1]) * k + n;
-        colors[i * 3 + 2] = c1[2] + (c2[2] - c1[2]) * k + n;
+      for (let k = 0; k < pos.count; k++) {
+        const x = pos.getX(k);
+        const z = pos.getZ(k);
+        const i = Math.round((x - M.x0) / es);
+        const j = Math.round((z - M.z0) / es);
+        const h = g.H[j * W + i];
+        pos.setXYZ(k, x, h - 0.3 * (1 - smooth(0.05, 0.4, h)), z);
+        uv.setXY(k, x / 4, z / 4);
+        const n = this.rand() * 0.04;
+        let c;
+        if (g.onTrack[j * W + i]) {
+          // tierra: más oscura en las caras de los saltos y en el fondo de las rodadas
+          const dark = Math.min(0.12, Math.abs(h - (g.H[Math.max(0, j - 1) * W + i] || h)) * 0.08);
+          c = [0.5 - dark + n, 0.34 - dark + n, 0.2 - dark * 0.6 + n];
+        } else {
+          // campo: hierba seca; tierra suelta junto a la pista
+          let near = 0;
+          for (const [a, b] of [[2, 0], [-2, 0], [0, 2], [0, -2]]) if (g.onTrack[Math.min(g.nz, Math.max(0, j + b)) * W + Math.min(g.nx, Math.max(0, i + a))]) near = 1;
+          c = near ? [0.55 + n, 0.43 + n, 0.27 + n] : [0.47 + n, 0.5 + n, 0.25 + n];
+        }
+        _col.setRGB(c[0], c[1], c[2], THREE.SRGBColorSpace);
+        colors[k * 3] = _col.r;
+        colors[k * 3 + 1] = _col.g;
+        colors[k * 3 + 2] = _col.b;
       }
       geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
       geo.computeVertexNormals();
-      const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }));
+      const mesh = new THREE.Mesh(geo, mxMat);
       mesh.receiveShadow = true;
       this.scene.add(mesh);
       this.shootables.push(mesh);
-
-      // Física en trozos casi cuadrados: cannon-es calcula mal la caja envolvente de un
-      // Heightfield muy alargado y los rayos de las ruedas lo atravesaban
-      const chunk = nx; // trozos cuadrados (nx × nx celdas); el último se solapa con el anterior
-      for (let k = 0; k * chunk < nz; k++) {
-        const cz0 = Math.min(k * chunk, nz - chunk);
-        const cz1 = cz0 + chunk;
-        const data = [];
-        for (let i = 0; i <= nx; i++) {
-          const col = [];
-          for (let j = cz0; j <= cz1; j++) col.push(this.rollingHeight(Z.x0 + i * es, Z.z0 + nz * es - j * es));
-          data.push(col);
-        }
-        const body = new CANNON.Body({ mass: 0, material: this.groundMaterial, collisionFilterGroup: GROUPS.STATIC });
-        body.addShape(new CANNON.Heightfield(data, { elementSize: es }));
-        body.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
-        body.position.set(Z.x0, 0, Z.z0 + nz * es - cz0 * es);
-        this.world.addBody(body);
-      }
-
-      this.terrainRibbon(Z.loop, { closed: true, width: 8, tex: trackTex[Z.track], heightFn: (x, z) => this.rollingHeight(x, z) });
     }
+    this.addHeightfield(M.x0, M.z0, g.nx, g.nz, es, (x, z) => g.H[Math.round((z - M.z0) / es) * W + Math.round((x - M.x0) / es)]);
+
+    // Decorado: pórtico de salida, línea de meta, banderines, balas de paja en las curvas y grada
+    const T = this.mxTrack;
+    const body = new CANNON.Body({ mass: 0, collisionFilterGroup: GROUPS.STATIC });
+    const red = new THREE.MeshStandardMaterial({ color: 0xc62828, roughness: 0.6 });
+    const metal = this.poleMaterial || new THREE.MeshStandardMaterial({ color: 0x555555 });
+    const sIdx = (T.startIdx + 18) % T.N;
+    const sp = T.samples[sIdx];
+    const sq = T.samples[(sIdx + 1) % T.N];
+    const yawS = Math.atan2(sq.x - sp.x, sq.z - sp.z);
+    const rx = Math.cos(yawS);
+    const rz = -Math.sin(yawS);
+    const gy = this.motocrossHeight(sp.x, sp.z);
+    for (const sd of [-1, 1]) {
+      const px = sp.x + rx * sd * (M.half + 1.2);
+      const pz = sp.z + rz * sd * (M.half + 1.2);
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.5, 6, 0.5), red);
+      post.position.set(px, this.motocrossHeight(px, pz) + 3 - 0.3, pz);
+      post.castShadow = true;
+      this.scene.add(post);
+      body.addShape(new CANNON.Box(new CANNON.Vec3(0.25, 3, 0.25)), new CANNON.Vec3(post.position.x, post.position.y, post.position.z));
+    }
+    const bannerTex = toTexture(
+      makeCanvas(512, 96, (ctx, Wd, Hd) => {
+        ctx.fillStyle = '#111';
+        ctx.fillRect(0, 0, Wd, Hd);
+        for (let x = 0; x < Wd; x += 32) {
+          ctx.fillStyle = (x / 32) % 2 ? '#fff' : '#111';
+          ctx.fillRect(x, 0, 16, 10);
+          ctx.fillRect(x + 16, Hd - 10, 16, 10);
+        }
+        ctx.fillStyle = '#f9c80e';
+        ctx.font = 'bold 50px Anton, Impact, "Arial Black", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('MOTOCROSS LAS DUNAS', Wd / 2, Hd / 2 + 2);
+      }),
+      { repeat: false }
+    );
+    const banner = new THREE.Mesh(new THREE.BoxGeometry((M.half + 1.2) * 2 + 0.5, 1.4, 0.15), [metal, metal, metal, metal, new THREE.MeshStandardMaterial({ map: bannerTex }), new THREE.MeshStandardMaterial({ map: bannerTex })]);
+    banner.position.set(sp.x, gy + 5.2, sp.z);
+    banner.rotation.y = yawS + Math.PI / 2;
+    this.scene.add(banner);
+    const checker = toTexture(
+      makeCanvas(64, 16, (ctx) => {
+        for (let x = 0; x < 64; x += 8) {
+          for (let y = 0; y < 16; y += 8) {
+            ctx.fillStyle = (x + y) % 16 ? '#111' : '#f2f2f2';
+            ctx.fillRect(x, y, 8, 8);
+          }
+        }
+      }),
+      { repeat: false }
+    );
+    const line = new THREE.Mesh(new THREE.PlaneGeometry(M.half * 2, 1), new THREE.MeshStandardMaterial({ map: checker, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    line.rotation.order = 'YXZ';
+    line.rotation.y = yawS + Math.PI / 2;
+    line.rotation.x = -Math.PI / 2;
+    line.position.set(sp.x, gy + 0.05, sp.z);
+    this.scene.add(line);
+
+    // Balas de paja en el exterior de las curvas cerradas y banderines cada ~35 m
+    const bales = [];
+    const flags = [];
+    for (let i = 0; i < T.N; i += 3) {
+      const p = T.samples[i];
+      const q = T.samples[(i + 1) % T.N];
+      const tx = q.x - p.x;
+      const tz = q.z - p.z;
+      const tl = Math.hypot(tx, tz) || 1;
+      const lx = -tz / tl; // izquierda (x, z)
+      const lz = tx / tl;
+      const k = T.curv[i];
+      if (Math.abs(k) > 1 / 14) {
+        const sd = -Math.sign(k);
+        const off = M.half + 3.3;
+        const bx = p.x + lx * sd * off;
+        const bz = p.z + lz * sd * off;
+        if (bx > M.x0 + 2 && bx < M.x1 - 2 && bz > M.z0 + 2 && bz < M.z1 - 2) bales.push([bx, this.motocrossHeight(bx, bz), bz, Math.atan2(tx, tz)]);
+      }
+      if (i % 36 === 0) {
+        const sd = (i / 36) % 2 ? 1 : -1;
+        const fx = p.x + lx * sd * (M.half + 1.6);
+        const fz = p.z + lz * sd * (M.half + 1.6);
+        flags.push([fx, this.motocrossHeight(fx, fz), fz, (i / 36) % 3]);
+      }
+    }
+    const baleGeo = new THREE.BoxGeometry(1.3, 0.7, 0.75);
+    const baleMat = new THREE.MeshStandardMaterial({ color: 0xd8b85a, roughness: 1 });
+    const baleIM = new THREE.InstancedMesh(baleGeo, baleMat, bales.length);
+    const mm = new THREE.Matrix4();
+    const qq = new THREE.Quaternion();
+    const one = new THREE.Vector3(1, 1, 1);
+    bales.forEach(([x, y, z, yaw], k) => {
+      qq.setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw + Math.PI / 2);
+      mm.compose(new THREE.Vector3(x, y + 0.3, z), qq, one);
+      baleIM.setMatrixAt(k, mm);
+      const b = new CANNON.Body({ mass: 0, collisionFilterGroup: GROUPS.STATIC });
+      b.addShape(new CANNON.Box(new CANNON.Vec3(0.65, 0.35, 0.38)));
+      b.position.set(x, y + 0.3, z);
+      b.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), yaw + Math.PI / 2);
+      this.addStreamed(b, x, z);
+    });
+    baleIM.castShadow = baleIM.receiveShadow = true;
+    this.scene.add(baleIM);
+    const poleIM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.03, 0.03, 2.2, 5), metal, flags.length);
+    const flagGeo = new THREE.PlaneGeometry(0.7, 0.45);
+    flagGeo.translate(0.35, 0, 0);
+    const flagIM = new THREE.InstancedMesh(flagGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.DoubleSide }), flags.length);
+    const fc = [new THREE.Color(0xf9c80e), new THREE.Color(0xc62828), new THREE.Color(0x1565c0)];
+    flags.forEach(([x, y, z, c], k) => {
+      mm.makeTranslation(x, y + 1.1, z);
+      poleIM.setMatrixAt(k, mm);
+      qq.setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.rand() * 6);
+      mm.compose(new THREE.Vector3(x, y + 1.95, z), qq, one);
+      flagIM.setMatrixAt(k, mm);
+      flagIM.setColorAt(k, fc[c]);
+    });
+    this.scene.add(poleIM, flagIM);
+
+    // Grada junto a la recta de salida (fuera del circuito, mirando a la pista)
+    const standMat = new THREE.MeshStandardMaterial({ color: 0x9e9e9e, roughness: 0.8 });
+    const seatMat = new THREE.MeshStandardMaterial({ color: 0x1565c0, roughness: 0.6 });
+    const gx = -488;
+    const gz = 131;
+    let sy = 0;
+    for (let x = gx - 12; x <= gx + 12; x += 2) for (let z = gz - 2; z <= gz + 6; z += 2) sy = Math.max(sy, this.motocrossHeight(x, z));
+    const base = new THREE.Mesh(new THREE.BoxGeometry(25, sy + 1, 6), this.concreteMat);
+    base.position.set(gx, (sy - 1) / 2, gz + 2.4);
+    this.scene.add(base);
+    for (let r = 0; r < 4; r++) {
+      const step = new THREE.Mesh(new THREE.BoxGeometry(24, 0.5 + r * 0.6, 1.2), r % 2 ? seatMat : standMat);
+      step.position.set(gx, sy + (0.5 + r * 0.6) / 2, gz + r * 1.2);
+      step.castShadow = step.receiveShadow = true;
+      this.scene.add(step);
+    }
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(25, 0.15, 5.6), red);
+    roof.position.set(gx, sy + 5.2, gz + 1.8);
+    this.scene.add(roof);
+    for (const dx of [-12, 12]) {
+      const p = new THREE.Mesh(new THREE.BoxGeometry(0.2, 5.2, 0.2), metal);
+      p.position.set(gx + dx, sy + 2.6, gz + 4.2);
+      this.scene.add(p);
+    }
+    body.addShape(new CANNON.Box(new CANNON.Vec3(12, 1.3 + sy / 2, 2.6)), new CANNON.Vec3(gx, 1.3 + sy / 2 - 0.5, gz + 1.8));
+    this.world.addBody(body);
+    this.reserved.push({ minX: M.x0 - 4, maxX: M.x1 + 10, minZ: M.z0 - 4, maxZ: M.z1 + 4 });
+    // Dónde dejar la moto de cross de muestra (en el aparcamiento junto a la grada)
+    this.motocrossParking = { pos: new THREE.Vector3(-463, 0, 133), heading: -Math.PI / 2 };
   }
 
   createBoundaries() {
@@ -2097,7 +2823,16 @@ export class Environment {
    * La geometría va a los lotes fusionados; la colisión es una caja (cámara, disparos y física).
    */
   addBuilding(x, z, w, h, d, style = 'office', { yaw = 0, storefront = true, gable = false } = {}) {
-    const add = (geo, mat, lx, y, lz) => this.chunkAdd(geo, mat, lx, y, lz, yaw, x, z);
+    // En una cuesta el edificio se apoya en la esquina más alta sobre un zócalo de piedra
+    const { lo, hi } = this.footprintHeights(x, z, w, d, yaw);
+    const y0 = hi;
+    const add = (geo, mat, lx, y, lz) => this.chunkAdd(geo, mat, lx, y + y0, lz, yaw, x, z);
+    if (hi - lo > 0.05) {
+      const ph = hi - lo + 0.6;
+      const pGeo = new THREE.BoxGeometry(w + 0.3, ph, d + 0.3);
+      Environment.meterUV(pGeo, w + 0.3, ph, d + 0.3, 3, 3);
+      add(pGeo, this.plinthMat, 0, -ph / 2 + 0.02, 0);
+    }
     const mats = this.facadeStyles[style];
     const mat = mats[Math.floor(this.rand() * mats.length)];
     const [tileW, tileH] = mat.userData.tile;
@@ -2144,11 +2879,28 @@ export class Environment {
         else add(new THREE.BoxGeometry(1.6 + this.rand() * 2, 1.2, 1.4 + this.rand() * 2), this.roofMat, sx, top + 1.2, sz);
       }
     }
-    return this.addCollider(x, z, w, h, d, yaw);
+    return this.addCollider(x, z, w, h + (hi - lo) + 0.6, d, yaw, lo - 0.6);
   }
 
-  /** Caja invisible para cámara y disparos + cuerpo físico en streaming. */
-  addCollider(x, z, w, h, d, yaw = 0) {
+  /** Alturas mínima y máxima del terreno bajo la planta de un edificio (esquinas y centro). */
+  footprintHeights(x, z, w, d, yaw = 0) {
+    let lo = Infinity;
+    let hi = -Infinity;
+    const c = Math.cos(yaw);
+    const sn = Math.sin(yaw);
+    for (const [a, b] of [[0, 0], [-1, -1], [1, -1], [-1, 1], [1, 1], [0, -1], [0, 1], [-1, 0], [1, 0]]) {
+      const lx = (a * w) / 2;
+      const lz = (b * d) / 2;
+      const h = cityHill(x + lx * c + lz * sn, z - lx * sn + lz * c);
+      lo = Math.min(lo, h);
+      hi = Math.max(hi, h);
+    }
+    if (hi < 0.02) return { lo: 0, hi: 0 };
+    return { lo, hi };
+  }
+
+  /** Caja invisible para cámara y disparos + cuerpo físico en streaming. y0 = cota de la base. */
+  addCollider(x, z, w, h, d, yaw = 0, y0 = 0) {
     if (!this.proxyGeo) {
       this.proxyGeo = new THREE.BoxGeometry(1, 1, 1);
       this.proxyMat = new THREE.MeshBasicMaterial({ visible: false });
@@ -2156,14 +2908,14 @@ export class Environment {
     const proxy = new THREE.Mesh(this.proxyGeo, this.proxyMat);
     proxy.scale.set(w, h, d);
     proxy.rotation.y = yaw;
-    proxy.position.set(x, h / 2, z);
+    proxy.position.set(x, y0 + h / 2, z);
     proxy.visible = false;
     proxy.updateMatrixWorld(true);
     this.allColliders.push(proxy);
     this.shootables.push(proxy);
     const body = new CANNON.Body({ mass: 0, collisionFilterGroup: GROUPS.STATIC });
     body.addShape(new CANNON.Box(new CANNON.Vec3(w / 2, h / 2, d / 2)));
-    body.position.set(x, h / 2, z);
+    body.position.set(x, y0 + h / 2, z);
     body.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), yaw);
     this.addStreamed(body, x, z, proxy);
     const rect = Environment.obbAABB({ x, z, hx: w / 2, hz: d / 2, yaw });
@@ -2271,7 +3023,7 @@ export class Environment {
           const d = this.districtAt(x, z);
           if (!d || d === 'none' || d === 'rural' || this.inTunnelZone(x, z)) continue;
           if (this.nearJunction(x, z, 6) || this.clearance(x, z) < 0.4 || reservedNear(x, z, 3) || markerNear(x, z)) continue;
-          trees.push([x, 0, z, true]);
+          trees.push([x, cityHill(x, z) - 0.1, z, true]);
         }
       }
     }
@@ -2287,9 +3039,8 @@ export class Environment {
       const want = { suburb: 0.5, hills: 0.7, rural: 0.45, beach: 0.08 }[d];
       if (!want || this.rand() > want) continue;
       if (this.clearance(x, z) < 3 || this.isInsideBuilding(x, z, 2.5) || reservedNear(x, z, 3)) continue;
-      const Z = this.rollingZone(x, z);
-      if (Z && (this.distToLoop(Z, x, z) < 8 || this.rand() < 0.6)) continue; // colinas más despejadas
-      trees.push([x, Z ? this.rollingHeight(x, z) - 0.3 : 0, z, true]);
+      if (this.inMotocross(x, z, 4)) continue;
+      trees.push([x, this.groundHeight(x, z) - 0.15, z, true]);
     }
     // Palmeras de la isla
     for (let k = 0; k < 14; k++) {
@@ -2384,7 +3135,7 @@ export class Environment {
         const d = this.districtAt(x, z);
         if (d === 'none') continue;
         // el brazo apunta hacia la calzada
-        lamps.push([x, z, Math.atan2(T.z * side, -T.x * side)]);
+        lamps.push([x, z, Math.atan2(T.z * side, -T.x * side), cityHill(x, z)]);
       }
     }
     const pole = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.07, 0.11, 7, 8), this.poleMaterial, lamps.length);
@@ -2398,13 +3149,13 @@ export class Environment {
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
     const one = new THREE.Vector3(1, 1, 1);
-    lamps.forEach(([x, z, ang], k) => {
-      m.makeTranslation(x, 3.5, z);
+    lamps.forEach(([x, z, ang, y], k) => {
+      m.makeTranslation(x, y + 3.5, z);
       pole.setMatrixAt(k, m);
       q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), ang);
-      m.compose(new THREE.Vector3(x, 6.9, z), q, one);
+      m.compose(new THREE.Vector3(x, y + 6.9, z), q, one);
       arm.setMatrixAt(k, m);
-      m.compose(new THREE.Vector3(x, 6.82, z), q, one);
+      m.compose(new THREE.Vector3(x, y + 6.82, z), q, one);
       heads.setMatrixAt(k, m);
     });
     pole.castShadow = arm.castShadow = true;
@@ -2437,14 +3188,15 @@ export class Environment {
     const one = new THREE.Vector3(1, 1, 1);
     const dark = new THREE.Color(0x1a1a1a);
     list.forEach((s, k) => {
+      const y = cityHill(s.p.x, s.p.z);
       q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), s.yaw);
-      m.compose(new THREE.Vector3(s.p.x, 2.5, s.p.z), q, one);
+      m.compose(new THREE.Vector3(s.p.x, y + 2.5, s.p.z), q, one);
       poles.setMatrixAt(k, m);
-      m.compose(new THREE.Vector3(s.p.x, 5.2, s.p.z), q, one);
+      m.compose(new THREE.Vector3(s.p.x, y + 5.2, s.p.z), q, one);
       boxes.setMatrixAt(k, m);
       const fwd = new THREE.Vector3(Math.sin(s.yaw), 0, Math.cos(s.yaw));
       for (let c = 0; c < 3; c++) {
-        m.compose(new THREE.Vector3(s.p.x + fwd.x * 0.27, 5.7 - c * 0.48, s.p.z + fwd.z * 0.27), q, one);
+        m.compose(new THREE.Vector3(s.p.x + fwd.x * 0.27, y + 5.7 - c * 0.48, s.p.z + fwd.z * 0.27), q, one);
         lamps.setMatrixAt(k * 3 + c, m);
         lamps.setColorAt(k * 3 + c, dark);
       }
@@ -2614,6 +3366,7 @@ export class Environment {
     this.storefrontMat.emissiveIntensity = 0.2 + glow * 1.1;
     this.updateEnvironmentMap();
     if (this.lampHeadMat) this.lampHeadMat.emissiveIntensity = glow * 2.5;
+    if (this.bridgeLampMat) this.bridgeLampMat.emissiveIntensity = glow * 2.5;
 
     if (this.lighthouseLamp) this.lighthouseLamp.emissiveIntensity = 0.4 + glow * 4;
     this.updateSignals();

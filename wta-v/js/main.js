@@ -166,6 +166,12 @@ for (const p of parked) {
   const v = new VehicleController(game, { type: p.type, color: p.color, position: new THREE.Vector3(6.3, 0, p.z), heading: Math.PI });
   v.addToWorld();
 }
+// Moto de cross de prueba en el aparcamiento del circuito de motocross
+if (game.env.motocrossParking) {
+  const mp = game.env.motocrossParking;
+  const v = new VehicleController(game, { type: 'cross', color: 0xff6d00, position: mp.pos, heading: mp.heading });
+  v.addToWorld();
+}
 
 // ----------------------------------------------------------------------
 // Explosiones (cohetes y coches que revientan)

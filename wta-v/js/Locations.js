@@ -117,6 +117,12 @@ export class Locations {
     };
     const add = (type, name, where, data = {}) => {
       const spot = Array.isArray(where) ? sidewalkSpot(...where) : where.pos ? manual(where) : env.spotAt(where.at[0], where.at[1], where.road);
+      // En las cuestas, marcador y coche a la altura del suelo (el marcador, en el punto más alto de su anillo)
+      if (!where.pos) {
+        let y = 0;
+        for (const [dx, dz] of [[0, 0], [1.6, 0], [-1.6, 0], [0, 1.6], [0, -1.6]]) y = Math.max(y, env.groundHeight(spot.pos.x + dx, spot.pos.z + dz));
+        spot.pos.y = y;
+      }
       const poi = { id: data.id || name, type, name, ...spot, ...data, style: TYPE_STYLE[type] };
       this.pois.push(poi);
       return poi;
@@ -490,6 +496,15 @@ export class Locations {
     const M = (o) => new THREE.MeshStandardMaterial(o);
     const darkGlass = M({ color: 0x0f161c, metalness: 0.9, roughness: 0.08, envMapIntensity: 1.3 });
     const trim = M({ color: 0x2a2a2a, roughness: 0.5, metalness: 0.4 });
+
+    // En una cuesta: cimientos de piedra hasta el terreno más bajo de la planta
+    const sink = Math.max(0, front.y - Math.min(env.groundHeight(center.x, center.z), env.groundHeight(front.x, front.z), env.groundHeight(center.x - n.x * D / 2, center.z - n.z * D / 2)));
+    if (front.y > 0.05) {
+      const fh = sink + 1.2;
+      const fGeo = new THREE.BoxGeometry(W + 0.4, fh, D + 0.4);
+      Environment.meterUV(fGeo, W + 0.4, fh, D + 0.4, 3, 3);
+      add(fGeo, env.plinthMat, 0, -fh / 2 + 0.02, -D / 2, false);
+    }
 
     // Cuerpo principal con textura en metros
     const shell = (material, tileW, tileH) => {

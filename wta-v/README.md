@@ -26,7 +26,9 @@ De fondo, la cámara sobrevuela la ciudad en 3D en una órbita lenta. En el cent
 
 ## La ciudad
 
-Puerto Sombra mide algo más de un kilómetro de lado. El **Centro** conserva su cuadrícula de rascacielos, pero con una glorieta en medio y una avenida en diagonal que corta las manzanas. Alrededor hay una **circunvalación** de curvas amplias que conecta los barrios: el **Polígono** (naves industriales), **Jardines** y **Las Lomas** (casas con tejado a dos aguas y calles sinuosas), **Colinas** (mansiones) y la costa, con **El Puerto** (contenedores y almacenes) y **La Playa**, junto al mar. Entre el centro y Colinas se levanta el **Monte Sombra**, una montaña de 40 metros que se puede conducir: la **carretera de la cumbre** sube desde la Carretera del Oeste por una rampa larga, recorre la cresta, cruza un barranco por un **puente** de arco rojo, pasa por encima del túnel de la Avenida Norte y baja hasta la Carretera del Nordeste. Las laderas norte y sur son empinadas (se baja rodando, no se sube) y el bosque tiene árboles sólidos. Frente a La Playa, un **puente colgante** de 150 metros lleva a la **Isla Faro**, con faro, palmeras, tienda y chiringuito. En los bordes este y oeste hay dos zonas de campo con subidas y bajadas: **Las Dunas**, al oeste, con suelo de arena y un circuito de tierra, y **Los Cerros**, al este, con hierba y un circuito de grava. Cada superficie agarra distinto (el asfalto es el que más; la arena, la que menos) y el nombre del suelo aparece bajo el del vehículo. Hay **rampas de salto** en la playa, el puerto, el polígono y la cumbre. Si caes al mar, te rescatan en la orilla (el coche se hunde; si era tuyo, se pide otra vez desde *Mis coches*). El tamaño del mapa no cambia. Los cruces entre avenidas tienen semáforo y paso de cebra, y el tráfico, la policía y el GPS siguen la red de calles, respetando el sentido de la glorieta.
+Puerto Sombra mide algo más de un kilómetro de lado. El **Centro** conserva su cuadrícula de rascacielos, pero con una glorieta en medio y una avenida en diagonal que corta las manzanas. Alrededor hay una **circunvalación** de curvas amplias que conecta los barrios: el **Polígono** (naves industriales), **Jardines** y **Las Lomas** (casas con tejado a dos aguas y calles sinuosas), **Colinas** (mansiones) y la costa, con **El Puerto** (contenedores y almacenes) y **La Playa**, junto al mar. Entre el centro y Colinas se levanta el **Monte Sombra**, una montaña de 40 metros que se puede conducir: la **carretera de la cumbre** sube desde la Carretera del Oeste por una rampa larga, recorre la cresta, cruza un barranco por un **puente de arco** de acero (dos arcos que nacen de las paredes del barranco, montantes cada 3 metros y estribos de piedra), pasa por encima del túnel de la Avenida Norte y baja hasta la Carretera del Nordeste. Las laderas norte y sur son empinadas (se baja rodando, no se sube) y el bosque tiene árboles sólidos. Frente a La Playa, un **puente colgante** de 150 metros lleva a la **Isla Faro**, con faro, palmeras, tienda y chiringuito. El puente tiene un tablero continuo que sube y baja sin escalones, dos torres pórtico de 31 metros, cables principales anclados en tierra y en la isla, péndolas cada 4 metros y farolas.
+
+La ciudad ya no es plana en todas partes. Tres barrios tienen **cuestas** de verdad, con calles, aceras, edificios, tráfico y peatones que suben y bajan: **Las Lomas y Jardines** (al este, hasta 9 metros de desnivel), **Colinas** (al norte, hasta 8 metros) y la **Cuesta del Sur**, la Avenida Sur entre el centro y la playa, que sube a una loma y baja hacia el mar. En las cuestas los edificios se apoyan sobre un zócalo de piedra, y la pendiente máxima ronda el 25 %. Al oeste de la circunvalación, donde antes estaban Las Dunas, está el **circuito de Motocross Las Dunas**: una pista de tierra de casi 1,5 km en serpentín con cuatro rectas, curvas de herradura con peralte, saltos dobles, mesetas, "whoops", rodillos y una subida de 5 metros (La Cumbre). Tiene pórtico de salida, banderines, balas de paja y grada, y una moto de cross aparcada junto a la grada para probarla. La tierra y la hierba agarran menos que el asfalto (salvo con la moto de cross), y el nombre del suelo aparece bajo el del vehículo. Hay **rampas de salto** en la playa, el puerto, el polígono y la cumbre. Si caes al mar, te rescatan en la orilla (el coche se hunde; si era tuyo, se pide otra vez desde *Mis coches*). El tamaño del mapa no cambia. Los cruces entre avenidas tienen semáforo y paso de cebra, y el tráfico, la policía y el GPS siguen la red de calles, respetando el sentido de la glorieta.
 
 | Radar | Lugar | Qué haces allí |
 |---|---|---|
@@ -89,7 +91,7 @@ El tercer código, `WTAFLY`, te da la **avioneta Gaviota**. Queda en tu garaje (
 
 ## Vehículos
 
-Doce modelos (diez coches y dos motos) con física propia (masa, tracción, agarre, suspensión y medidas). Todos se ajustaron con un banco de pruebas automático que comprueba aceleración, frenada, curvas y slalom sin volcar, y que el freno de mano derrapa sin hacer trompo.
+Trece modelos (diez coches y tres motos) con física propia (masa, tracción, agarre, suspensión y medidas). Todos se ajustaron con un banco de pruebas automático que comprueba aceleración, frenada, curvas y slalom sin volcar, y que el freno de mano derrapa sin hacer trompo.
 
 | Modelo | Tipo | Tracción | 0-100 | Punta | Precio |
 |---|---|---|---|---|---|
@@ -103,9 +105,12 @@ Doce modelos (diez coches y dos motos) con física propia (masa, tracción, agar
 | Furia R | Superdeportivo | total | 2,5 s | 265 km/h | 95.000 |
 | Vespino | Scooter | trasera | 6,6 s | 126 km/h | 1.500 |
 | Rayo | Moto deportiva | trasera | 2,8 s | 224 km/h | 12.000 |
+| Barro | Motocross | trasera | 3,8 s | 127 km/h | 6.500 |
 | Taxi y Patrulla | Solo se roban | trasera | | | |
 
 **Motos.** Se compran en Autos Velasco (hay un Vespino aparcado cerca de casa para probarlo) y el código secreto también te las da. El piloto va a la vista y la moto se inclina en las curvas según la velocidad. Por dentro usan cuatro ruedas físicas muy juntas, dos por eje, con más inercia de giro y un estabilizador más fuerte, así que no se caen solas; la inclinación es visual. Aguantan menos golpes que un coche.
+
+**Moto de cross (Barro).** Ligera, con suspensión larga y blanda y neumáticos de tacos: en tierra y hierba casi no pierde agarre y aguanta caídas de salto que dañarían otra moto. En el aire se mantiene derecha y busca caer sobre las ruedas; W baja el morro y S lo sube. Se compra en Autos Velasco, hay una en el circuito y el código WTASECRET también la da. En un salto los coches tampoco dan vueltas de campana: amortiguan el giro en el aire.
 
 **Avioneta.** Monoplaza de ala alta de 9 metros. W sube la potencia y S la baja (en tierra, con la potencia a cero, S frena y luego da marcha atrás despacio). Para despegar, potencia a tope en una recta larga y, pasados los 95 km/h, mantén Espacio para levantar el morro. En el aire, A/D la inclinan para girar, Espacio sube y Shift baja; al soltarlos el morro vuelve solo a horizontal. El techo es de unos 200 metros, por debajo de 70 km/h entra en pérdida y, cerca del borde del mapa, gira sola hacia la ciudad. Para aterrizar, baja la potencia y el morro hacia una calle recta: cerca del suelo saca los flaps, endereza y se posa sola (con Espacio sigues en vuelo rasante). Un aterrizaje duro o un choque la daña. Solo te puedes bajar con ella parada.
 
@@ -178,7 +183,7 @@ js/VehicleController.js   Catálogo de vehículos y física RaycastVehicle con e
 js/InteractionSystem.js   Entrar y salir de vehículos
 js/AITraffic.js           Tráfico por la red de calles con semáforos y object pooling
 js/WantedSystem.js        Estrellas, patrullas, disparos de la policía y arrestos
-js/Environment.js         Red de calles (curvas, glorieta, túnel), barrios, edificios, mar y ciclo día/noche
+js/Environment.js         Red de calles (curvas, glorieta, túnel), cuestas, motocross, puentes, barrios, edificios, mar y ciclo día/noche
 js/Cheats.js              Código secreto (terminal del ordenador de casa)
 js/Quality.js             Calidad gráfica, contador de FPS y ajuste automático
 js/HUD.js                 Radar, dinero, velocímetro, objetivos y avisos

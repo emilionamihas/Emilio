@@ -453,7 +453,7 @@ export class Missions {
     this.target = pos;
     this.targetLabel = label;
     this.targetMarker.visible = marker;
-    if (marker) this.targetMarker.position.set(pos.x, 0, pos.z);
+    if (marker) this.targetMarker.position.set(pos.x, this.game.env.groundHeight(pos.x, pos.z), pos.z);
   }
 
   updateRace(step, dt) {

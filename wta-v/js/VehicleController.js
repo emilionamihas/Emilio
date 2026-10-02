@@ -103,6 +103,15 @@ export const CATALOG = {
     wheel: { r: 0.32, x: 0.2, zf: 0.74, zr: -0.72, rest: 0.24 },
     style: 'sportbike', bike: true, colors: [0xd50000, 0x111111, 0x1e88e5, 0x76ff03, 0xff6d00],
   },
+  // Motocross: ligera, suspensión larga y blanda, tacos que agarran en tierra; control en el aire
+  cross: {
+    label: 'Barro', kind: 'Motocross', price: 6500, mass: 150, drive: 'rwd', power: 1500, maxSpeed: 36,
+    brakeDecel: 10, handbrakeDecel: 4, maxSteer: 0.5, gripFront: 2.1, gripRear: 2.0, drift: 0.8,
+    stiffness: 24, damping: [2.2, 3.4], health: 80,
+    body: { w: 0.22, l: 0.95, h: 0.55 }, cabin: null,
+    wheel: { r: 0.36, x: 0.18, zf: 0.8, zr: -0.72, rest: 0.42 },
+    style: 'cross', bike: true, offroad: true, colors: [0xff6d00, 0x1e88e5, 0xfdd835, 0x43a047, 0xd50000],
+  },
   // Avioneta: solo con el código WTAFLY. En tierra rueda con su tren; en el aire, vuelo arcade
   avioneta: {
     label: 'Gaviota', kind: 'Avioneta', price: 0, mass: 900, drive: 'rwd', power: 0, maxSpeed: 62,
@@ -304,7 +313,7 @@ export class VehicleController {
       mass: s.mass,
       material: this.game.materials.vehicle,
       collisionFilterGroup: GROUPS.VEHICLE,
-      collisionFilterMask: GROUPS.STATIC | GROUPS.PLAYER | GROUPS.VEHICLE,
+      collisionFilterMask: GROUPS.STATIC | GROUPS.PLAYER | GROUPS.VEHICLE | GROUPS.TERRAIN,
       angularDamping: 0.4,
       linearDamping: 0.01,
     });
@@ -869,7 +878,25 @@ export class VehicleController {
     const axleY = s.connY - w.rest * 0.55; // altura aproximada del eje en reposo (local del chasis)
     const fz = w.zf;
     const rz = w.zr;
-    if (s.style === 'scooter') {
+    if (s.style === 'cross') {
+      // Cross: guardabarros altos, placa portanúmeros, asiento largo y plano, cuadro fino y motor visto
+      const white = new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.5 });
+      add(extrudeProfile([[fz + 0.38, axleY + 0.5], [fz + 0.1, axleY + 0.47], [fz - 0.15, axleY + 0.55], [fz - 0.1, axleY + 0.6], [fz + 0.4, axleY + 0.56]], 0.16, 0.02), this.paintMat); // guardabarros delantero
+      add(extrudeProfile([[fz - 0.2, axleY + 0.95], [fz - 0.12, axleY + 0.55], [fz - 0.3, axleY + 0.52], [fz - 0.38, axleY + 0.92]], 0.3, 0.03), white); // placa delantera
+      add(extrudeProfile([[fz - 0.35, axleY + 0.78], [fz - 0.42, axleY + 0.95], [-0.05, axleY + 0.92], [0.0, axleY + 0.72]], 0.32, 0.05), this.paintMat); // depósito y tapas
+      add(extrudeProfile([[0.05, axleY + 0.93], [rz - 0.25, axleY + 1.0], [rz - 0.32, axleY + 0.92], [rz + 0.1, axleY + 0.8], [-0.05, axleY + 0.8]], 0.24, 0.04), white); // colín
+      box(0.22, 0.07, 0.95, trim, 0, axleY + 0.99, (rz - 0.1) / 2 + 0.05); // asiento largo
+      box(0.26, 0.3, 0.36, SHARED.grille, 0, axleY + 0.32, 0.08); // motor
+      box(0.06, 0.06, 0.7, chrome, 0.13, axleY + 0.55, rz + 0.25, -0.35); // escape alto
+      box(0.08, 0.08, 0.2, SHARED.trim, 0.13, axleY + 0.72, rz - 0.08, -0.35);
+      box(0.06, 0.05, 0.85, trim, 0, axleY + 0.18, rz / 2); // basculante
+      box(0.04, 0.5, 0.04, trim, 0, axleY + 0.55, -0.05); // tubo del cuadro
+      box(0.78, 0.03, 0.03, trim, 0, axleY + 1.08, fz - 0.33); // manillar ancho
+      for (const sx of [-0.36, 0.36]) box(0.05, 0.05, 0.12, SHARED.trim, sx, axleY + 1.08, fz - 0.33); // puños
+      box(0.1, 0.06, 0.03, this.headMat, 0, axleY + 0.78, fz - 0.17);
+      box(0.08, 0.04, 0.03, this.tailMat, 0, axleY + 0.92, rz - 0.3);
+      this.seat = { y: axleY + 0.98, z: rz + 0.45 };
+    } else if (s.style === 'scooter') {
       // Plataforma, escudo delantero y carrocería trasera redondeada
       box(0.34, 0.08, 0.7, trim, 0, axleY + 0.05, 0.02);
       add(extrudeProfile([[fz - 0.12, axleY + 0.05], [fz + 0.02, axleY + 0.1], [fz - 0.05, axleY + 0.85], [fz - 0.2, axleY + 0.85], [fz - 0.25, axleY + 0.1]], 0.36, 0.04), this.paintMat);
@@ -897,11 +924,27 @@ export class VehicleController {
       box(0.3, 0.18, 0.02, new THREE.MeshStandardMaterial({ color: 0x0e1419, metalness: 0.9, roughness: 0.05, transparent: true, opacity: 0.7 }), 0, axleY + 0.98, fz - 0.33, -0.5); // cúpula
       this.seat = { y: axleY + 0.8, z: rz + 0.52 };
     }
-    // Horquilla delantera
-    for (const x of [-0.09, 0.09]) cyl(0.025, 0.8, chrome, x, axleY + 0.38, fz - 0.14, -0.3);
+    // Horquilla delantera (más larga en la de cross)
+    const forkL = s.style === 'cross' ? 1.05 : 0.8;
+    for (const x of [-0.09, 0.09]) cyl(s.style === 'cross' ? 0.032 : 0.025, forkL, chrome, x, axleY + forkL / 2 - 0.02, fz - 0.14, -0.3);
 
     // Ruedas: dos visibles (cada una representa a un par de ruedas físicas)
-    const wheelGeo = new THREE.CylinderGeometry(w.r, w.r, 0.13, 22);
+    let wheelGeo;
+    if (s.style === 'cross') {
+      // Tacos: radio alterno en el perímetro y rueda más estrecha
+      wheelGeo = new THREE.CylinderGeometry(w.r, w.r, 0.11, 32, 1);
+      const wp = wheelGeo.attributes.position;
+      for (let i = 0; i < wp.count; i++) {
+        const x = wp.getX(i);
+        const z = wp.getZ(i);
+        const r = Math.hypot(x, z);
+        if (r < w.r * 0.9) continue;
+        const a = Math.atan2(z, x);
+        const k = Math.round((a / (Math.PI * 2)) * 32) % 2 ? 0.94 : 1;
+        wp.setXYZ(i, (x / r) * w.r * k, wp.getY(i), (z / r) * w.r * k);
+      }
+      wheelGeo.computeVertexNormals();
+    } else wheelGeo = new THREE.CylinderGeometry(w.r, w.r, 0.13, 22);
     wheelGeo.rotateZ(Math.PI / 2);
     const rimGeo = new THREE.CylinderGeometry(w.r * 0.66, w.r * 0.66, 0.14, 18);
     rimGeo.rotateZ(Math.PI / 2);
@@ -1078,6 +1121,12 @@ export class VehicleController {
 
   update(dt) {
     if (!this.inWorld) return;
+    // Colisión de la carrocería con el terreno (cuestas, circuito): cara en cannon (prisma contra
+    // cada celda). Los coches de la IA rodando con las 4 ruedas en el suelo solo necesitan los rayos
+    // de las ruedas; en cuanto saltan, vuelcan, chocan o los lleva el jugador, se activa.
+    const terrain = this.driver === 'player' || this.destroyed || !this.driver || this.groundedWheels() < 4 || this.health < this.maxHealth;
+    const mask = GROUPS.STATIC | GROUPS.PLAYER | GROUPS.VEHICLE | (terrain ? GROUPS.TERRAIN : 0);
+    if (this.chassisBody.collisionFilterMask !== mask) this.chassisBody.collisionFilterMask = mask;
     if (this.spec.plane) {
       this.updatePlane(dt);
       return;
@@ -1133,6 +1182,8 @@ export class VehicleController {
       const p = this.chassisBody.position;
       this.surface = this.game.env.surfaceAt(p.x, p.z, p.y);
       grip = this.surface ? SURFACE_GRIP[this.surface] : 1;
+      // La moto de cross apenas pierde agarre fuera del asfalto (neumáticos de tacos)
+      if (s.offroad) grip = 1 - (1 - grip) * 0.2;
       if (this.surface && absSpeed > 6 && this.surface !== 'hierba' && Math.random() < 0.35) {
         const hp = wr[2 + Math.floor(Math.random() * 2)].raycastResult.hitPointWorld;
         this.game.effects.spawnSmoke(new THREE.Vector3(hp.x, hp.y + 0.3, hp.z), new THREE.Vector3(0, 0.8, 0), 0.8);
@@ -1220,7 +1271,14 @@ export class VehicleController {
     const body = this.chassisBody;
     const q = body.quaternion;
     const up = q.vmult(_v.set(0, 1, 0), _up);
-    if (up.y < 0.55 || this.groundedWheels() < 2) return;
+    const grounded = this.groundedWheels();
+    if (grounded === 0) this.airT = (this.airT || 0) + dt;
+    else this.airT = 0;
+    if (grounded === 0 && this.airT > 0.12 && up.y > 0.2 && !this.spec.plane) {
+      this.airControl(dt);
+      return;
+    }
+    if (up.y < 0.55 || grounded < 2) return;
 
     const fwd = q.vmult(_v2.set(0, 0, 1), _fwd);
     const right = q.vmult(_v.set(1, 0, 0), _right);
@@ -1252,11 +1310,50 @@ export class VehicleController {
     }
   }
 
+  /**
+   * En el aire (saltos): las motos se mantienen derechas y orientan el morro hacia la trayectoria
+   * para caer sobre las ruedas; W baja el morro y S lo sube. Los coches solo amortiguan el giro
+   * para no dar vueltas de campana en un cambio de rasante.
+   */
+  airControl(dt) {
+    const body = this.chassisBody;
+    const q = body.quaternion;
+    const w = body.angularVelocity;
+    const fwd = q.vmult(_v2.set(0, 0, 1), _fwd);
+    const left = q.vmult(_v.set(1, 0, 0), _right);
+    if (!this.spec.bike) {
+      const k = Math.min(1, 1.5 * dt);
+      const roll = w.dot(fwd);
+      w.x -= fwd.x * roll * k;
+      w.y -= fwd.y * roll * k;
+      w.z -= fwd.z * roll * k;
+      return;
+    }
+    const vel = body.velocity;
+    const hs = Math.hypot(vel.x, vel.z);
+    const pitch = Math.asin(Math.max(-1, Math.min(1, fwd.y)));
+    const roll = Math.asin(Math.max(-1, Math.min(1, left.y)));
+    // Morro según la trayectoria (un poco arriba), limitado; el piloto lo corrige con W/S
+    const path = hs > 2 ? Math.atan2(vel.y, hs) : 0;
+    const inp = this.input;
+    const lean = this.driver === 'player' ? (inp.reverse ? 0.35 : 0) - (inp.throttle ? 0.35 : 0) : 0;
+    const target = Math.max(-0.6, Math.min(0.5, path * 0.85 + 0.05 + lean));
+    const pitchRate = Math.max(-2.5, Math.min(2.5, (target - pitch) * 4));
+    const rollRate = -roll * 5;
+    const yaw = w.dot(_v.set(0, 1, 0));
+    // velocidad angular = cabeceo (eje izquierdo) + balanceo (eje longitudinal) + guiñada que ya tenía (amortiguada)
+    w.set(left.x * -pitchRate + fwd.x * rollRate, left.y * -pitchRate + fwd.y * rollRate + yaw * (1 - Math.min(1, dt * 2)), left.z * -pitchRate + fwd.z * rollRate);
+  }
+
   onCollide(e) {
     const impact = Math.abs(e.contact.getImpactVelocityAlongNormal());
-    if (impact < 5) return;
     const other = e.body;
-    this.damage((impact - 5) * 3);
+    // Caer de un salto contra el suelo (contacto casi vertical con algo estático) duele menos que
+    // chocar contra una pared; las motos de cross están hechas para eso
+    const ground = other.mass === 0 && Math.abs(e.contact.ni.y) > 0.7;
+    const limit = ground ? (this.spec.offroad ? 13 : 9) : 5;
+    if (impact < limit) return;
+    this.damage((impact - limit) * 3);
     const otherVehicle = other.userData && other.userData.vehicle;
     if (this.driver === 'player' && otherVehicle && otherVehicle.type === 'police' && impact > 6) {
       this.game.wanted.reportCrime('attack_police');

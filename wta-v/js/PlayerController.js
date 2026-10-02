@@ -71,7 +71,7 @@ export class PlayerController {
       fixedRotation: true,
       linearDamping: 0,
       collisionFilterGroup: GROUPS.PLAYER,
-      collisionFilterMask: GROUPS.STATIC | GROUPS.VEHICLE,
+      collisionFilterMask: GROUPS.STATIC | GROUPS.VEHICLE | GROUPS.TERRAIN,
     });
     this.body.addShape(new CANNON.Sphere(BODY_RADIUS));
     this.body.position.set(spawn.x, spawn.y + BODY_RADIUS + 0.05, spawn.z);
@@ -169,7 +169,9 @@ export class PlayerController {
   }
 
   teleport(pos, velocity) {
-    this.body.position.set(pos.x, Math.max(pos.y, 0) + BODY_RADIUS + 0.05, pos.z);
+    const env = this.game && this.game.env;
+    const ground = env && env.groundHeight ? env.groundHeight(pos.x, pos.z, (pos.y || 0) + 1) : 0;
+    this.body.position.set(pos.x, Math.max(pos.y || 0, ground, 0) + BODY_RADIUS + 0.05, pos.z);
     this.body.velocity.set(velocity ? velocity.x : 0, velocity ? velocity.y : 0, velocity ? velocity.z : 0);
     this.syncMesh();
   }
@@ -274,7 +276,7 @@ export class PlayerController {
     this.game.world.raycastClosest(
       from,
       to,
-      { skipBackfaces: true, collisionFilterMask: GROUPS.STATIC | GROUPS.VEHICLE },
+      { skipBackfaces: true, collisionFilterMask: GROUPS.STATIC | GROUPS.VEHICLE | GROUPS.TERRAIN },
       result
     );
     this.onGround = result.hasHit && this.body.velocity.y < 3;
