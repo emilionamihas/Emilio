@@ -292,8 +292,8 @@ export class AITraffic {
       if (along < 25) speed = Math.min(speed, THREE.MathUtils.lerp(agent.cruise, 5, Math.min(1, turn * 1.5)));
     }
 
-    // Semáforo: parar antes de la línea si no está en verde
-    if (agent.to.signal) {
+    // Semáforo: parar antes de la línea si no está en verde (quien huye no para)
+    if (agent.to.signal && !agent.flee) {
       const light = env.signalState(agent.to, agent.from);
       const stopDist = along - (agent.to.radius + 2.5);
       if (light !== 'green' && stopDist > -0.5 && stopDist < 22) {
@@ -307,7 +307,7 @@ export class AITraffic {
     // Obstáculos delante: otros vehículos y el jugador
     const fwd = v.getForward();
     const obstacles = this.game.vehicles;
-    for (const o of obstacles) {
+    for (const o of agent.flee ? [] : obstacles) {
       if (o === v) continue;
       const dx = o.position.x - pos.x;
       const dz = o.position.z - pos.z;
@@ -324,7 +324,7 @@ export class AITraffic {
       if (ahead > 0 && ahead < 12 && lateral < 2) speed = 0;
     }
 
-    driveTo(v, target, speed);
+    driveTo(v, target, speed, { aggressive: !!agent.flee });
 
     // Atascado demasiado tiempo (sin semáforo ni obstáculo): reciclar si no se ve
     if (speed > 3 && Math.abs(v.getForwardSpeed()) < 0.5) agent.stuck += dt;

@@ -20,7 +20,17 @@ De fondo, la cámara sobrevuela la ciudad en 3D en una órbita lenta. En el cent
 
 ## Modos
 
-**Modo historia.** Nueve misiones encadenadas con tres personajes: Lucho, el mecánico que te da tus primeros trabajos; Vera, que planifica los golpes; y Don Aurelio, que manda en la ciudad. Empiezas con 300 dólares y solo con los puños. Los golpes van subiendo de nivel: primero un coche cualquiera, luego una tienda, un deportivo por encargo, el Banco del Puerto, una huida cronometrada, una banda rival, el Banco Central y, al final, la Reserva Federal. Cada banco se desbloquea con su misión. La partida se guarda sola al terminar cada misión.
+**Modo historia.** Nueve misiones encadenadas (más cinco de la segunda parte) con tres personajes: Lucho, el mecánico que te da tus primeros trabajos; Vera, que planifica los golpes; y Don Aurelio, que manda en la ciudad. Empiezas con 300 dólares y solo con los puños. Los golpes van subiendo de nivel: primero un coche cualquiera, luego una tienda, un deportivo por encargo, el Banco del Puerto, una huida cronometrada, una banda rival, el Banco Central y, al final, la Reserva Federal. Cada banco se desbloquea con su misión. La partida se guarda sola al terminar cada misión.
+
+Después del Gran Golpe empieza la **segunda parte**, con cinco misiones que no se parecen entre sí:
+
+- **Barro y gloria** (Lucho): carrera ilegal de una vuelta en el circuito de motocross contra tres pilotos con moto de cross. Hay cuenta atrás, posición en vivo y cronómetro. Solo vale ganar, y la moto te la quedas.
+- **Mercancía frágil** (Lucho): lleva una furgoneta con champán robado por las cuestas del sur y el puente hasta el chiringuito de la isla. Cada golpe o salto rompe botellas, y si la carga baja de cierto punto la misión falla.
+- **Rodaje** (Vera): eres el especialista de un anuncio. Haz tres saltos con un Vento GT desde tres rampas distintas, de más de un segundo en el aire, y aterriza de pie.
+- **El contable** (Vera): persecución por Las Lomas. El contable huye sin respetar semáforos; hay que pararlo a golpes sin que el coche arda, coger el maletín a pie y llevárselo a Vera.
+- **Correo aéreo** (Don Aurelio): despega con una avioneta desde la Avenida Oeste, pasa por ocho aros en el aire (sobre el Monte Sombra, el puente del barranco y la costa), suelta un paquete en paracaídas sobre la Isla Faro y aterriza.
+
+Si ya tenías la historia terminada, la segunda parte se abre sola al cargar la partida. Los vehículos que te prestan los contactos no cuentan como robo.
 
 **Modo libre.** Toda la ciudad abierta desde el principio, con 60.000 dólares, una pistola y medio chaleco. Las armas, los negocios y los coches se siguen comprando. Cada modo guarda su propia partida en el navegador.
 

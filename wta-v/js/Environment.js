@@ -2085,6 +2085,12 @@ export class Environment {
       this.slab(body, a, b, { width: 5, thick: rise + 0.4, mat });
       this.rampSpots.push([x, z]);
       this.reserved.push({ minX: x - 9, maxX: x + 9, minZ: z - 9, maxZ: z + 9 });
+      // carrerilla (40 m) y zona de caída (35 m) despejadas: sin contenedores, edificios ni árboles
+      const ax = x - dir.x * 45;
+      const az = z - dir.z * 45;
+      const bx = x + dir.x * 40;
+      const bz = z + dir.z * 40;
+      this.reserved.push({ minX: Math.min(ax, bx) - 5, maxX: Math.max(ax, bx) + 5, minZ: Math.min(az, bz) - 5, maxZ: Math.max(az, bz) + 5 });
     }
     this.world.addBody(body);
   }
@@ -2203,8 +2209,10 @@ export class Environment {
     }
     // Perfil: lista de [inicio (m), función(u) -> altura]
     const table = (h, up, top, down) => (u) => (u < 0 ? 0 : u < up ? h * smooth(0, 1, u / up) ** 0.7 : u < up + top ? h : u < up + top + down ? h * (1 - smooth(0, 1, (u - up - top) / down)) : 0);
-    const kicker = (h, up) => (u) => (u >= 0 && u < up ? h * (u / up) ** 1.3 : 0);
-    const landing = (h, down) => (u) => (u >= 0 && u < down ? h * (1 - smooth(0, 1, u / down)) : 0);
+    // Saltos dobles: el labio corta en seco pero baja en 3 m, y la recepción tiene cara trasera en
+    // rampa: quien se queda corto cae a un foso poco hondo y puede salir
+    const kicker = (h, up) => (u) => (u >= 0 && u < up ? h * (u / up) ** 1.3 : u >= up && u < up + 3 ? h * (1 - (u - up) / 3) * 0.6 : 0);
+    const landing = (h, down) => (u) => (u >= -7 && u < 0 ? h * smooth(0, 1, (u + 7) / 7) : u >= 0 && u < down ? h * (1 - smooth(0, 1, u / down)) : 0);
     const roller = (h, len, n = 1) => (u) => (u >= 0 && u < len * n ? h * 0.5 * (1 - Math.cos((2 * Math.PI * u) / len)) : 0);
     const F = [];
     const at = (lane, u, f) => F.push([lane, u, f]);
@@ -2235,7 +2243,7 @@ export class Environment {
     const prof = new Float32Array(N);
     for (const [lane, u0, f] of F) {
       const i0 = start[lane];
-      for (let k = u0; k < u0 + 130; k++) {
+      for (let k = u0 - 8; k < u0 + 130; k++) {
         const u = k - u0;
         const h = f(u);
         if (h > 0) {

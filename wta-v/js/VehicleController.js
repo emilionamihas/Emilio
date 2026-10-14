@@ -1353,7 +1353,13 @@ export class VehicleController {
     const ground = other.mass === 0 && Math.abs(e.contact.ni.y) > 0.7;
     const limit = ground ? (this.spec.offroad ? 13 : 9) : 5;
     if (impact < limit) return;
-    this.damage((impact - limit) * 3);
+    // Un mismo golpe genera contactos varios pasos seguidos: en 0,3 s solo cuenta el exceso sobre el anterior
+    const now = this.game.time || 0;
+    const prev = now - (this.lastHitT ?? -1) < 0.3 ? this.lastHitImpact : limit;
+    this.lastHitT = now;
+    this.lastHitImpact = Math.max(prev, impact);
+    if (impact <= prev) return;
+    this.damage((impact - prev) * 3);
     const otherVehicle = other.userData && other.userData.vehicle;
     if (this.driver === 'player' && otherVehicle && otherVehicle.type === 'police' && impact > 6) {
       this.game.wanted.reportCrime('attack_police');
@@ -1362,7 +1368,7 @@ export class VehicleController {
 
   damage(amount) {
     if (this.destroyed) return;
-    this.health -= amount;
+    this.health -= amount * (this.damageScale ?? 1); // damageScale < 1: carreras (los roces entre pilotos son normales)
     if (this.health <= 0) this.explode();
   }
 

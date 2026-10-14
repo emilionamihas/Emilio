@@ -1426,3 +1426,9 @@ body {
 @media (prefers-reduced-motion: reduce) {
   #overlay *, #overlay *::before, #overlay *::after { animation-duration: 0.01s !important; animation-iteration-count: 1 !important; }
 }
+
+/* Cuenta atrás de las carreras: sin oscurecer la pantalla */
+#big-message.show.count {
+  background: none;
+  color: #fdd835;
+}
