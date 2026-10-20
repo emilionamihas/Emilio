@@ -1,0 +1,655 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Estudio</title>
+<meta name="description" content="Asistente de estudio: tarjetas con repetición espaciada, pomodoro, planificador y notas. Todo guardado en tu navegador." />
+<style>
+  :root {
+    --bg: #f4f6fb;
+    --surface: #ffffff;
+    --surface-2: #eef1f8;
+    --border: #d9dee9;
+    --text: #1b2130;
+    --muted: #5d6680;
+    --accent: #4f6bed;
+    --accent-soft: #e5ebfd;
+    --good: #2e9e6b;
+    --good-soft: #e0f4ea;
+    --warn: #d98324;
+    --bad: #d6485a;
+    --shadow: 0 1px 2px rgba(20,28,56,.06), 0 8px 24px rgba(20,28,56,.06);
+    --radius: 14px;
+  }
+  :root:not([data-theme="light"]) {
+    @media (prefers-color-scheme: dark) {
+      --bg: #0f131c;
+      --surface: #171c28;
+      --surface-2: #1f2634;
+      --border: #2b3345;
+      --text: #e8ecf5;
+      --muted: #95a0bd;
+      --accent: #7f96ff;
+      --accent-soft: #232c45;
+      --good: #51c48a;
+      --good-soft: #17301f;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f131c;
+    --surface: #171c28;
+    --surface-2: #1f2634;
+    --border: #2b3345;
+    --text: #e8ecf5;
+    --muted: #95a0bd;
+    --accent: #7f96ff;
+    --accent-soft: #232c45;
+    --good: #51c48a;
+    --good-soft: #17301f;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 24px 16px 80px; }
+
+  header.top {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; margin-bottom: 20px; flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand .dot {
+    width: 34px; height: 34px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), #9b6bed);
+    display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 18px;
+  }
+  .brand h1 { font-size: 19px; margin: 0; letter-spacing: -.01em; }
+  .brand p { margin: 0; font-size: 12.5px; color: var(--muted); }
+  .theme-btn {
+    border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    border-radius: 10px; padding: 8px 12px; cursor: pointer; font-size: 13px;
+  }
+
+  nav.tabs {
+    display: flex; gap: 6px; background: var(--surface-2); padding: 6px;
+    border-radius: 12px; margin-bottom: 20px; overflow-x: auto;
+  }
+  nav.tabs button {
+    flex: 1 1 auto; white-space: nowrap; border: 0; background: transparent;
+    color: var(--muted); padding: 9px 12px; border-radius: 8px; cursor: pointer;
+    font-size: 14px; font-weight: 600;
+  }
+  nav.tabs button.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); margin-bottom: 16px;
+  }
+  .card h2 { margin: 0 0 4px; font-size: 16px; }
+  .card .sub { margin: 0 0 16px; color: var(--muted); font-size: 13px; }
+
+  label { display: block; font-size: 13px; font-weight: 600; margin: 0 0 6px; }
+  input[type="text"], input[type="password"], textarea, select {
+    width: 100%; border: 1px solid var(--border); background: var(--bg);
+    color: var(--text); border-radius: 10px; padding: 10px 12px; font-size: 14px;
+    font-family: inherit; resize: vertical;
+  }
+  input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+
+  .btn {
+    border: 0; background: var(--accent); color: #fff; border-radius: 10px;
+    padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .btn:hover { filter: brightness(1.05); }
+  .btn.ghost { background: var(--surface-2); color: var(--text); }
+  .btn.good { background: var(--good); }
+  .btn.sm { padding: 6px 10px; font-size: 13px; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+  .hidden { display: none !important; }
+  .muted { color: var(--muted); }
+  .pill { font-size: 12px; background: var(--accent-soft); color: var(--accent); padding: 3px 9px; border-radius: 999px; font-weight: 600; }
+
+  /* Flashcards */
+  .deck-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px;
+  }
+  .deck-item .meta { font-size: 12.5px; color: var(--muted); }
+  .flash {
+    min-height: 180px; display: grid; place-items: center; text-align: center;
+    padding: 28px 20px; background: var(--surface-2); border-radius: 12px; cursor: pointer;
+    font-size: 19px; line-height: 1.4; user-select: none;
+  }
+  .flash .hint { font-size: 12px; color: var(--muted); margin-top: 14px; }
+  .grade-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 14px; }
+  .grade-row button { padding: 12px 6px; font-size: 13px; }
+  .g0 { background: var(--bad); } .g1 { background: var(--warn); }
+  .g2 { background: #3f8ad0; } .g3 { background: var(--good); }
+
+  /* Pomodoro */
+  .timer { font-size: 64px; font-weight: 700; text-align: center; letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+  .timer-state { text-align: center; color: var(--muted); margin-bottom: 8px; font-weight: 600; }
+
+  /* Planner */
+  .task { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+  .task:last-child { border-bottom: 0; }
+  .task input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); }
+  .task.done span.txt { text-decoration: line-through; color: var(--muted); }
+  .task .txt { flex: 1; }
+  .task .due { font-size: 12px; color: var(--muted); }
+  .del { background: transparent; border: 0; color: var(--muted); cursor: pointer; font-size: 18px; line-height: 1; }
+
+  .notes-area { min-height: 320px; }
+  footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 30px; }
+  .empty { text-align: center; color: var(--muted); padding: 24px 0; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="dot">E</div>
+      <div>
+        <h1>Estudio</h1>
+        <p>Tu asistente de estudio, todo en este dispositivo</p>
+      </div>
+    </div>
+    <button class="theme-btn" id="themeBtn">Tema</button>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button data-tab="cards" class="active">Tarjetas</button>
+    <button data-tab="pomo">Pomodoro</button>
+    <button data-tab="plan">Plan</button>
+    <button data-tab="notes">Notas</button>
+  </nav>
+
+  <!-- ============ TARJETAS ============ -->
+  <section id="tab-cards">
+    <div class="card" id="deckListCard">
+      <h2>Tus mazos</h2>
+      <p class="sub">Repaso con repetición espaciada. Las tarjetas que fallas vuelven antes; las que dominas, más tarde.</p>
+      <div id="deckList"></div>
+      <div class="row" style="margin-top:14px">
+        <input type="text" id="newDeckName" placeholder="Nombre del mazo (ej. Biología tema 3)" style="flex:1 1 220px" />
+        <button class="btn" id="addDeckBtn">Crear mazo</button>
+      </div>
+    </div>
+
+    <div class="card hidden" id="deckEditCard">
+      <div class="row" style="justify-content:space-between">
+        <h2 id="editDeckTitle">Mazo</h2>
+        <button class="btn ghost sm" id="backFromEdit">Volver</button>
+      </div>
+      <p class="sub">Añade tarjetas. Una por pregunta.</p>
+      <div style="margin-bottom:10px">
+        <label>Pregunta (anverso)</label>
+        <textarea id="cardFront" rows="2" placeholder="¿Qué es...?"></textarea>
+      </div>
+      <div style="margin-bottom:10px">
+        <label>Respuesta (reverso)</label>
+        <textarea id="cardBack" rows="2" placeholder="Es..."></textarea>
+      </div>
+      <div class="row">
+        <button class="btn" id="addCardBtn">Añadir tarjeta</button>
+        <span class="muted" id="cardCount"></span>
+      </div>
+      <div id="cardList" style="margin-top:16px"></div>
+    </div>
+
+    <div class="card hidden" id="studyCard">
+      <div class="row" style="justify-content:space-between">
+        <h2 id="studyTitle">Repasando</h2>
+        <button class="btn ghost sm" id="endStudy">Terminar</button>
+      </div>
+      <p class="sub" id="studyProgress"></p>
+      <div class="flash" id="flashEl">
+        <div>
+          <div id="flashText">Toca para empezar</div>
+          <div class="hint" id="flashHint">toca la tarjeta para ver la respuesta</div>
+        </div>
+      </div>
+      <div class="grade-row hidden" id="gradeRow">
+        <button class="g0" data-q="0">Otra vez</button>
+        <button class="g1" data-q="1">Difícil</button>
+        <button class="g2" data-q="2">Bien</button>
+        <button class="g3" data-q="3">Fácil</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ POMODORO ============ -->
+  <section id="tab-pomo" class="hidden">
+    <div class="card">
+      <h2>Temporizador pomodoro</h2>
+      <p class="sub">Trabaja en bloques enfocados con descansos. El valor por defecto es 25 minutos de estudio y 5 de descanso.</p>
+      <div class="timer-state" id="pomoState">Enfoque</div>
+      <div class="timer" id="pomoDisplay">25:00</div>
+      <div class="row" style="justify-content:center; margin-top:16px">
+        <button class="btn" id="pomoStart">Iniciar</button>
+        <button class="btn ghost" id="pomoReset">Reiniciar</button>
+      </div>
+      <div class="row" style="justify-content:center; margin-top:14px">
+        <div style="flex:0 0 130px">
+          <label>Enfoque (min)</label>
+          <input type="text" id="focusMin" value="25" inputmode="numeric" />
+        </div>
+        <div style="flex:0 0 130px">
+          <label>Descanso (min)</label>
+          <input type="text" id="breakMin" value="5" inputmode="numeric" />
+        </div>
+      </div>
+      <p class="sub" style="text-align:center; margin:16px 0 0">Bloques completados hoy: <span class="pill" id="pomoCount">0</span></p>
+    </div>
+  </section>
+
+  <!-- ============ PLAN ============ -->
+  <section id="tab-plan" class="hidden">
+    <div class="card">
+      <h2>Planificador</h2>
+      <p class="sub">Lo que tienes que hacer. Lo pendiente arriba, lo terminado abajo.</p>
+      <div class="row" style="margin-bottom:16px">
+        <input type="text" id="taskText" placeholder="Estudiar capítulo 4" style="flex:1 1 200px" />
+        <input type="text" id="taskDue" placeholder="Fecha (opcional)" style="flex:0 0 150px" />
+        <button class="btn" id="addTaskBtn">Añadir</button>
+      </div>
+      <div id="taskList"></div>
+    </div>
+  </section>
+
+  <!-- ============ NOTAS ============ -->
+  <section id="tab-notes" class="hidden">
+    <div class="card">
+      <h2>Notas</h2>
+      <p class="sub">Un bloc sencillo. Se guarda solo mientras escribes.</p>
+      <textarea id="notesArea" class="notes-area" placeholder="Escribe aquí tus apuntes..."></textarea>
+      <p class="sub" id="notesSaved" style="margin:10px 0 0">Guardado</p>
+    </div>
+  </section>
+
+  <footer>
+    Todo se guarda únicamente en este navegador. Si borras los datos del sitio, se pierde.
+  </footer>
+</div>
+
+<script>
+"use strict";
+
+/* ---------- almacenamiento seguro ---------- */
+const store = {
+  get(key, fallback) {
+    try { const v = localStorage.getItem(key); return v == null ? fallback : JSON.parse(v); }
+    catch (e) { return fallback; }
+  },
+  set(key, val) {
+    try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
+  }
+};
+
+/* ---------- tema ---------- */
+(function initTheme() {
+  const saved = store.get("theme", null);
+  if (saved) document.documentElement.setAttribute("data-theme", saved);
+  document.getElementById("themeBtn").addEventListener("click", () => {
+    const cur = document.documentElement.getAttribute("data-theme");
+    const dark = cur ? cur === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const next = dark ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    store.set("theme", next);
+  });
+})();
+
+/* ---------- navegación ---------- */
+const tabs = document.getElementById("tabs");
+tabs.addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-tab]");
+  if (!btn) return;
+  [...tabs.children].forEach(b => b.classList.toggle("active", b === btn));
+  ["cards", "pomo", "plan", "notes"].forEach(t => {
+    document.getElementById("tab-" + t).classList.toggle("hidden", t !== btn.dataset.tab);
+  });
+});
+
+/* ====================================================================
+   TARJETAS con repetición espaciada (SM-2 simplificado)
+==================================================================== */
+let decks = store.get("decks", []);
+let activeDeckId = null;
+let studyQueue = [];
+let studyIndex = 0;
+let showingBack = false;
+
+const DAY = 86400000;
+function saveDecks() { store.set("decks", decks); }
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+function newCard(front, back) {
+  return { id: uid(), front, back, ease: 2.5, interval: 0, reps: 0, due: Date.now() };
+}
+
+function dueCount(deck) {
+  const now = Date.now();
+  return deck.cards.filter(c => c.due <= now).length;
+}
+
+function renderDeckList() {
+  const el = document.getElementById("deckList");
+  if (!decks.length) {
+    el.innerHTML = '<p class="empty">Aún no tienes mazos. Crea el primero abajo.</p>';
+    return;
+  }
+  el.innerHTML = "";
+  decks.forEach(deck => {
+    const due = dueCount(deck);
+    const item = document.createElement("div");
+    item.className = "deck-item";
+    item.innerHTML = `
+      <div>
+        <div style="font-weight:600">${escapeHtml(deck.name)}</div>
+        <div class="meta">${deck.cards.length} tarjeta(s) · ${due} para repasar hoy</div>
+      </div>
+      <div class="row">
+        <button class="btn good sm" data-act="study" ${due ? "" : "disabled"}>Repasar</button>
+        <button class="btn ghost sm" data-act="edit">Editar</button>
+        <button class="del" data-act="del" title="Eliminar">×</button>
+      </div>`;
+    item.querySelector('[data-act="study"]').addEventListener("click", () => startStudy(deck.id));
+    item.querySelector('[data-act="edit"]').addEventListener("click", () => openDeck(deck.id));
+    item.querySelector('[data-act="del"]').addEventListener("click", () => {
+      if (confirm("¿Eliminar el mazo \"" + deck.name + "\"?")) {
+        decks = decks.filter(d => d.id !== deck.id);
+        saveDecks(); renderDeckList();
+      }
+    });
+    el.appendChild(item);
+  });
+}
+
+document.getElementById("addDeckBtn").addEventListener("click", () => {
+  const input = document.getElementById("newDeckName");
+  const name = input.value.trim();
+  if (!name) return;
+  decks.push({ id: uid(), name, cards: [] });
+  saveDecks();
+  input.value = "";
+  renderDeckList();
+});
+
+function openDeck(id) {
+  activeDeckId = id;
+  const deck = decks.find(d => d.id === id);
+  document.getElementById("editDeckTitle").textContent = deck.name;
+  document.getElementById("deckListCard").classList.add("hidden");
+  document.getElementById("studyCard").classList.add("hidden");
+  document.getElementById("deckEditCard").classList.remove("hidden");
+  renderCardList();
+}
+
+document.getElementById("backFromEdit").addEventListener("click", () => {
+  document.getElementById("deckEditCard").classList.add("hidden");
+  document.getElementById("deckListCard").classList.remove("hidden");
+  renderDeckList();
+});
+
+document.getElementById("addCardBtn").addEventListener("click", () => {
+  const f = document.getElementById("cardFront");
+  const b = document.getElementById("cardBack");
+  const front = f.value.trim(), back = b.value.trim();
+  if (!front || !back) return;
+  const deck = decks.find(d => d.id === activeDeckId);
+  deck.cards.push(newCard(front, back));
+  saveDecks();
+  f.value = ""; b.value = ""; f.focus();
+  renderCardList();
+});
+
+function renderCardList() {
+  const deck = decks.find(d => d.id === activeDeckId);
+  document.getElementById("cardCount").textContent = deck.cards.length + " tarjeta(s)";
+  const list = document.getElementById("cardList");
+  if (!deck.cards.length) { list.innerHTML = '<p class="empty">Sin tarjetas todavía.</p>'; return; }
+  list.innerHTML = "";
+  deck.cards.forEach(c => {
+    const row = document.createElement("div");
+    row.className = "deck-item";
+    row.innerHTML = `
+      <div style="flex:1; min-width:0">
+        <div style="font-weight:600; overflow:hidden; text-overflow:ellipsis">${escapeHtml(c.front)}</div>
+        <div class="meta" style="overflow:hidden; text-overflow:ellipsis">${escapeHtml(c.back)}</div>
+      </div>
+      <button class="del" title="Eliminar">×</button>`;
+    row.querySelector(".del").addEventListener("click", () => {
+      deck.cards = deck.cards.filter(x => x.id !== c.id);
+      saveDecks(); renderCardList();
+    });
+    list.appendChild(row);
+  });
+}
+
+function startStudy(id) {
+  activeDeckId = id;
+  const deck = decks.find(d => d.id === id);
+  const now = Date.now();
+  studyQueue = deck.cards.filter(c => c.due <= now).sort((a, b) => a.due - b.due);
+  if (!studyQueue.length) return;
+  studyIndex = 0;
+  document.getElementById("studyTitle").textContent = "Repasando: " + deck.name;
+  document.getElementById("deckListCard").classList.add("hidden");
+  document.getElementById("deckEditCard").classList.add("hidden");
+  document.getElementById("studyCard").classList.remove("hidden");
+  showCard();
+}
+
+function showCard() {
+  showingBack = false;
+  const card = studyQueue[studyIndex];
+  document.getElementById("studyProgress").textContent =
+    "Tarjeta " + (studyIndex + 1) + " de " + studyQueue.length;
+  document.getElementById("flashText").textContent = card.front;
+  document.getElementById("flashHint").textContent = "toca la tarjeta para ver la respuesta";
+  document.getElementById("gradeRow").classList.add("hidden");
+}
+
+document.getElementById("flashEl").addEventListener("click", () => {
+  if (!studyQueue.length || studyIndex >= studyQueue.length) return;
+  if (showingBack) return;
+  showingBack = true;
+  const card = studyQueue[studyIndex];
+  document.getElementById("flashText").textContent = card.back;
+  document.getElementById("flashHint").textContent = "¿qué tal te salió?";
+  document.getElementById("gradeRow").classList.remove("hidden");
+});
+
+document.getElementById("gradeRow").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-q]");
+  if (!btn) return;
+  gradeCard(parseInt(btn.dataset.q, 10));
+});
+
+/* SM-2 simplificado: q de 0 a 3 */
+function gradeCard(q) {
+  const card = studyQueue[studyIndex];
+  if (q === 0) {
+    card.reps = 0; card.interval = 0;
+    card.due = Date.now() + 60000; // en 1 min, vuelve en esta sesión
+  } else {
+    card.reps += 1;
+    card.ease = Math.max(1.3, card.ease + (0.1 - (3 - q) * (0.08 + (3 - q) * 0.02)));
+    if (card.reps === 1) card.interval = 1;
+    else if (card.reps === 2) card.interval = 3;
+    else card.interval = Math.round(card.interval * card.ease);
+    card.due = Date.now() + card.interval * DAY;
+  }
+  saveDecks();
+  studyIndex++;
+  // re-encolar las de "otra vez" al final
+  const now = Date.now();
+  if (studyIndex >= studyQueue.length) {
+    const deck = decks.find(d => d.id === activeDeckId);
+    const again = deck.cards.filter(c => c.due <= now && !studyQueue.slice(studyIndex).includes(c));
+    const pending = studyQueue.slice(studyIndex).concat(again.filter(c => c.due <= now && c.interval === 0));
+    if (pending.length) { studyQueue = pending; studyIndex = 0; showCard(); return; }
+    endStudy();
+    return;
+  }
+  showCard();
+}
+
+function endStudy() {
+  document.getElementById("studyCard").classList.add("hidden");
+  document.getElementById("deckListCard").classList.remove("hidden");
+  renderDeckList();
+}
+document.getElementById("endStudy").addEventListener("click", endStudy);
+
+/* ====================================================================
+   POMODORO
+==================================================================== */
+let pomoTimer = null;
+let pomoRemaining = 25 * 60;
+let pomoPhase = "focus"; // focus | break
+let pomoRunning = false;
+let pomoCount = store.get("pomoCount", { date: todayKey(), n: 0 });
+
+function todayKey() { return new Date().toISOString().slice(0, 10); }
+if (pomoCount.date !== todayKey()) pomoCount = { date: todayKey(), n: 0 };
+document.getElementById("pomoCount").textContent = pomoCount.n;
+
+function focusSecs() { return (parseInt(document.getElementById("focusMin").value, 10) || 25) * 60; }
+function breakSecs() { return (parseInt(document.getElementById("breakMin").value, 10) || 5) * 60; }
+
+function renderPomo() {
+  const m = Math.floor(pomoRemaining / 60);
+  const s = pomoRemaining % 60;
+  document.getElementById("pomoDisplay").textContent =
+    String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+  document.getElementById("pomoState").textContent = pomoPhase === "focus" ? "Enfoque" : "Descanso";
+}
+
+function tick() {
+  pomoRemaining--;
+  if (pomoRemaining < 0) {
+    if (pomoPhase === "focus") {
+      pomoCount.n++; pomoCount.date = todayKey();
+      store.set("pomoCount", pomoCount);
+      document.getElementById("pomoCount").textContent = pomoCount.n;
+      pomoPhase = "break"; pomoRemaining = breakSecs();
+      beep();
+    } else {
+      pomoPhase = "focus"; pomoRemaining = focusSecs();
+      beep();
+    }
+  }
+  renderPomo();
+}
+
+document.getElementById("pomoStart").addEventListener("click", () => {
+  if (pomoRunning) {
+    clearInterval(pomoTimer); pomoRunning = false;
+    document.getElementById("pomoStart").textContent = "Reanudar";
+  } else {
+    pomoRunning = true;
+    document.getElementById("pomoStart").textContent = "Pausar";
+    pomoTimer = setInterval(tick, 1000);
+  }
+});
+document.getElementById("pomoReset").addEventListener("click", () => {
+  clearInterval(pomoTimer); pomoRunning = false;
+  pomoPhase = "focus"; pomoRemaining = focusSecs();
+  document.getElementById("pomoStart").textContent = "Iniciar";
+  renderPomo();
+});
+
+function beep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator(); const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.frequency.value = 660; o.type = "sine";
+    g.gain.setValueAtTime(0.0001, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
+    o.start(); o.stop(ctx.currentTime + 0.5);
+  } catch (e) {}
+}
+renderPomo();
+
+/* ====================================================================
+   PLANIFICADOR
+==================================================================== */
+let tasks = store.get("tasks", []);
+function saveTasks() { store.set("tasks", tasks); }
+
+function renderTasks() {
+  const list = document.getElementById("taskList");
+  if (!tasks.length) { list.innerHTML = '<p class="empty">Nada pendiente. Añade algo arriba.</p>'; return; }
+  const sorted = [...tasks].sort((a, b) => (a.done - b.done));
+  list.innerHTML = "";
+  sorted.forEach(t => {
+    const row = document.createElement("div");
+    row.className = "task" + (t.done ? " done" : "");
+    const chk = document.createElement("input");
+    chk.type = "checkbox"; chk.checked = t.done;
+    chk.addEventListener("change", () => { t.done = chk.checked; saveTasks(); renderTasks(); });
+    const txt = document.createElement("span");
+    txt.className = "txt"; txt.textContent = t.text;
+    const due = document.createElement("span");
+    due.className = "due"; due.textContent = t.due || "";
+    const del = document.createElement("button");
+    del.className = "del"; del.textContent = "×";
+    del.addEventListener("click", () => { tasks = tasks.filter(x => x.id !== t.id); saveTasks(); renderTasks(); });
+    row.append(chk, txt, due, del);
+    list.appendChild(row);
+  });
+}
+
+document.getElementById("addTaskBtn").addEventListener("click", addTask);
+document.getElementById("taskText").addEventListener("keydown", (e) => { if (e.key === "Enter") addTask(); });
+function addTask() {
+  const t = document.getElementById("taskText");
+  const d = document.getElementById("taskDue");
+  const text = t.value.trim();
+  if (!text) return;
+  tasks.push({ id: uid(), text, due: d.value.trim(), done: false });
+  saveTasks();
+  t.value = ""; d.value = ""; t.focus();
+  renderTasks();
+}
+
+/* ====================================================================
+   NOTAS
+==================================================================== */
+const notesArea = document.getElementById("notesArea");
+notesArea.value = store.get("notes", "");
+let notesTimer = null;
+notesArea.addEventListener("input", () => {
+  document.getElementById("notesSaved").textContent = "Guardando...";
+  clearTimeout(notesTimer);
+  notesTimer = setTimeout(() => {
+    store.set("notes", notesArea.value);
+    document.getElementById("notesSaved").textContent = "Guardado";
+  }, 400);
+});
+
+/* ---------- util ---------- */
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+/* ---------- arranque ---------- */
+renderDeckList();
+renderTasks();
+</script>
+</body>
+</html>
