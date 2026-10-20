@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Estudio</title>
-<meta name="description" content="Asistente de estudio: tarjetas con repetición espaciada, pomodoro, planificador y notas. Todo guardado en tu navegador." />
+<meta name="description" content="Asistente de estudio: tarjetas con repetición espaciada, temporizador, planificador y notas. Todo guardado en tu navegador." />
 <style>
   :root {
     --bg: #f4f6fb;
@@ -153,9 +153,36 @@
   .notes-area { min-height: 320px; }
   footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 30px; }
   .empty { text-align: center; color: var(--muted); padding: 24px 0; font-size: 14px; }
+
+  /* Pantalla de acceso */
+  body.locked { overflow: hidden; }
+  #lock { position: fixed; inset: 0; background: var(--bg); display: grid; place-items: center; z-index: 1000; padding: 16px; }
+  #lock .box {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 30px 24px; width: 100%; max-width: 340px; text-align: center;
+  }
+  #lock .lock-dot {
+    width: 46px; height: 46px; border-radius: 12px; margin: 0 auto 14px;
+    background: linear-gradient(135deg, var(--accent), #9b6bed);
+    display: grid; place-items: center; color: #fff; font-size: 22px; font-weight: 700;
+  }
+  #lock h2 { margin: 0 0 4px; font-size: 17px; }
+  #lock p { margin: 0 0 16px; color: var(--muted); font-size: 13px; }
+  #lock input { text-align: center; letter-spacing: .08em; margin-bottom: 10px; }
+  #lock .err { color: var(--bad); font-size: 12.5px; min-height: 18px; margin-top: 10px; }
 </style>
 </head>
 <body>
+<div id="lock">
+  <div class="box">
+    <div class="lock-dot">E</div>
+    <h2>Acceso</h2>
+    <p>Introduce tu código para entrar.</p>
+    <input type="password" id="lockInput" placeholder="Código" autocomplete="off" autocapitalize="characters" />
+    <button class="btn" id="lockBtn" style="width:100%">Entrar</button>
+    <div class="err" id="lockErr"></div>
+  </div>
+</div>
 <div class="wrap">
   <header class="top">
     <div class="brand">
@@ -170,7 +197,7 @@
 
   <nav class="tabs" id="tabs">
     <button data-tab="cards" class="active">Tarjetas</button>
-    <button data-tab="pomo">Pomodoro</button>
+    <button data-tab="pomo">Temporizador</button>
     <button data-tab="plan">Plan</button>
     <button data-tab="notes">Notas</button>
   </nav>
@@ -232,7 +259,7 @@
   <!-- ============ POMODORO ============ -->
   <section id="tab-pomo" class="hidden">
     <div class="card">
-      <h2>Temporizador pomodoro</h2>
+      <h2>Temporizador</h2>
       <p class="sub">Trabaja en bloques enfocados con descansos. El valor por defecto es 25 minutos de estudio y 5 de descanso.</p>
       <div class="timer-state" id="pomoState">Enfoque</div>
       <div class="timer" id="pomoDisplay">25:00</div>
@@ -296,6 +323,31 @@ const store = {
     try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
   }
 };
+
+/* ---------- pantalla de acceso ---------- */
+/* Nota: esto es un candado personal, no seguridad real. El código vive
+   en el propio archivo y puede verse en el código fuente. */
+(function initLock() {
+  const CODE = "SECRET-IA";
+  const lock = document.getElementById("lock");
+  const input = document.getElementById("lockInput");
+  const btn = document.getElementById("lockBtn");
+  const err = document.getElementById("lockErr");
+  document.body.classList.add("locked");
+  function tryUnlock() {
+    if (input.value.trim().toUpperCase() === CODE) {
+      lock.remove();
+      document.body.classList.remove("locked");
+    } else {
+      err.textContent = "Código incorrecto";
+      input.value = "";
+      input.focus();
+    }
+  }
+  btn.addEventListener("click", tryUnlock);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") tryUnlock(); });
+  input.focus();
+})();
 
 /* ---------- tema ---------- */
 (function initTheme() {
