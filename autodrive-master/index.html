@@ -1,0 +1,1165 @@
+<title>AutoDrive Master</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          display: ['"Barlow Condensed"', '"Arial Narrow"', 'sans-serif'],
+          sans: ['Barlow', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+          mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace']
+        },
+        colors: { ink: '#0b0f19' }
+      }
+    }
+  };
+</script>
+<style>
+  /* Layout: una columna centrada (máx. 1100px); navegación arriba en escritorio y abajo en móvil.
+     Tipografía Barlow: nació de la rotulación de carreteras, por eso encaja con el tema. */
+  :root {
+    --bg: #0b0f19;
+    --surface: rgba(255, 255, 255, 0.035);
+    --surface-solid: #121827;
+    --line: rgba(255, 255, 255, 0.09);
+    --fg: #e7eaf3;
+    --muted: #8a93a8;
+    --emerald: #10b981;
+    --indigo: #6366f1;
+    --coral: #f43f5e;
+    --amber: #f59e0b;
+    --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
+    --font-body: Barlow, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, monospace;
+    color-scheme: dark;
+  }
+  html, body { background: var(--bg); color: var(--fg); }
+  body { font-family: var(--font-body); font-size: 16px; -webkit-font-smoothing: antialiased; }
+  .font-display { letter-spacing: 0.01em; }
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  .atmos {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(60rem 40rem at -10% -10%, rgba(16, 185, 129, 0.13), transparent 60%),
+      radial-gradient(50rem 36rem at 110% 0%, rgba(99, 102, 241, 0.16), transparent 60%),
+      radial-gradient(40rem 30rem at 50% 120%, rgba(244, 63, 94, 0.07), transparent 60%);
+  }
+  .shell {
+    position: relative; z-index: 1;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .glass {
+    background: var(--surface);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid var(--line);
+    border-radius: 1rem;
+  }
+  .lane {
+    height: 2px;
+    background: repeating-linear-gradient(90deg, rgba(250, 204, 21, 0.55) 0 18px, transparent 18px 32px);
+    opacity: 0.6;
+  }
+  .bottomnav {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+    padding-top: 8px;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+    padding-left: max(10px, env(safe-area-inset-left, 0px));
+    padding-right: max(10px, env(safe-area-inset-right, 0px));
+    background: rgba(11, 15, 25, 0.82);
+    -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+    border-top: 1px solid var(--line);
+  }
+  :focus-visible { outline: 2px solid #818cf8; outline-offset: 2px; border-radius: 10px; }
+
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @keyframes pop { 0% { transform: scale(1); } 40% { transform: scale(1.02); } 100% { transform: scale(1); } }
+  @keyframes shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-6px); } 40% { transform: translateX(5px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(2px); } }
+  @keyframes flicker { 0%, 100% { transform: scale(1) rotate(0deg); } 50% { transform: scale(1.08) rotate(-3deg); } }
+  .view { animation: rise 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .reveal { animation: rise 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .pop { animation: pop 0.45s ease-out; }
+  .shake { animation: shake 0.42s ease-out; }
+  .flame { animation: flicker 2.4s ease-in-out infinite; transform-origin: 50% 80%; }
+
+  /* Tarjetas de señales con volteo */
+  .flip { perspective: 1200px; }
+  .flip-inner {
+    position: relative; height: 300px; width: 100%;
+    transform-style: preserve-3d;
+    transition: transform 0.7s cubic-bezier(0.3, 0.7, 0.2, 1);
+    cursor: pointer;
+  }
+  .flip.flipped .flip-inner { transform: rotateY(180deg); }
+  .face {
+    position: absolute; inset: 0;
+    -webkit-backface-visibility: hidden; backface-visibility: hidden;
+    border-radius: 1rem; border: 1px solid var(--line);
+    background: linear-gradient(160deg, rgba(30, 37, 56, 0.92), rgba(16, 21, 34, 0.96));
+  }
+  .face.back { transform: rotateY(180deg); }
+
+  .bar-fill { transition: width 1.1s cubic-bezier(0.2, 0.7, 0.2, 1); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .view, .reveal, .pop, .shake, .flame { animation: none !important; }
+    .flip-inner { transition-duration: 0.01s; }
+    .bar-fill { transition: none; }
+  }
+</style>
+
+<div class="atmos" aria-hidden="true"></div>
+<div id="root">
+  <p style="padding: 48px 16px; text-align: center; color: #8a93a8; font-family: system-ui, sans-serif;">Cargando AutoDrive Master…</p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/htm@3.1.1/dist/htm.umd.js"></script>
+<script>
+(function () {
+  const { useState, useEffect, useRef, useCallback } = React;
+  const html = htm.bind(React.createElement);
+
+  /* ───────── Configuración ───────── */
+  const KEY = 'autodrive-master-v1';
+  const PASS = 0.8;          // 80 % para aprobar
+  const EXAM_SIZE = 20;      // preguntas por simulacro
+  const EXAM_MINUTES = 20;   // duración del simulacro
+  const LET = ['A', 'B', 'C', 'D'];
+  const cx = (...a) => a.filter(Boolean).join(' ');
+  function shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  }
+  const dayKey = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const today = () => dayKey(new Date());
+  const fmtTime = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
+  const fmtDate = (t) => new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(t));
+
+  /* ───────── Iconos (trazos de Lucide) ───────── */
+  const ICONS = {
+    home: '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+    clipboard: '<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/>',
+    target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+    layers: '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
+    alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+    clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+    flame: '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
+    bookmark: '<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>',
+    check: '<polyline points="20 6 9 17 4 12"/>',
+    x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+    left: '<path d="m15 18-6-6 6-6"/>',
+    right: '<path d="m9 18 6-6-6-6"/>',
+    arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+    rotate: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+    bulb: '<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>',
+    trophy: '<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>',
+    trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
+    flag: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/>',
+    book: '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>'
+  };
+  function Icon({ name, className = 'w-5 h-5' }) {
+    return html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className=${className} aria-hidden="true" dangerouslySetInnerHTML=${{ __html: ICONS[name] }}></svg>`;
+  }
+
+  /* ───────── Señales de tránsito (SVG) ───────── */
+  const RING = '<circle cx="60" cy="60" r="52" fill="#fff" stroke="#e11d48" stroke-width="11"/>';
+  const SLASH = '<line x1="25" y1="25" x2="95" y2="95" stroke="#e11d48" stroke-width="10" stroke-linecap="round"/>';
+  const DIAMOND = '<rect x="20" y="20" width="80" height="80" rx="9" transform="rotate(45 60 60)" fill="#facc15" stroke="#111" stroke-width="3"/><rect x="25" y="25" width="70" height="70" rx="6" transform="rotate(45 60 60)" fill="none" stroke="#111" stroke-width="1.6"/>';
+  const SERVICE = '<rect x="8" y="8" width="104" height="104" rx="14" fill="#1d4ed8"/><rect x="24" y="24" width="72" height="72" rx="8" fill="#fff"/>';
+  // fit: ancho máximo en px; si la fuente no carga, el texto se comprime en vez de salirse de la señal.
+  const TXT = (t, x, y, size, fill = '#111', anchor = 'middle', family = 'Barlow Condensed, Arial Narrow, sans-serif', fit) =>
+    `<text x="${x}" y="${y}" text-anchor="${anchor}" font-family="${family}" font-weight="700" font-size="${size}" fill="${fill}"${fit ? ` textLength="${fit}" lengthAdjust="spacingAndGlyphs"` : ''}>${t}</text>`;
+  const FIG = (x, y, s) => `<g transform="translate(${x} ${y}) scale(${s})" stroke="#111" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"><circle cx="0" cy="-27" r="6.5" fill="#111" stroke="none"/><path d="M1 -17 L-2 5 M-2 5 L-11 24 M-2 5 L9 24 M0 -11 L-12 0 M0 -11 L12 -3"/></g>`;
+
+  const SIGN_SVG = {
+    pare: '<polygon points="81.4,8.3 111.7,38.6 111.7,81.4 81.4,111.7 38.6,111.7 8.3,81.4 8.3,38.6 38.6,8.3" fill="#dc2626"/><polygon points="79.1,13.8 106.2,40.9 106.2,79.1 79.1,106.2 40.9,106.2 13.8,79.1 13.8,40.9 40.9,13.8" fill="none" stroke="#fff" stroke-width="3"/>' + TXT('PARE', 60, 72, 34, '#fff', 'middle', undefined, 74),
+    ceda: '<polygon points="10,16 110,16 60,104" fill="#fff" stroke="#e11d48" stroke-width="10" stroke-linejoin="round"/>' + TXT('CEDA EL', 60, 43, 15, '#111', 'middle', undefined, 52) + TXT('PASO', 60, 61, 17),
+    vel60: RING + TXT('60', 60, 73, 48) + TXT('km/h', 60, 90, 13),
+    noIzq: RING + '<path d="M72 92 V60 Q72 45 57 45 H46" fill="none" stroke="#111" stroke-width="9"/><polygon points="30,45 47,32 47,58" fill="#111"/>' + SLASH,
+    noEst: RING + TXT('E', 60, 79, 54) + SLASH,
+    noU: RING + '<path d="M74 92 V56 a16 16 0 0 0 -32 0 V64" fill="none" stroke="#111" stroke-width="9"/><polygon points="30,62 54,62 42,82" fill="#111"/>' + SLASH,
+    siga: RING + '<line x1="60" y1="94" x2="60" y2="42" stroke="#111" stroke-width="10"/><polygon points="60,24 78,48 42,48" fill="#111"/>',
+    curva: DIAMOND + '<path d="M50 88 V66 C50 52 58 45 72 43" fill="none" stroke="#111" stroke-width="8"/><polygon points="86,42 70,31 70,54" fill="#111"/>',
+    peatones: DIAMOND + FIG(60, 66, 1),
+    escolar: DIAMOND + FIG(48, 66, 0.85) + FIG(72, 72, 0.65),
+    semaforo: DIAMOND + '<rect x="50" y="30" width="20" height="60" rx="5" fill="#111"/><circle cx="60" cy="42" r="6.5" fill="#ef4444"/><circle cx="60" cy="60" r="6.5" fill="#f59e0b"/><circle cx="60" cy="78" r="6.5" fill="#22c55e"/>',
+    reductor: DIAMOND + '<path d="M32 76 H46 Q60 52 74 76 H88" fill="none" stroke="#111" stroke-width="7" stroke-linejoin="round"/>',
+    cruce: DIAMOND + '<line x1="60" y1="28" x2="60" y2="92" stroke="#111" stroke-width="10"/><line x1="28" y1="60" x2="92" y2="60" stroke="#111" stroke-width="10"/>',
+    estrecho: DIAMOND + '<path d="M44 88 V72 L52 58 V34" fill="none" stroke="#111" stroke-width="7"/><path d="M76 88 V72 L68 58 V34" fill="none" stroke="#111" stroke-width="7"/>',
+    doble: DIAMOND + '<line x1="48" y1="88" x2="48" y2="44" stroke="#111" stroke-width="7"/><polygon points="48,30 58,46 38,46" fill="#111"/><line x1="72" y1="32" x2="72" y2="76" stroke="#111" stroke-width="7"/><polygon points="72,90 62,74 82,74" fill="#111"/>',
+    hospital: SERVICE + TXT('H', 60, 80, 56),
+    parking: SERVICE + TXT('E', 60, 80, 56),
+    gasolina: SERVICE + '<rect x="42" y="38" width="24" height="44" rx="3" fill="#111"/><rect x="46" y="43" width="16" height="11" rx="1" fill="#fff"/><rect x="38" y="82" width="32" height="5" rx="1" fill="#111"/><path d="M66 50 H72 V72 a4 4 0 0 0 8 0 V52 L74 44" fill="none" stroke="#111" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>',
+    restaurante: SERVICE + '<path d="M46 36 V52 M52 36 V52 M58 36 V52 M46 52 Q52 60 58 52" fill="none" stroke="#111" stroke-width="3.5" stroke-linecap="round"/><line x1="52" y1="56" x2="52" y2="86" stroke="#111" stroke-width="5" stroke-linecap="round"/><path d="M70 36 Q81 46 77 64 H71 Z" fill="#111"/><line x1="74" y1="62" x2="74" y2="86" stroke="#111" stroke-width="5" stroke-linecap="round"/>',
+    info: SERVICE + TXT('i', 60, 84, 64, '#111', 'middle', 'Georgia, serif'),
+    destino: '<rect x="4" y="24" width="112" height="72" rx="10" fill="#15803d"/><rect x="9" y="29" width="102" height="62" rx="7" fill="none" stroke="#fff" stroke-width="2.5"/>' + TXT('Centro', 18, 56, 23, '#fff', 'start', undefined, 56) + TXT('5 km', 18, 82, 19, '#fff', 'start') + '<path d="M80 52 H100 M92 43 L101 52 L92 61" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>'
+  };
+
+  const SIGNS = [
+    { id: 'pare', type: 'reg', name: 'PARE / ALTO', meaning: 'Detención total obligatoria antes de la línea de alto. Avanzas solo cuando la vía esté libre.', tip: 'Es la única señal octagonal: se reconoce aunque la veas de espaldas.' },
+    { id: 'ceda', type: 'reg', name: 'Ceda el paso', meaning: 'Reduce la velocidad y cede el paso a quienes circulan por la vía preferente. Te detienes solo si hace falta.', tip: 'La única señal con forma de triángulo invertido.' },
+    { id: 'vel60', type: 'reg', name: 'Velocidad máxima 60 km/h', meaning: 'No puedes superar los 60 km/h desde la señal hasta que otra indique un límite distinto.', tip: 'Es un máximo, no una velocidad recomendada. Con lluvia o tránsito, ve más lento.' },
+    { id: 'noIzq', type: 'reg', name: 'Prohibido girar a la izquierda', meaning: 'No puedes doblar a la izquierda en la próxima intersección.', tip: 'Tres giros a la derecha te llevan al mismo destino.' },
+    { id: 'noEst', type: 'reg', name: 'Prohibido estacionar', meaning: 'No puedes dejar el vehículo estacionado. Sí puedes detenerte un momento para subir o bajar pasajeros.', tip: 'La E cruzada se usa en México, Colombia y Perú, entre otros. Otros países usan la P.' },
+    { id: 'noU', type: 'reg', name: 'Prohibido girar en U', meaning: 'No puedes dar vuelta en U para regresar en sentido contrario.', tip: 'Suele aparecer cerca de curvas, puentes o vías rápidas.' },
+    { id: 'siga', type: 'reg', name: 'Siga de frente', meaning: 'En la próxima intersección solo puedes continuar recto. Los giros están prohibidos.', tip: 'Flecha dentro de un círculo obliga. Flecha en un rectángulo solo orienta.' },
+    { id: 'curva', type: 'prev', name: 'Curva a la derecha', meaning: 'Más adelante hay una curva pronunciada a la derecha. Reduce la velocidad antes de entrar.', tip: 'Frena en la recta, antes de la curva, nunca dentro de ella.' },
+    { id: 'peatones', type: 'prev', name: 'Cruce de peatones', meaning: 'Zona con paso frecuente de peatones. Reduce la velocidad y prepárate para detenerte.', tip: 'Un auto detenido en el carril de al lado puede estar tapando a alguien que cruza.' },
+    { id: 'escolar', type: 'prev', name: 'Zona escolar', meaning: 'Hay una escuela cerca. Reduce mucho la velocidad (el límite suele estar entre 20 y 30 km/h) y extrema la atención.', tip: 'Los niños son impredecibles y difíciles de ver entre autos estacionados.' },
+    { id: 'semaforo', type: 'prev', name: 'Semáforo adelante', meaning: 'Hay un semáforo próximo, quizá oculto tras una curva o una pendiente. Prepárate para detenerte.', tip: 'Levanta el pie del acelerador desde que ves la señal.' },
+    { id: 'reductor', type: 'prev', name: 'Reductor de velocidad', meaning: 'Hay un tope, resalto o reductor más adelante. Baja la velocidad para pasarlo.', tip: 'Pásalo despacio y en línea recta para cuidar la suspensión.' },
+    { id: 'cruce', type: 'prev', name: 'Intersección en cruz', meaning: 'Más adelante se cruzan dos vías. Atento a vehículos que entran por ambos lados.', tip: 'Sin otras señales, la prioridad es de quien viene por tu derecha.' },
+    { id: 'estrecho', type: 'prev', name: 'Estrechamiento de vía', meaning: 'La calzada se hace más angosta. Reduce y ten cuidado con los vehículos que vienen de frente.', tip: 'Si no caben dos, cede el paso a quien ya entró al tramo angosto.' },
+    { id: 'doble', type: 'prev', name: 'Doble circulación', meaning: 'A partir de aquí la vía tiene tránsito en ambos sentidos.', tip: 'Muy común al terminar una autopista o un tramo de un solo sentido.' },
+    { id: 'hospital', type: 'info', name: 'Hospital', meaning: 'Hay un hospital cerca. Evita usar la bocina y facilita el paso a las ambulancias.', tip: 'Fondo azul con recuadro blanco: señal de servicio.' },
+    { id: 'parking', type: 'info', name: 'Estacionamiento', meaning: 'Indica una zona o edificio donde sí está permitido estacionar.', tip: 'Compárala con la E cruzada en rojo: la forma y el color cambian el significado.' },
+    { id: 'gasolina', type: 'info', name: 'Gasolinera', meaning: 'Hay una estación de combustible más adelante.', tip: 'En carretera, recargar cuando el tanque llega a 1/4 evita quedarte varado.' },
+    { id: 'restaurante', type: 'info', name: 'Restaurante', meaning: 'Hay un servicio de comida próximo.', tip: 'Buen momento para una pausa: se recomienda descansar cada 2 horas de manejo.' },
+    { id: 'info', type: 'info', name: 'Información turística', meaning: 'Punto de información para visitantes: mapas, rutas y servicios de la zona.', tip: 'Las informativas nunca imponen una obligación, solo orientan.' },
+    { id: 'destino', type: 'info', name: 'Señal de destino', meaning: 'Indica la dirección y la distancia hasta un lugar. Las de fondo verde orientan en carreteras y vías urbanas.', tip: 'Fíjate en el carril con antelación para no hacer maniobras bruscas.' }
+  ];
+  const SIGN_TYPES = {
+    reg: { label: 'Reglamentarias', short: 'Reglamentaria', chip: 'bg-rose-500/15 text-rose-300 border-rose-400/25' },
+    prev: { label: 'Preventivas', short: 'Preventiva', chip: 'bg-amber-500/15 text-amber-300 border-amber-400/25' },
+    info: { label: 'Informativas', short: 'Informativa', chip: 'bg-sky-500/15 text-sky-300 border-sky-400/25' }
+  };
+  const SIGN_BY_ID = Object.fromEntries(SIGNS.map((s) => [s.id, s]));
+
+  function Sign({ id, className = 'w-24 h-24' }) {
+    const label = SIGN_BY_ID[id] ? 'Señal: ' + SIGN_BY_ID[id].name : 'Señal de tránsito';
+    const svg = `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${label}" style="width:100%;height:100%;overflow:visible">${SIGN_SVG[id]}</svg>`;
+    return html`<div className=${className} dangerouslySetInnerHTML=${{ __html: svg }}></div>`;
+  }
+
+  /* ───────── Banco de preguntas ───────── */
+  const CATS = {
+    senales: { label: 'Señales', chip: 'bg-indigo-500/15 text-indigo-300 border-indigo-400/25' },
+    normas: { label: 'Normas de circulación', chip: 'bg-emerald-500/15 text-emerald-300 border-emerald-400/25' },
+    seguridad: { label: 'Seguridad vial', chip: 'bg-rose-500/15 text-rose-300 border-rose-400/25' },
+    conduccion: { label: 'Conducción y mecánica', chip: 'bg-amber-500/15 text-amber-300 border-amber-400/25' }
+  };
+
+  const RAW = [
+    { id: 'q1', cat: 'senales', sign: 'ceda', q: '¿Qué te obliga a hacer esta señal?',
+      opts: ['Detenerte siempre por completo, aunque no venga nadie', 'Reducir la velocidad y ceder el paso a quienes circulan por la vía preferente; detenerte solo si es necesario', 'Tocar la bocina para avisar que vas a cruzar', 'Nada: te da prioridad sobre la otra vía'], answer: 1,
+      exp: 'El triángulo invertido con borde rojo es CEDA EL PASO. A diferencia de PARE, no exige detenerse siempre: bajas la velocidad, miras y dejas pasar a quien circula por la vía principal. Si viene alguien, te detienes. Si la vía está libre, continúas sin parar.',
+      tip: 'Triángulo invertido = ceder. Octágono = detenerse siempre.' },
+    { id: 'q2', cat: 'senales', sign: 'pare', q: 'Llegas a esta señal y no se ve ningún vehículo. ¿Qué haces?',
+      opts: ['Paso despacio sin detenerme, porque la vía está libre', 'Me detengo por completo antes de la línea de alto y sigo solo cuando sea seguro', 'Me detengo solo si hay peatones', 'Toco la bocina y continúo'], answer: 1,
+      exp: 'PARE (ALTO en México) exige detención total siempre, haya o no tránsito. La parada se hace antes de la línea blanca o, si no la hay, antes del paso peatonal. El error más común en el examen práctico es la “parada rodando”: el vehículo tiene que quedar completamente quieto.',
+      tip: 'Ruedas quietas, mira a ambos lados y luego avanza.' },
+    { id: 'q3', cat: 'senales', sign: 'curva', q: 'Las señales con forma de rombo y fondo amarillo, como esta, pertenecen al grupo de:',
+      opts: ['Señales reglamentarias', 'Señales informativas', 'Señales preventivas', 'Señales de obra temporal'], answer: 2,
+      exp: 'Las preventivas avisan de un peligro o un cambio en la vía más adelante: curvas, cruces, reductores, zonas escolares. El rombo amarillo se ve de lejos. Las de obras usan la misma forma pero en naranja. Las reglamentarias (círculos y el octágono de PARE) imponen obligaciones o prohibiciones, y las informativas (rectángulos azules o verdes) orientan.',
+      tip: 'Amarillo avisa, rojo ordena, azul y verde informan.' },
+    { id: 'q4', cat: 'senales', sign: 'noEst', q: '¿Qué indica esta señal?',
+      opts: ['Estación de servicio a la derecha', 'Prohibido estacionar', 'Estacionamiento exclusivo', 'Prohibido detenerse por cualquier motivo'], answer: 1,
+      exp: 'El círculo con borde rojo y la letra E cruzada por una diagonal prohíbe estacionar. Sí puedes detenerte un momento para que suba o baje un pasajero, siempre que no bloquees el tránsito. “Prohibido detenerse” es otra señal distinta y más restrictiva.',
+      tip: 'La diagonal roja convierte cualquier símbolo en prohibición.' },
+    { id: 'q5', cat: 'senales', sign: 'hospital', q: 'Las señales de fondo azul, como esta, sirven principalmente para:',
+      opts: ['Advertir de un peligro cercano', 'Informar sobre servicios disponibles en la vía', 'Indicar límites de velocidad', 'Marcar zonas en obras'], answer: 1,
+      exp: 'Las señales informativas de servicios (hospital, gasolinera, restaurante, estacionamiento) tienen fondo azul. Las de destino y ruta suelen ser verdes. Ninguna impone una obligación: su función es orientarte.',
+      tip: 'Azul = servicios. Verde = rutas y destinos.' },
+    { id: 'q6', cat: 'normas', q: '¿Qué significa la luz amarilla fija del semáforo?',
+      opts: ['Que debes acelerar para cruzar antes del rojo', 'Que la luz roja está por encenderse: debes detenerte si puedes hacerlo con seguridad', 'Que puedes seguir con precaución, igual que en verde', 'Que el semáforo está fallando'], answer: 1,
+      exp: 'El amarillo es una fase de transición. Si al encenderse ya estás tan cerca que frenar sería peligroso (entrarías frenando dentro del cruce), termina de cruzar con precaución. Si puedes detenerte a tiempo, debes hacerlo. Acelerar para “ganarle” al rojo es una de las causas más frecuentes de choques en intersecciones.',
+      tip: 'Amarillo = prepárate para detenerte, no para acelerar.' },
+    { id: 'q7', cat: 'normas', q: 'Un semáforo con la luz roja intermitente debe tratarse como:',
+      opts: ['Una señal de PARE: detención total y luego avanzar con precaución', 'Una señal de CEDA EL PASO', 'Un semáforo apagado que puedes ignorar', 'Una indicación de que tienes preferencia'], answer: 0,
+      exp: 'La roja intermitente equivale a PARE: te detienes por completo, cedes el paso a quien corresponda y avanzas cuando sea seguro. La amarilla intermitente, en cambio, significa precaución: reduces la velocidad y cruzas atento, sin obligación de detenerte.',
+      tip: 'Rojo parpadeando = PARE. Amarillo parpadeando = precaución.' },
+    { id: 'q8', cat: 'normas', q: 'En una intersección sin semáforo ni señales llegan dos vehículos al mismo tiempo. ¿Quién pasa primero?',
+      opts: ['El que va más rápido', 'El vehículo de mayor tamaño', 'El que viene por la derecha', 'El que toque primero la bocina'], answer: 2,
+      exp: 'La regla general en la mayoría de los reglamentos latinoamericanos es la prioridad de quien se aproxima por tu derecha. Si alguien viene por ese lado, le cedes el paso. Ante la duda, cede: tener la preferencia no te protege de un choque.',
+      tip: 'Sin señales, manda la derecha.' },
+    { id: 'q9', cat: 'normas', q: 'Al entrar a una glorieta (rotonda), ¿quién tiene preferencia?',
+      opts: ['Los vehículos que ya circulan dentro de la glorieta', 'Los vehículos que intentan entrar', 'Siempre el vehículo más grande', 'Quien esté más cerca de su salida'], answer: 0,
+      exp: 'En la mayoría de los reglamentos, quien ya circula dentro de la glorieta tiene prioridad sobre quien entra. Antes de incorporarte, reduce la velocidad, cede el paso y entra cuando haya un espacio seguro. Usa la direccional derecha para indicar que vas a salir. Si la glorieta tiene semáforos o señales propias, esas mandan.',
+      tip: 'Quien está dentro, pasa primero.' },
+    { id: 'q10', cat: 'normas', q: '¿Qué indica una doble línea continua amarilla en el centro de la calzada?',
+      opts: ['Que puedes rebasar si no viene nadie', 'Que está prohibido cruzarla para rebasar o dar vuelta en U', 'Que hay un carril exclusivo para transporte público', 'Que la vía es de un solo sentido'], answer: 1,
+      exp: 'Las líneas amarillas separan flujos en sentido contrario. Cuando son continuas no se pueden cruzar: rebasar ahí obliga a invadir el carril contrario sin visibilidad suficiente. Si la línea de tu lado es discontinua, puedes rebasar con precaución.',
+      tip: 'Continua = muro. Discontinua = puerta, solo si es seguro.' },
+    { id: 'q11', cat: 'normas', q: 'Como regla general, ¿por qué lado se rebasa a otro vehículo?',
+      opts: ['Por la derecha', 'Por la izquierda', 'Por cualquier lado si hay espacio', 'Por el acotamiento u orilla'], answer: 1,
+      exp: 'Se rebasa por la izquierda: señalizas antes, revisas espejos y punto ciego, y vuelves a tu carril cuando ves el vehículo rebasado en el retrovisor interior. Rebasar por la derecha solo se admite en casos concretos, como cuando el otro vehículo indicó que gira a la izquierda.',
+      tip: 'Rebasar por la izquierda, volver cuando lo veas en el retrovisor.' },
+    { id: 'q12', cat: 'normas', q: 'Escuchas la sirena de una ambulancia que se acerca por detrás. ¿Qué haces?',
+      opts: ['Acelero para despejarle el camino', 'Me orillo a la derecha y me detengo si hace falta para cederle el paso', 'Freno de golpe en mi carril', 'Sigo igual: la ambulancia debe esquivarme'], answer: 1,
+      exp: 'Los vehículos de emergencia con sirena y luces encendidas tienen prioridad. Señaliza, oríllate a la derecha de forma progresiva y detente si hace falta. Frenar en seco o hacer maniobras bruscas puede provocar un choque. Tampoco sigas a la ambulancia aprovechando el espacio que abre.',
+      tip: 'Orillarse, no frenar en seco.' },
+    { id: 'q13', cat: 'normas', q: 'Un peatón está por cruzar en un paso de cebra sin semáforo. ¿Qué debes hacer?',
+      opts: ['Tocar la bocina para que espere', 'Pasar rápido antes de que baje de la banqueta', 'Detenerte y dejarlo cruzar', 'Pasar despacio por delante de él'], answer: 2,
+      exp: 'En un paso peatonal sin semáforo, el peatón tiene prioridad. Te detienes antes de las franjas y esperas a que termine de cruzar. Cuidado con el carril de al lado: si un auto se detuvo, puede estar tapando a un peatón que tú no ves.',
+      tip: 'En la cebra, el peatón manda.' },
+    { id: 'q14', cat: 'seguridad', q: '¿Qué distancia mínima de seguimiento se recomienda con el vehículo de adelante en condiciones normales?',
+      opts: ['Un metro por cada 10 km/h', 'La necesaria para leer sus placas', 'Al menos 3 segundos', 'Medio segundo si tienes buenos frenos'], answer: 2,
+      exp: 'La regla de los 3 segundos sirve a cualquier velocidad. Elige un punto fijo (un poste, una señal). Cuando el auto de adelante lo pase, cuenta “mil uno, mil dos, mil tres”. Si llegas al punto antes de terminar, vas demasiado cerca. Con lluvia, de noche o con carga, duplica esa distancia.',
+      tip: 'Mil uno, mil dos, mil tres.' },
+    { id: 'q15', cat: 'seguridad', q: 'Con lluvia intensa notas que el volante se pone ligero y el auto “flota” (hidroplaneo). ¿Qué haces?',
+      opts: ['Frenar a fondo de inmediato', 'Girar el volante con fuerza para recuperar el control', 'Soltar suavemente el acelerador y mantener el volante recto, sin frenar de golpe', 'Acelerar para que las llantas recuperen agarre'], answer: 2,
+      exp: 'En el hidroplaneo, las llantas pierden contacto con el pavimento por una capa de agua. Frenar o girar bruscamente puede hacer que el auto se cruce. Suelta el acelerador con suavidad y mantén la dirección hasta que las llantas vuelvan a agarrar. La mejor prevención: velocidad moderada y llantas con buen dibujo.',
+      tip: 'Pie fuera del acelerador, volante quieto.' },
+    { id: 'q16', cat: 'seguridad', q: 'Manejas con niebla densa. ¿Qué luces debes usar?',
+      opts: ['Luces altas, para ver más lejos', 'Luces bajas, y antiniebla si el vehículo las tiene', 'Solo las luces de estacionamiento', 'Ninguna, para no deslumbrar'], answer: 1,
+      exp: 'Las luces altas rebotan en las gotas de la niebla y te deslumbran a ti mismo. Las bajas iluminan el pavimento por debajo de la niebla y te hacen visible para los demás. Reduce la velocidad y aumenta la distancia de seguimiento.',
+      tip: 'Niebla = luces bajas.' },
+    { id: 'q17', cat: 'seguridad', q: '¿Dónde deben viajar los niños pequeños dentro del vehículo?',
+      opts: ['En el asiento delantero, en brazos de un adulto', 'En el asiento trasero, con un sistema de retención adecuado a su edad y talla', 'Adelante, con el cinturón de adulto', 'En cualquier asiento si el viaje es corto'], answer: 1,
+      exp: 'El asiento trasero es el lugar más seguro. Los niños usan silla, elevador o cinturón según su peso y talla, porque el cinturón de adulto solo protege bien a partir de cierta estatura. Llevarlos en brazos es muy peligroso: en un choque a 50 km/h es imposible sostenerlos. La edad mínima para ir adelante varía según el país, normalmente entre 10 y 12 años.',
+      tip: 'Niños atrás y con su silla.' },
+    { id: 'q18', cat: 'seguridad', q: '¿Cuál de estas afirmaciones sobre el alcohol y la conducción es correcta?',
+      opts: ['Un café cargado elimina los efectos del alcohol', 'Si comiste bien, el alcohol no te afecta', 'Incluso pequeñas cantidades aumentan el tiempo de reacción y reducen la percepción del riesgo', 'Solo los destilados afectan; la cerveza no'], answer: 2,
+      exp: 'El alcohol afecta los reflejos, la visión y el juicio desde cantidades pequeñas, y lo único que lo elimina es el tiempo. Ni el café, ni la comida, ni una ducha aceleran ese proceso. El límite legal cambia según el país, y muchos aplican tolerancia cero a conductores nuevos y profesionales.',
+      tip: 'Si bebes, no manejes. Solo el tiempo elimina el alcohol.' },
+    { id: 'q19', cat: 'seguridad', q: '¿Qué dice la norma general sobre usar el celular en la mano mientras manejas?',
+      opts: ['Está permitido en los semáforos en rojo', 'Está prohibido: la distracción multiplica el riesgo de choque', 'Está permitido por debajo de 40 km/h', 'Solo está prohibido en carretera'], answer: 1,
+      exp: 'Manipular el celular está prohibido en prácticamente todos los reglamentos, también cuando estás detenido en un semáforo, porque sigues al mando del vehículo. Escribir un mensaje te quita la vista del camino varios segundos: a 60 km/h, en 4 segundos recorres más de 60 metros a ciegas.',
+      tip: '4 segundos mirando el celular = 60 metros a ciegas.' },
+    { id: 'q20', cat: 'seguridad', q: 'Manejando de noche en carretera empiezas a cabecear de sueño. ¿Qué es lo más seguro?',
+      opts: ['Bajar la ventanilla y subir el volumen', 'Tomar un café y seguir hasta el destino', 'Detenerte en un lugar seguro y descansar', 'Acelerar para llegar antes'], answer: 2,
+      exp: 'La única solución eficaz para el sueño es dormir. El aire frío, la música o el café solo disimulan el cansancio unos minutos. Un microsueño de 3 segundos a 100 km/h equivale a recorrer más de 80 metros sin control. Detente en una zona segura y duerme al menos 15 o 20 minutos.',
+      tip: 'Contra el sueño, solo funciona dormir.' },
+    { id: 'q21', cat: 'conduccion', q: 'Vas a cambiar de carril. ¿Cuál es la secuencia correcta?',
+      opts: ['Girar el volante y luego poner la direccional', 'Mirar el retrovisor interior y cambiarte', 'Poner la direccional, revisar espejos y girar la cabeza para revisar el punto ciego antes de moverte', 'Tocar la bocina y cambiarte'], answer: 2,
+      exp: 'Los espejos no lo muestran todo: a los lados y un poco atrás queda un punto ciego donde puede haber una moto o un auto. La secuencia correcta es señalizar con anticipación, revisar retrovisores, girar la cabeza brevemente hacia el lado del cambio y solo entonces moverte de forma gradual.',
+      tip: 'Señal, espejo, hombro, maniobra.' },
+    { id: 'q22', cat: 'conduccion', q: 'En una frenada de emergencia con un vehículo que tiene frenos ABS, debes:',
+      opts: ['Bombear el pedal del freno repetidamente', 'Pisar el freno a fondo, mantenerlo y dirigir el volante para esquivar el obstáculo', 'Usar el freno de mano', 'Soltar el freno en cuanto sientas vibración en el pedal'], answer: 1,
+      exp: 'El ABS evita que las ruedas se bloqueen, y por eso puedes seguir girando el volante mientras frenas. Pisa con fuerza y mantén la presión. La vibración y el ruido en el pedal son normales: indican que el sistema está trabajando. Bombear el freno era la técnica para autos sin ABS.',
+      tip: 'Con ABS: pisa fuerte, mantén y esquiva.' },
+    { id: 'q23', cat: 'conduccion', q: 'Tu vehículo se descompone en una carretera. ¿Qué haces primero?',
+      opts: ['Me quedo dentro del auto, en el carril, esperando ayuda', 'Enciendo las intermitentes, saco el auto de la vía si puedo y coloco los triángulos de seguridad bien atrás del vehículo', 'Coloco los triángulos pegados a la defensa', 'Pido a un pasajero que haga señas parado en el carril'], answer: 1,
+      exp: 'Primero hazte visible con las luces intermitentes. Si el auto aún se mueve, llévalo al acotamiento. Ponte un chaleco reflectante si tienes y coloca los triángulos lo bastante lejos para que los demás tengan tiempo de reaccionar; en carretera, normalmente a 50 metros o más. Después espera fuera de la calzada.',
+      tip: 'Intermitentes, orilla, triángulos lejos, tú fuera de la vía.' },
+    { id: 'q24', cat: 'conduccion', q: 'Te acercas a un cruce de ferrocarril sin barreras ni semáforo. ¿Qué haces?',
+      opts: ['Cruzo rápido para no quedarme en las vías', 'Reduzco la velocidad, me detengo, miro y escucho en ambas direcciones antes de cruzar', 'Cruzo si no escucho el silbato', 'Rebaso al auto de adelante para cruzar juntos'], answer: 1,
+      exp: 'El tren siempre tiene prioridad y necesita cientos de metros para frenar. Antes de cruzar, detente, mira y escucha. Nunca te detengas sobre las vías: cruza solo si hay espacio del otro lado para que tu vehículo quede completamente fuera. Está prohibido rebasar cerca de un cruce ferroviario.',
+      tip: 'Pare, mire, escuche.' }
+  ];
+
+  // Las opciones se barajan una vez por sesión para que la letra correcta no se memorice.
+  const Q = RAW.map((r) => {
+    const perm = shuffle(r.opts.map((_, i) => i));
+    return { ...r, opts: perm.map((i) => r.opts[i]), answer: perm.indexOf(r.answer) };
+  });
+  const Q_BY_ID = Object.fromEntries(Q.map((q) => [q.id, q]));
+
+  /* ───────── Progreso ───────── */
+  const DEFAULT = { q: {}, errors: [], days: [], exams: [], signs: [] };
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) return { ...DEFAULT, ...JSON.parse(raw) };
+    } catch (e) { /* almacenamiento no disponible */ }
+    return { ...DEFAULT };
+  }
+  function applyAnswer(s, id, ok, review) {
+    const prev = s.q[id] || { seen: 0, correct: 0, last: null };
+    const q = { ...s.q, [id]: { seen: prev.seen + 1, correct: prev.correct + (ok ? 1 : 0), last: ok } };
+    let errors = s.errors;
+    if (!ok && !errors.includes(id)) errors = [...errors, id];
+    if (ok && review) errors = errors.filter((e) => e !== id);
+    const t = today();
+    const days = s.days.includes(t) ? s.days : [...s.days, t].slice(-400);
+    return { ...s, q, errors, days };
+  }
+  // Una pregunta vale 1 si la acertaste 2+ veces y la última fue correcta; 0,7 si solo la acertaste una vez.
+  const qScore = (st) => (st && st.last ? (st.correct >= 2 ? 1 : 0.7) : 0);
+  function readiness(state, ids = Q.map((q) => q.id)) {
+    if (!ids.length) return 0;
+    return Math.round((ids.reduce((a, id) => a + qScore(state.q[id]), 0) / ids.length) * 100);
+  }
+  function streakInfo(days) {
+    const set = new Set(days);
+    const d = new Date();
+    const todayDone = set.has(dayKey(d));
+    if (!todayDone) d.setDate(d.getDate() - 1);
+    let n = 0;
+    while (set.has(dayKey(d))) { n++; d.setDate(d.getDate() - 1); }
+    return { n, todayDone };
+  }
+
+  /* ───────── Piezas comunes ───────── */
+  function useCountUp(target, dur = 1200) {
+    const [v, setV] = useState(0);
+    useEffect(() => {
+      const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce) { setV(target); return; }
+      let raf; const t0 = performance.now();
+      const step = (t) => {
+        const p = Math.min(1, (t - t0) / dur);
+        setV(Math.round(target * (1 - Math.pow(1 - p, 3))));
+        if (p < 1) raf = requestAnimationFrame(step);
+      };
+      raf = requestAnimationFrame(step);
+      return () => cancelAnimationFrame(raf);
+    }, [target]);
+    return v;
+  }
+
+  function Ring({ value, size = 184, stroke = 13, id, colors = ['#10b981', '#6366f1'], children }) {
+    const r = (size - stroke) / 2, c = 2 * Math.PI * r;
+    const [v, setV] = useState(0);
+    useEffect(() => { const t = setTimeout(() => setV(value), 80); return () => clearTimeout(t); }, [value]);
+    const shown = useCountUp(value);
+    return html`<div className="relative shrink-0" style=${{ width: size, height: size, maxWidth: '100%' }}>
+      <svg width=${size} height=${size} viewBox=${'0 0 ' + size + ' ' + size} style=${{ transform: 'rotate(-90deg)' }} aria-hidden="true">
+        <defs><linearGradient id=${id} x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor=${colors[0]}></stop><stop offset="100%" stopColor=${colors[1]}></stop></linearGradient></defs>
+        <circle cx=${size / 2} cy=${size / 2} r=${r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth=${stroke}></circle>
+        <circle cx=${size / 2} cy=${size / 2} r=${r} fill="none" stroke=${'url(#' + id + ')'} strokeWidth=${stroke} strokeLinecap="round"
+          strokeDasharray=${c} strokeDashoffset=${c * (1 - v / 100)} style=${{ transition: 'stroke-dashoffset 1.4s cubic-bezier(.2,.7,.2,1)' }}></circle>
+      </svg>
+      <div className="absolute inset-0 grid place-items-center text-center">${children(shown)}</div>
+    </div>`;
+  }
+
+  function Chip({ className, children }) {
+    return html`<span className=${cx('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em]', className)}>${children}</span>`;
+  }
+  const CatChip = ({ cat }) => html`<${Chip} className=${CATS[cat].chip}>${CATS[cat].label}<//>`;
+
+  function Btn({ variant = 'primary', className, children, ...rest }) {
+    const styles = {
+      primary: 'bg-indigo-500 hover:bg-indigo-400 text-white shadow-lg shadow-indigo-500/25',
+      emerald: 'bg-emerald-500 hover:bg-emerald-400 text-emerald-950 shadow-lg shadow-emerald-500/20',
+      coral: 'bg-rose-500 hover:bg-rose-400 text-white shadow-lg shadow-rose-500/20',
+      ghost: 'border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] hover:border-white/20 text-slate-200'
+    };
+    return html`<button ...${rest} className=${cx('inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition duration-200 active:scale-[0.98] disabled:opacity-40 disabled:pointer-events-none', styles[variant], className)}>${children}</button>`;
+  }
+
+  function Eyebrow({ children, className }) {
+    return html`<p className=${cx('text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400', className)}>${children}</p>`;
+  }
+
+  function ProgressBar({ value, className, color = 'from-emerald-400 to-indigo-400' }) {
+    return html`<div className=${cx('h-1.5 w-full overflow-hidden rounded-full bg-white/[0.07]', className)}>
+      <div className=${cx('bar-fill h-full rounded-full bg-gradient-to-r', color)} style=${{ width: Math.max(0, Math.min(100, value)) + '%' }}></div>
+    </div>`;
+  }
+
+  /* ───────── Pregunta y explicación ───────── */
+  function Explanation({ q, chosen }) {
+    const ok = chosen === q.answer;
+    const tone = ok ? 'border-emerald-400/25 bg-emerald-500/[0.07]' : 'border-rose-400/25 bg-rose-500/[0.07]';
+    return html`<div className=${cx('reveal mt-5 rounded-xl border p-5', tone)} role="status">
+      <div className=${cx('flex items-center gap-2 font-display text-xl font-semibold', ok ? 'text-emerald-300' : 'text-rose-300')}>
+        <${Icon} name=${ok ? 'check' : 'x'} className="w-5 h-5" />
+        ${ok ? 'Correcto' : chosen == null ? 'Sin responder' : 'Incorrecto'}
+      </div>
+      ${!ok && html`<p className="mt-1 text-sm text-slate-300">Respuesta correcta: <strong className="text-slate-100">${LET[q.answer]}. ${q.opts[q.answer]}</strong></p>`}
+      <p className="mt-3 leading-relaxed text-slate-200 max-w-[65ch]">${q.exp}</p>
+      ${q.tip && html`<div className="mt-4 flex gap-3 rounded-lg bg-white/[0.04] px-4 py-3 text-sm text-slate-200">
+        <${Icon} name="bulb" className="w-5 h-5 shrink-0 text-amber-300" />
+        <span><span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-300/90">Para recordar</span>${q.tip}</span>
+      </div>`}
+    </div>`;
+  }
+
+  function QuestionCard({ q, chosen, onChoose, mode, reveal, header }) {
+    return html`<article className="glass reveal p-5 sm:p-7">
+      ${header}
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+        ${q.sign && html`<div className="self-center rounded-2xl bg-white/[0.04] p-3 sm:self-start"><${Sign} id=${q.sign} className="w-24 h-24 sm:w-28 sm:h-28" /></div>`}
+        <div className="min-w-0 flex-1">
+          <${CatChip} cat=${q.cat} />
+          <h2 className="mt-3 font-display text-[26px] font-semibold leading-[1.15] text-white sm:text-[30px] text-balance">${q.q}</h2>
+        </div>
+      </div>
+      <div className="mt-6 grid gap-2.5">
+        ${q.opts.map((o, i) => {
+          const isChosen = chosen === i, isRight = i === q.answer;
+          let tone = 'border-white/10 bg-white/[0.025] hover:border-white/25 hover:bg-white/[0.06]';
+          let badge = 'bg-white/[0.06] text-slate-300 group-hover:bg-white/[0.12]';
+          let mark = LET[i];
+          if (mode === 'exam' && isChosen) { tone = 'border-indigo-400/70 bg-indigo-500/15 ring-1 ring-indigo-400/40'; badge = 'bg-indigo-500 text-white'; }
+          if (reveal) {
+            if (isRight) { tone = 'border-emerald-400/70 bg-emerald-500/15' + (isChosen ? ' pop' : ''); badge = 'bg-emerald-500 text-emerald-950'; mark = html`<${Icon} name="check" className="w-4 h-4" />`; }
+            else if (isChosen) { tone = 'border-rose-400/70 bg-rose-500/15 shake'; badge = 'bg-rose-500 text-white'; mark = html`<${Icon} name="x" className="w-4 h-4" />`; }
+            else { tone = 'border-white/5 bg-transparent opacity-50'; }
+          }
+          return html`<button key=${i} type="button" disabled=${reveal} onClick=${() => onChoose(i)} aria-pressed=${isChosen}
+            className=${cx('group flex w-full items-start gap-4 rounded-xl border px-4 py-3.5 text-left transition duration-200 disabled:cursor-default', tone)}>
+            <span className=${cx('grid h-8 w-8 shrink-0 place-items-center rounded-lg text-sm font-bold transition', badge)}>${mark}</span>
+            <span className="min-w-0 pt-1 leading-snug text-slate-100">${o}</span>
+          </button>`;
+        })}
+      </div>
+      ${reveal && html`<${Explanation} q=${q} chosen=${chosen} />`}
+    </article>`;
+  }
+
+  /* ───────── Práctica (también usada por el banco de errores) ───────── */
+  function PracticeRunner({ ids, review, onAnswer, onExit, title }) {
+    const [order, setOrder] = useState(ids);
+    const [idx, setIdx] = useState(0);
+    const [chosen, setChosen] = useState(null);
+    const [score, setScore] = useState({ ok: 0, n: 0 });
+    const [done, setDone] = useState(false);
+    const q = Q_BY_ID[order[idx]];
+
+    const choose = useCallback((i) => {
+      if (chosen != null || done) return;
+      setChosen(i);
+      const ok = i === q.answer;
+      onAnswer(q.id, ok, review);
+      setScore((s) => ({ ok: s.ok + (ok ? 1 : 0), n: s.n + 1 }));
+    }, [chosen, done, q, review, onAnswer]);
+    const next = useCallback(() => {
+      if (chosen == null) return;
+      if (idx + 1 >= order.length) setDone(true);
+      else { setIdx(idx + 1); setChosen(null); }
+    }, [chosen, idx, order.length]);
+    const restart = () => { setOrder(shuffle(ids)); setIdx(0); setChosen(null); setScore({ ok: 0, n: 0 }); setDone(false); };
+
+    useEffect(() => {
+      const onKey = (e) => {
+        if (e.target && /input|textarea|select/i.test(e.target.tagName)) return;
+        const k = e.key.toLowerCase();
+        const map = { '1': 0, '2': 1, '3': 2, '4': 3, a: 0, b: 1, c: 2, d: 3 };
+        if (k in map && map[k] < q.opts.length) choose(map[k]);
+        else if (k === 'enter' && chosen != null) { e.preventDefault(); next(); }
+      };
+      window.addEventListener('keydown', onKey);
+      return () => window.removeEventListener('keydown', onKey);
+    }, [choose, next, chosen, q]);
+
+    if (done) {
+      const pct = Math.round((score.ok / Math.max(1, score.n)) * 100);
+      return html`<div className="glass reveal p-6 sm:p-10 text-center">
+        <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-emerald-500/15 text-emerald-300"><${Icon} name="trophy" className="w-7 h-7" /></div>
+        <${Eyebrow}>${title}<//>
+        <h2 className="mt-2 font-display text-4xl font-semibold text-white">Ronda terminada</h2>
+        <p className="mt-2 text-slate-300"><span className="tnum font-semibold text-white">${score.ok} de ${score.n}</span> correctas (${pct} %).
+          ${review ? ' Las que acertaste salieron del banco de errores.' : ''}</p>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <${Btn} variant="emerald" onClick=${restart}><${Icon} name="rotate" className="w-4 h-4" />Otra ronda<//>
+          <${Btn} variant="ghost" onClick=${onExit}>Salir<//>
+        </div>
+      </div>`;
+    }
+
+    const header = html`<div className="mb-5 flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <${Eyebrow}>${title}<//>
+        <p className="tnum mt-1 text-sm text-slate-300">Pregunta <span className="font-semibold text-white">${idx + 1}</span> de ${order.length} · <span className="text-emerald-300">${score.ok} correctas</span></p>
+      </div>
+      <${Btn} variant="ghost" className="!px-3" onClick=${onExit} aria-label="Salir de la práctica"><${Icon} name="x" className="w-4 h-4" /><span className="hidden sm:inline">Salir</span><//>
+    </div>
+    <${ProgressBar} value=${((idx + (chosen != null ? 1 : 0)) / order.length) * 100} className="mb-6" />`;
+
+    return html`<div>
+      <${QuestionCard} key=${q.id + '-' + idx} q=${q} chosen=${chosen} onChoose=${choose} mode="practice" reveal=${chosen != null} header=${header} />
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <p className="hidden text-xs text-slate-500 sm:block">Atajos: teclas 1–4 o A–D para responder, Enter para seguir.</p>
+        <${Btn} className="ml-auto" disabled=${chosen == null} onClick=${next}>${idx + 1 >= order.length ? 'Ver resultado' : 'Siguiente'}<${Icon} name="arrow" className="w-4 h-4" /><//>
+      </div>
+    </div>`;
+  }
+
+  function PracticeView({ state, onAnswer }) {
+    const [cat, setCat] = useState('all');
+    const [weakFirst, setWeakFirst] = useState(true);
+    const [session, setSession] = useState(null);
+
+    if (session) return html`<${PracticeRunner} key=${session.key} ids=${session.ids} review=${false} onAnswer=${onAnswer} onExit=${() => setSession(null)} title=${session.title} />`;
+
+    const pool = Q.filter((q) => cat === 'all' || q.cat === cat);
+    const start = () => {
+      let ids = shuffle(pool.map((q) => q.id));
+      if (weakFirst) ids = ids.sort((a, b) => qScore(state.q[a]) - qScore(state.q[b]));
+      setSession({ ids, key: Date.now(), title: cat === 'all' ? 'Práctica · Todas las categorías' : 'Práctica · ' + CATS[cat].label });
+    };
+    const options = [['all', 'Todas', Q.length, readiness(state)], ...Object.keys(CATS).map((k) => {
+      const ids = Q.filter((q) => q.cat === k).map((q) => q.id);
+      return [k, CATS[k].label, ids.length, readiness(state, ids)];
+    })];
+
+    return html`<div className="grid gap-5">
+      <header>
+        <${Eyebrow}>Modo práctica<//>
+        <h1 className="mt-1 font-display text-4xl font-semibold text-white sm:text-5xl">Aprende pregunta a pregunta</h1>
+        <p className="mt-2 max-w-[60ch] text-slate-300">Ves la respuesta y la explicación en cuanto eliges una opción. Sin reloj y sin presión: aquí se trata de entender el porqué.</p>
+      </header>
+      <section className="glass p-5 sm:p-6">
+        <${Eyebrow}>Elige un tema<//>
+        <div className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+          ${options.map(([k, label, n, pct]) => html`<button key=${k} type="button" onClick=${() => setCat(k)} aria-pressed=${cat === k}
+            className=${cx('rounded-xl border p-4 text-left transition', cat === k ? 'border-emerald-400/60 bg-emerald-500/10 ring-1 ring-emerald-400/30' : 'border-white/10 bg-white/[0.02] hover:border-white/25')}>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="font-semibold text-white">${label}</span>
+              <span className="tnum text-xs text-slate-400">${n} preguntas</span>
+            </div>
+            <${ProgressBar} value=${pct} className="mt-3" />
+            <p className="tnum mt-2 text-xs text-slate-400">${pct} % dominado</p>
+          </button>`)}
+        </div>
+        <div className="mt-5 flex flex-col gap-4 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
+          <label htmlFor="weak-first" className="flex cursor-pointer items-center gap-3 text-sm text-slate-300">
+            <input id="weak-first" type="checkbox" checked=${weakFirst} onChange=${(e) => setWeakFirst(e.target.checked)} className="h-4 w-4 accent-emerald-500" />
+            Empezar por las que menos domino
+          </label>
+          <${Btn} variant="emerald" onClick=${start}>Empezar práctica (${pool.length})<${Icon} name="arrow" className="w-4 h-4" /><//>
+        </div>
+      </section>
+    </div>`;
+  }
+
+  /* ───────── Simulacro ───────── */
+  function ExamRunner({ exam, setExam, onFinish, now }) {
+    const [confirm, setConfirm] = useState(false);
+    const q = Q_BY_ID[exam.ids[exam.cur]];
+    const left = Math.max(0, exam.start + exam.duration - now);
+    const answered = Object.keys(exam.answers).length;
+    const unanswered = exam.ids.length - answered;
+    const marked = exam.marks.includes(exam.cur);
+    const low = left < 2 * 60 * 1000;
+
+    const setCur = (i) => { setConfirm(false); setExam((e) => ({ ...e, cur: Math.max(0, Math.min(e.ids.length - 1, i)) })); };
+    const choose = (i) => setExam((e) => ({ ...e, answers: { ...e.answers, [e.cur]: i } }));
+    const toggleMark = () => setExam((e) => ({ ...e, marks: e.marks.includes(e.cur) ? e.marks.filter((m) => m !== e.cur) : [...e.marks, e.cur] }));
+    const finish = () => { if (unanswered > 0 && !confirm) setConfirm(true); else onFinish(exam); };
+
+    return html`<div className="grid gap-4">
+      <div className="glass flex flex-wrap items-center gap-3 p-3 sm:p-4">
+        <div className="min-w-0 flex-1">
+          <${Eyebrow}>Simulacro de examen<//>
+          <p className="tnum mt-0.5 text-sm text-slate-300"><span className="font-semibold text-white">${answered}</span> de ${exam.ids.length} respondidas</p>
+        </div>
+        <div className=${cx('tnum flex items-center gap-2 rounded-xl border px-3 py-2 font-mono text-lg font-bold', low ? 'border-rose-400/50 bg-rose-500/15 text-rose-300' : 'border-white/10 bg-white/[0.04] text-white')} aria-live="off" aria-label=${'Tiempo restante ' + fmtTime(left)}>
+          <${Icon} name="clock" className="w-4 h-4" />${fmtTime(left)}
+        </div>
+        <${Btn} variant="coral" onClick=${finish}><${Icon} name="flag" className="w-4 h-4" />Terminar<//>
+      </div>
+
+      ${confirm && html`<div className="reveal glass flex flex-col gap-3 border-rose-400/30 p-4 sm:flex-row sm:items-center sm:justify-between" role="alertdialog" aria-label="Confirmar fin del simulacro">
+        <p className="text-sm text-slate-200">Te quedan <strong className="text-white">${unanswered} sin responder</strong>. Contarán como incorrectas.</p>
+        <div className="flex gap-2">
+          <${Btn} variant="ghost" onClick=${() => setConfirm(false)}>Seguir respondiendo<//>
+          <${Btn} variant="coral" onClick=${() => onFinish(exam)}>Terminar igual<//>
+        </div>
+      </div>`}
+
+      <${QuestionCard} key=${'exam-' + exam.cur} q=${q} chosen=${exam.answers[exam.cur]} onChoose=${choose} mode="exam" reveal=${false}
+        header=${html`<div className="mb-5 flex items-center justify-between gap-3">
+          <p className="tnum font-display text-xl font-semibold text-slate-300">Pregunta <span className="text-white">${exam.cur + 1}</span><span className="text-slate-500"> / ${exam.ids.length}</span></p>
+          <${Btn} variant="ghost" onClick=${toggleMark} aria-pressed=${marked} className=${cx('!px-3', marked && '!border-amber-400/50 !bg-amber-500/15 !text-amber-200')}>
+            <${Icon} name="bookmark" className=${cx('w-4 h-4', marked && 'fill-amber-300')} />${marked ? 'Marcada' : 'Marcar para revisar'}
+          <//>
+        </div>`} />
+
+      <div className="flex items-center justify-between gap-3">
+        <${Btn} variant="ghost" disabled=${exam.cur === 0} onClick=${() => setCur(exam.cur - 1)}><${Icon} name="left" className="w-4 h-4" />Anterior<//>
+        ${exam.cur + 1 < exam.ids.length
+          ? html`<${Btn} onClick=${() => setCur(exam.cur + 1)}>Siguiente<${Icon} name="right" className="w-4 h-4" /><//>`
+          : html`<${Btn} variant="coral" onClick=${finish}>Terminar simulacro<${Icon} name="flag" className="w-4 h-4" /><//>`}
+      </div>
+
+      <section className="glass p-4 sm:p-5">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <${Eyebrow}>Mapa del examen<//>
+          <div className="flex flex-wrap gap-3 text-xs text-slate-400">
+            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded bg-indigo-500"></span>Respondida</span>
+            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded bg-amber-400"></span>Marcada</span>
+            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded border border-white/25"></span>Pendiente</span>
+          </div>
+        </div>
+        <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-10">
+          ${exam.ids.map((id, i) => {
+            const a = exam.answers[i] != null, m = exam.marks.includes(i), cur = i === exam.cur;
+            return html`<button key=${id} type="button" onClick=${() => setCur(i)} aria-label=${'Ir a la pregunta ' + (i + 1)} aria-current=${cur ? 'step' : undefined}
+              className=${cx('tnum relative h-10 rounded-lg text-sm font-semibold transition',
+                a ? 'bg-indigo-500/80 text-white hover:bg-indigo-500' : 'border border-white/15 text-slate-400 hover:border-white/35 hover:text-white',
+                cur && 'ring-2 ring-white/80 ring-offset-2 ring-offset-[#0b0f19]')}>
+              ${i + 1}
+              ${m && html`<span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-[#0b0f19] bg-amber-400"></span>`}
+            </button>`;
+          })}
+        </div>
+      </section>
+    </div>`;
+  }
+
+  function ExamResults({ exam, onNew, onClose, goErrors }) {
+    const [filter, setFilter] = useState(exam.passed ? 'all' : 'wrong');
+    const [open, setOpen] = useState({});
+    const pct = Math.round((exam.score / exam.res.length) * 100);
+    const wrong = exam.res.filter((r) => !r.ok).length;
+    const markedN = exam.res.filter((r) => r.marked).length;
+    const list = exam.res.map((r, i) => ({ ...r, i })).filter((r) => filter === 'all' || (filter === 'wrong' && !r.ok) || (filter === 'marked' && r.marked));
+    const byCat = Object.keys(CATS).map((k) => {
+      const rs = exam.res.filter((r) => Q_BY_ID[r.id].cat === k);
+      return { k, n: rs.length, ok: rs.filter((r) => r.ok).length };
+    }).filter((c) => c.n > 0);
+
+    return html`<div className="grid gap-5">
+      <section className="glass reveal flex flex-col items-center gap-6 p-6 sm:flex-row sm:p-8">
+        <${Ring} value=${pct} id="ring-result" colors=${exam.passed ? ['#10b981', '#6366f1'] : ['#f43f5e', '#f59e0b']}>
+          ${(v) => html`<div><div className="tnum font-display text-5xl font-bold text-white">${v}<span className="text-2xl text-slate-400">%</span></div><div className="tnum text-sm text-slate-400">${exam.score} / ${exam.res.length}</div></div>`}
+        <//>
+        <div className="min-w-0 flex-1 text-center sm:text-left">
+          <${Chip} className=${exam.passed ? 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30' : 'bg-rose-500/15 text-rose-300 border-rose-400/30'}>
+            <${Icon} name=${exam.passed ? 'check' : 'x'} className="w-3.5 h-3.5" />${exam.passed ? 'Aprobado' : 'Reprobado'}
+          <//>
+          <h1 className="mt-3 font-display text-4xl font-semibold text-white sm:text-5xl text-balance">${exam.passed ? 'Listo para el examen real' : 'Todavía no, pero cerca'}</h1>
+          <p className="mt-2 max-w-[55ch] text-slate-300">${exam.passed
+            ? 'Superaste el ' + Math.round(PASS * 100) + ' % exigido. Repasa las que fallaste para llegar con margen.'
+            : 'Se necesita un ' + Math.round(PASS * 100) + ' % (' + Math.ceil(PASS * exam.res.length) + ' aciertos). Revisa abajo cada error con su explicación.'}</p>
+          <div className="tnum mt-4 flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-slate-400 sm:justify-start">
+            <span className="flex items-center gap-1.5"><${Icon} name="clock" className="w-4 h-4" />${fmtTime(exam.used)} de ${EXAM_MINUTES}:00</span>
+            <span className="flex items-center gap-1.5 text-rose-300"><${Icon} name="x" className="w-4 h-4" />${wrong} errores</span>
+            <span className="flex items-center gap-1.5 text-amber-300"><${Icon} name="bookmark" className="w-4 h-4" />${markedN} marcadas</span>
+          </div>
+          <div className="mt-5 flex flex-wrap justify-center gap-3 sm:justify-start">
+            <${Btn} onClick=${onNew}><${Icon} name="rotate" className="w-4 h-4" />Nuevo simulacro<//>
+            ${wrong > 0 && html`<${Btn} variant="ghost" onClick=${goErrors}>Practicar mis errores<//>`}
+            <${Btn} variant="ghost" onClick=${onClose}>Cerrar<//>
+          </div>
+        </div>
+      </section>
+
+      <section className="glass p-5 sm:p-6">
+        <${Eyebrow}>Desglose por tema<//>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          ${byCat.map((c) => html`<div key=${c.k}>
+            <div className="flex items-baseline justify-between text-sm"><span className="text-slate-200">${CATS[c.k].label}</span><span className="tnum text-slate-400">${c.ok}/${c.n}</span></div>
+            <${ProgressBar} value=${(c.ok / c.n) * 100} className="mt-2" color=${c.ok / c.n >= PASS ? 'from-emerald-400 to-emerald-300' : 'from-rose-400 to-amber-300'} />
+          </div>`)}
+        </div>
+      </section>
+
+      <section className="grid gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-display text-2xl font-semibold text-white">Revisión del examen</h2>
+          <div className="flex gap-1 rounded-xl border border-white/10 bg-white/[0.03] p-1" role="tablist" aria-label="Filtrar preguntas">
+            ${[['all', 'Todas', exam.res.length], ['wrong', 'Errores', wrong], ['marked', 'Marcadas', markedN]].map(([k, l, n]) => html`<button key=${k} type="button" role="tab" aria-selected=${filter === k} onClick=${() => setFilter(k)}
+              className=${cx('tnum rounded-lg px-3 py-1.5 text-sm font-medium transition', filter === k ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white')}>${l} <span className="text-slate-500">${n}</span></button>`)}
+          </div>
+        </div>
+        ${list.length === 0 && html`<p className="glass p-6 text-center text-slate-400">No hay preguntas en este filtro.</p>`}
+        ${list.map((r) => {
+          const q = Q_BY_ID[r.id], isOpen = !!open[r.i];
+          return html`<article key=${r.id} className="glass overflow-hidden">
+            <button type="button" onClick=${() => setOpen((o) => ({ ...o, [r.i]: !o[r.i] }))} aria-expanded=${isOpen}
+              className="flex w-full items-start gap-4 p-4 text-left transition hover:bg-white/[0.03] sm:p-5">
+              <span className=${cx('grid h-8 w-8 shrink-0 place-items-center rounded-lg', r.ok ? 'bg-emerald-500/15 text-emerald-300' : 'bg-rose-500/15 text-rose-300')}><${Icon} name=${r.ok ? 'check' : 'x'} className="w-4 h-4" /></span>
+              <span className="min-w-0 flex-1">
+                <span className="tnum block text-xs text-slate-500">Pregunta ${r.i + 1} · ${CATS[q.cat].label}${r.marked ? ' · Marcada' : ''}</span>
+                <span className="mt-1 block font-medium leading-snug text-slate-100">${q.q}</span>
+                ${!r.ok && html`<span className="mt-1 block text-sm text-rose-300/90">Tu respuesta: ${r.chosen == null ? 'sin responder' : LET[r.chosen] + '. ' + q.opts[r.chosen]}</span>`}
+              </span>
+              <${Icon} name="right" className=${cx('mt-1 h-4 w-4 shrink-0 text-slate-500 transition', isOpen && 'rotate-90')} />
+            </button>
+            ${isOpen && html`<div className="border-t border-white/10 px-4 pb-5 sm:px-5">
+              <div className="flex flex-col gap-4 pt-4 sm:flex-row">
+                ${q.sign && html`<${Sign} id=${q.sign} className="h-20 w-20 shrink-0" />`}
+                <div className="min-w-0 flex-1"><${Explanation} q=${q} chosen=${r.chosen} /></div>
+              </div>
+            </div>`}
+          </article>`;
+        })}
+      </section>
+    </div>`;
+  }
+
+  function ExamView({ exam, setExam, startExam, finishExam, now, state, go }) {
+    if (exam && !exam.finished) return html`<${ExamRunner} exam=${exam} setExam=${setExam} onFinish=${finishExam} now=${now} />`;
+    if (exam && exam.finished) return html`<${ExamResults} exam=${exam} onNew=${startExam} onClose=${() => setExam(null)} goErrors=${() => go('errores')} />`;
+    const history = [...state.exams].reverse().slice(0, 6);
+    return html`<div className="grid gap-5">
+      <header>
+        <${Eyebrow}>Simulacro de examen teórico<//>
+        <h1 className="mt-1 font-display text-4xl font-semibold text-white sm:text-5xl">Practica en condiciones reales</h1>
+        <p className="mt-2 max-w-[60ch] text-slate-300">Como en el examen oficial, no sabrás si acertaste hasta el final. Puedes saltar entre preguntas y marcar las dudosas para volver a ellas.</p>
+      </header>
+      <section className="glass p-6 sm:p-8">
+        <div className="grid grid-cols-3 gap-3 text-center">
+          ${[[EXAM_SIZE, 'preguntas'], [EXAM_MINUTES + ':00', 'minutos'], [Math.round(PASS * 100) + ' %', 'para aprobar']].map(([v, l]) => html`<div key=${l} className="rounded-xl border border-white/10 bg-white/[0.03] px-2 py-4">
+            <div className="tnum font-display text-3xl font-bold text-white sm:text-4xl">${v}</div>
+            <div className="mt-1 text-xs uppercase tracking-[0.12em] text-slate-400">${l}</div>
+          </div>`)}
+        </div>
+        <p className="mt-5 text-sm text-slate-400">Las preguntas se eligen al azar entre ${Q.length}. Si se acaba el tiempo, el examen se entrega solo. Las que falles pasan a tu banco de errores.</p>
+        <${Btn} className="mt-6 w-full sm:w-auto !py-3 !text-base" onClick=${startExam}><${Icon} name="clipboard" className="w-5 h-5" />Comenzar simulacro<//>
+      </section>
+      <section className="glass p-5 sm:p-6">
+        <${Eyebrow}>Historial<//>
+        ${history.length === 0
+          ? html`<p className="mt-3 text-sm text-slate-400">Todavía no has hecho ningún simulacro. Aquí verás tu nota, el tiempo y el veredicto de cada intento.</p>`
+          : html`<div className="mt-3 overflow-x-auto"><table className="tnum w-full min-w-[420px] text-left text-sm">
+              <thead><tr className="text-xs uppercase tracking-[0.1em] text-slate-500"><th className="py-2 font-medium">Fecha</th><th className="py-2 font-medium">Nota</th><th className="py-2 font-medium">Tiempo</th><th className="py-2 font-medium">Resultado</th></tr></thead>
+              <tbody>${history.map((h) => html`<tr key=${h.date} className="border-t border-white/5">
+                <td className="py-2.5 text-slate-300">${fmtDate(h.date)}</td>
+                <td className="py-2.5 font-semibold text-white">${h.score}/${h.total}</td>
+                <td className="py-2.5 text-slate-400">${fmtTime(h.used)}</td>
+                <td className="py-2.5"><span className=${h.passed ? 'text-emerald-300' : 'text-rose-300'}>${h.passed ? 'Aprobado' : 'Reprobado'}</span></td>
+              </tr>`)}</tbody>
+            </table></div>`}
+      </section>
+    </div>`;
+  }
+
+  /* ───────── Señales ───────── */
+  function SignCard({ s, learned, onToggleLearned }) {
+    const [flipped, setFlipped] = useState(false);
+    const t = SIGN_TYPES[s.type];
+    const toggle = () => setFlipped((f) => !f);
+    return html`<div className=${cx('flip', flipped && 'flipped')}>
+      <div className="flip-inner" role="button" tabIndex="0" aria-pressed=${flipped} aria-label=${flipped ? s.name + '. Toca para ver la señal' : 'Señal ' + t.short.toLowerCase() + '. Toca para ver su significado'}
+        onClick=${toggle} onKeyDown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } }}>
+        <div className="face front flex flex-col items-center justify-between p-4">
+          <div className="flex w-full items-center justify-between">
+            <${Chip} className=${t.chip}>${t.short}<//>
+            ${learned && html`<span className="grid h-6 w-6 place-items-center rounded-full bg-emerald-500/20 text-emerald-300" title="Aprendida"><${Icon} name="check" className="w-3.5 h-3.5" /></span>`}
+          </div>
+          <${Sign} id=${s.id} className="h-32 w-32 drop-shadow-[0_10px_25px_rgba(0,0,0,0.45)] transition-transform duration-300 hover:scale-105" />
+          <p className="text-xs text-slate-500">Toca para voltear</p>
+        </div>
+        <div className="face back flex flex-col p-4 text-left">
+          <${Chip} className=${cx(t.chip, 'self-start')}>${t.short}<//>
+          <h3 className="mt-3 font-display text-2xl font-semibold leading-tight text-white text-balance">${s.name}</h3>
+          <div className="mt-2 min-h-0 flex-1 overflow-y-auto pr-1">
+            <p className="text-sm leading-relaxed text-slate-300">${s.meaning}</p>
+            <p className="mt-2 text-xs leading-relaxed text-amber-200/80">${s.tip}</p>
+          </div>
+          <button type="button" onClick=${(e) => { e.stopPropagation(); onToggleLearned(s.id); }} onKeyDown=${(e) => e.stopPropagation()}
+            className=${cx('mt-3 inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition',
+              learned ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200' : 'border-white/15 text-slate-300 hover:border-white/30 hover:text-white')}>
+            <${Icon} name="check" className="w-3.5 h-3.5" />${learned ? 'Aprendida' : 'Marcar como aprendida'}
+          </button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function SignsView({ state, toggleLearned }) {
+    const [type, setType] = useState('all');
+    const list = SIGNS.filter((s) => type === 'all' || s.type === type);
+    const learned = state.signs.filter((id) => SIGN_BY_ID[id]).length;
+    const tabs = [['all', 'Todas', SIGNS.length], ...Object.keys(SIGN_TYPES).map((k) => [k, SIGN_TYPES[k].label, SIGNS.filter((s) => s.type === k).length])];
+    return html`<div className="grid gap-5">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <${Eyebrow}>Flashcards de señales<//>
+          <h1 className="mt-1 font-display text-4xl font-semibold text-white sm:text-5xl">Reconócelas a la primera</h1>
+          <p className="mt-2 max-w-[58ch] text-slate-300">Intenta decir el nombre y el significado antes de voltear cada tarjeta. La forma y el color ya te dicen el grupo.</p>
+        </div>
+        <div className="glass shrink-0 px-4 py-3">
+          <p className="tnum text-sm text-slate-300"><span className="font-display text-2xl font-bold text-white">${learned}</span> / ${SIGNS.length} aprendidas</p>
+          <${ProgressBar} value=${(learned / SIGNS.length) * 100} className="mt-2 w-40" />
+        </div>
+      </header>
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Tipo de señal">
+        ${tabs.map(([k, l, n]) => html`<button key=${k} type="button" role="tab" aria-selected=${type === k} onClick=${() => setType(k)}
+          className=${cx('tnum rounded-full border px-4 py-2 text-sm font-medium transition', type === k ? 'border-indigo-400/60 bg-indigo-500/20 text-white' : 'border-white/10 bg-white/[0.03] text-slate-400 hover:text-white hover:border-white/25')}>
+          ${l} <span className="text-slate-500">${n}</span></button>`)}
+      </div>
+      <div className="grid grid-cols-1 gap-4 min-[420px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        ${list.map((s) => html`<${SignCard} key=${s.id} s=${s} learned=${state.signs.includes(s.id)} onToggleLearned=${toggleLearned} />`)}
+      </div>
+      <div className="glass grid gap-3 p-5 text-sm text-slate-300 sm:grid-cols-3">
+        <p><strong className="text-rose-300">Reglamentarias.</strong> Círculo con borde rojo (y el octágono de PARE). Obligan o prohíben.</p>
+        <p><strong className="text-amber-300">Preventivas.</strong> Rombo amarillo. Avisan de un peligro más adelante.</p>
+        <p><strong className="text-sky-300">Informativas.</strong> Rectángulo azul o verde. Orientan sobre servicios y destinos.</p>
+      </div>
+    </div>`;
+  }
+
+  /* ───────── Banco de errores ───────── */
+  function ErrorsView({ state, onAnswer, clearErrors }) {
+    const [session, setSession] = useState(null);
+    const [confirm, setConfirm] = useState(false);
+    const ids = state.errors.filter((id) => Q_BY_ID[id]);
+
+    if (session) return html`<${PracticeRunner} key=${session.key} ids=${session.ids} review=${true} onAnswer=${onAnswer} onExit=${() => setSession(null)} title="Repaso de errores" />`;
+
+    return html`<div className="grid gap-5">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <${Eyebrow}>Banco de errores<//>
+          <h1 className="mt-1 font-display text-4xl font-semibold text-white sm:text-5xl">Lo que todavía falla</h1>
+          <p className="mt-2 max-w-[60ch] text-slate-300">Cada pregunta que fallas en el simulacro o en la práctica se guarda aquí. Sale del banco cuando la aciertas en este repaso.</p>
+        </div>
+        ${ids.length > 0 && html`<div className="flex shrink-0 flex-wrap gap-2">
+          <${Btn} variant="coral" onClick=${() => setSession({ ids: shuffle(ids), key: Date.now() })}><${Icon} name="rotate" className="w-4 h-4" />Repasar todas (${ids.length})<//>
+          <${Btn} variant="ghost" onClick=${() => setConfirm(true)} aria-label="Vaciar banco de errores"><${Icon} name="trash" className="w-4 h-4" /><//>
+        </div>`}
+      </header>
+      ${confirm && html`<div className="reveal glass flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between" role="alertdialog" aria-label="Confirmar vaciado">
+        <p className="text-sm text-slate-200">¿Vaciar el banco? Se quitarán ${ids.length} preguntas. Tus estadísticas no cambian.</p>
+        <div className="flex gap-2"><${Btn} variant="ghost" onClick=${() => setConfirm(false)}>Cancelar<//><${Btn} variant="coral" onClick=${() => { clearErrors(); setConfirm(false); }}>Vaciar<//></div>
+      </div>`}
+      ${ids.length === 0
+        ? html`<div className="glass p-8 text-center sm:p-12">
+            <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-emerald-500/15 text-emerald-300"><${Icon} name="check" className="w-7 h-7" /></div>
+            <h2 className="font-display text-3xl font-semibold text-white">Sin errores pendientes</h2>
+            <p className="mx-auto mt-2 max-w-[44ch] text-slate-400">Cuando falles una pregunta en el simulacro o la práctica, aparecerá aquí para que la repases hasta dominarla.</p>
+          </div>`
+        : html`<div className="grid gap-3">${ids.map((id) => {
+            const q = Q_BY_ID[id], st = state.q[id] || { seen: 0, correct: 0 };
+            const fails = st.seen - st.correct;
+            return html`<article key=${id} className="glass flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
+              ${q.sign && html`<${Sign} id=${q.sign} className="hidden h-14 w-14 shrink-0 sm:block" />`}
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2"><${CatChip} cat=${q.cat} /><span className="tnum text-xs text-rose-300/80">Fallada ${fails} ${fails === 1 ? 'vez' : 'veces'}</span></div>
+                <p className="mt-2 font-medium leading-snug text-slate-100">${q.q}</p>
+              </div>
+              <${Btn} variant="ghost" className="shrink-0" onClick=${() => setSession({ ids: [id], key: Date.now() })}>Practicar<${Icon} name="arrow" className="w-4 h-4" /><//>
+            </article>`;
+          })}</div>`}
+    </div>`;
+  }
+
+  /* ───────── Dashboard ───────── */
+  const DAY_LETTERS = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
+  function Dashboard({ state, exam, now, go, onReset }) {
+    const [confirmReset, setConfirmReset] = useState(false);
+    const ready = readiness(state);
+    const stats = Object.values(state.q);
+    const seen = stats.reduce((a, s) => a + s.seen, 0);
+    const correct = stats.reduce((a, s) => a + s.correct, 0);
+    const accuracy = seen ? Math.round((correct / seen) * 100) : 0;
+    const passed = state.exams.filter((e) => e.passed).length;
+    const { n: streak, todayDone } = streakInfo(state.days);
+    const daySet = new Set(state.days);
+    const week = Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); return { k: dayKey(d), l: DAY_LETTERS[d.getDay()], today: i === 6 }; });
+    const level = ready >= 80 ? ['Listo para el examen', 'text-emerald-300'] : ready >= 50 ? ['Avanzando bien', 'text-indigo-300'] : ready > 0 ? ['En construcción', 'text-amber-300'] : ['Empieza tu preparación', 'text-slate-300'];
+    const lastExams = state.exams.slice(-10);
+
+    const quick = [
+      { id: 'simulacro', icon: 'clipboard', title: 'Simulacro de examen', desc: EXAM_SIZE + ' preguntas, ' + EXAM_MINUTES + ' minutos, veredicto final.', tone: 'bg-indigo-500/15 text-indigo-300', glow: 'hover:border-indigo-400/40' },
+      { id: 'practica', icon: 'target', title: 'Modo práctica', desc: 'Respuesta y explicación al instante.', tone: 'bg-emerald-500/15 text-emerald-300', glow: 'hover:border-emerald-400/40' },
+      { id: 'senales', icon: 'layers', title: 'Flashcards de señales', desc: SIGNS.length + ' señales para voltear y memorizar.', tone: 'bg-rose-500/15 text-rose-300', glow: 'hover:border-rose-400/40' }
+    ];
+
+    return html`<div className="grid gap-5">
+      ${exam && !exam.finished && html`<button type="button" onClick=${() => go('simulacro')} className="reveal glass flex items-center gap-4 border-indigo-400/40 p-4 text-left transition hover:bg-white/[0.06]">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-indigo-500/20 text-indigo-300"><${Icon} name="clock" /></span>
+        <span className="min-w-0 flex-1"><span className="block font-semibold text-white">Simulacro en curso</span><span className="tnum block text-sm text-slate-400">Quedan ${fmtTime(exam.start + exam.duration - now)} · ${Object.keys(exam.answers).length}/${exam.ids.length} respondidas</span></span>
+        <${Icon} name="arrow" className="w-5 h-5 text-slate-400" />
+      </button>`}
+
+      <section className="grid gap-4 md:grid-cols-3">
+        <div className="glass flex flex-col items-center gap-6 p-6 sm:flex-row sm:p-7 md:col-span-2">
+          <${Ring} value=${ready} id="ring-ready">
+            ${(v) => html`<div><div className="tnum font-display text-6xl font-bold leading-none text-white">${v}<span className="text-3xl text-slate-400">%</span></div><div className="mt-1 text-[11px] uppercase tracking-[0.16em] text-slate-400">preparación</div></div>`}
+          <//>
+          <div className="min-w-0 flex-1 text-center sm:text-left">
+            <${Eyebrow}>Índice de preparación<//>
+            <h1 className=${cx('mt-1 font-display text-4xl font-semibold leading-tight text-balance', level[1])}>${level[0]}</h1>
+            <p className="mt-2 text-sm leading-relaxed text-slate-400">Se calcula con tus aciertos sobre las ${Q.length} preguntas. Una pregunta cuenta completa cuando la aciertas dos veces y tu último intento fue correcto. Apunta al 80 % antes del examen real.</p>
+            <dl className="tnum mt-5 grid grid-cols-3 gap-2">
+              ${[['Respondidas', stats.length + '/' + Q.length], ['Precisión', accuracy + ' %'], ['Aprobados', passed + '/' + state.exams.length]].map(([l, v]) => html`<div key=${l} className="rounded-xl bg-white/[0.04] px-2 py-3 text-center">
+                <dd className="font-display text-2xl font-bold text-white">${v}</dd>
+                <dt className="mt-0.5 text-[10px] uppercase tracking-[0.12em] text-slate-400">${l}</dt>
+              </div>`)}
+            </dl>
+          </div>
+        </div>
+
+        <div className="glass flex flex-col p-6">
+          <${Eyebrow}>Racha de estudio<//>
+          <div className="mt-3 flex items-center gap-3">
+            <span className=${cx('grid h-14 w-14 place-items-center rounded-2xl', streak > 0 ? 'bg-gradient-to-br from-amber-400/25 to-rose-500/25 text-amber-300' : 'bg-white/[0.05] text-slate-500')}>
+              <${Icon} name="flame" className=${cx('w-8 h-8', streak > 0 && 'flame')} />
+            </span>
+            <div><div className="tnum font-display text-5xl font-bold leading-none text-white">${streak}</div><div className="text-sm text-slate-400">${streak === 1 ? 'día seguido' : 'días seguidos'}</div></div>
+          </div>
+          <div className="mt-5 grid grid-cols-7 gap-1.5">
+            ${week.map((d) => html`<div key=${d.k} className="flex flex-col items-center gap-1.5">
+              <span className=${cx('h-8 w-full rounded-lg', daySet.has(d.k) ? 'bg-gradient-to-b from-emerald-400 to-emerald-600' : 'bg-white/[0.06]', d.today && 'ring-2 ring-white/40')}></span>
+              <span className=${cx('text-[11px]', d.today ? 'font-semibold text-white' : 'text-slate-500')}>${d.l}</span>
+            </div>`)}
+          </div>
+          <p className="mt-4 text-sm text-slate-400">${todayDone ? 'Hoy ya estudiaste. Vuelve mañana para sumar otro día.' : streak > 0 ? 'Responde una pregunta hoy para no perder la racha.' : 'Responde tu primera pregunta para empezar una racha.'}</p>
+        </div>
+      </section>
+
+      <section className="grid gap-3 sm:grid-cols-3">
+        ${quick.map((c) => html`<button key=${c.id} type="button" onClick=${() => go(c.id)} className=${cx('glass group flex flex-col items-start gap-4 p-5 text-left transition duration-300 hover:-translate-y-0.5 hover:bg-white/[0.06]', c.glow)}>
+          <span className=${cx('grid h-11 w-11 place-items-center rounded-xl', c.tone)}><${Icon} name=${c.icon} /></span>
+          <span className="w-full">
+            <span className="flex items-center justify-between font-display text-2xl font-semibold text-white">${c.title}<${Icon} name="arrow" className="w-5 h-5 text-slate-500 transition group-hover:translate-x-1 group-hover:text-white" /></span>
+            <span className="mt-1 block text-sm text-slate-400">${c.desc}</span>
+          </span>
+        </button>`)}
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2">
+        <div className="glass p-6">
+          <${Eyebrow}>Dominio por tema<//>
+          <div className="mt-4 grid gap-4">
+            ${Object.keys(CATS).map((k) => {
+              const ids = Q.filter((q) => q.cat === k).map((q) => q.id);
+              const pct = readiness(state, ids);
+              const mastered = ids.filter((id) => qScore(state.q[id]) === 1).length;
+              return html`<div key=${k}>
+                <div className="flex items-baseline justify-between gap-2 text-sm"><span className="text-slate-200">${CATS[k].label}</span><span className="tnum text-slate-400">${pct} %</span></div>
+                <${ProgressBar} value=${pct} className="mt-2" />
+                <p className="tnum mt-1 text-xs text-slate-500">${mastered} de ${ids.length} dominadas</p>
+              </div>`;
+            })}
+          </div>
+        </div>
+        <div className="glass flex flex-col p-6">
+          <div className="flex items-center justify-between gap-2">
+            <${Eyebrow}>Últimos simulacros<//>
+            ${state.errors.length > 0 && html`<button type="button" onClick=${() => go('errores')} className="tnum flex items-center gap-1.5 rounded-full bg-rose-500/15 px-3 py-1 text-xs font-semibold text-rose-300 hover:bg-rose-500/25"><${Icon} name="alert" className="w-3.5 h-3.5" />${state.errors.length} por repasar</button>`}
+          </div>
+          ${lastExams.length === 0
+            ? html`<div className="flex flex-1 flex-col items-start justify-center gap-3 py-6">
+                <p className="text-sm text-slate-400">Aún no hay simulacros. Cuando hagas el primero, aquí verás la evolución de tus notas frente a la línea de aprobado.</p>
+                <${Btn} variant="ghost" onClick=${() => go('simulacro')}>Hacer mi primer simulacro<//>
+              </div>`
+            : html`<div className="relative mt-5 h-40" role="img" aria-label=${'Notas de los últimos ' + lastExams.length + ' simulacros'}>
+                <div className="absolute inset-x-0 border-t border-dashed border-emerald-400/50" style=${{ bottom: PASS * 100 + '%' }}>
+                  <span className="absolute -top-5 right-0 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-300/80">Aprobado ${Math.round(PASS * 100)} %</span>
+                </div>
+                <div className="absolute inset-0 flex items-end gap-2">
+                  ${lastExams.map((e, i) => {
+                    const p = (e.score / e.total) * 100;
+                    return html`<div key=${e.date} className="flex h-full flex-1 flex-col justify-end" title=${fmtDate(e.date) + ': ' + e.score + '/' + e.total}>
+                      <div className=${cx('w-full rounded-t-md', e.passed ? 'bg-gradient-to-t from-emerald-600 to-emerald-400' : 'bg-gradient-to-t from-rose-600 to-rose-400', i === lastExams.length - 1 && 'ring-2 ring-white/50')} style=${{ height: Math.max(4, p) + '%' }}></div>
+                    </div>`;
+                  })}
+                </div>
+              </div>
+              <p className="tnum mt-3 text-sm text-slate-400">Último: <span className="font-semibold text-white">${lastExams[lastExams.length - 1].score}/${lastExams[lastExams.length - 1].total}</span> · Mejor: <span className="font-semibold text-white">${Math.max(...state.exams.map((e) => e.score))}/${EXAM_SIZE}</span></p>`}
+        </div>
+      </section>
+
+      <footer className="flex flex-col gap-3 pt-2 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+        <p className="max-w-[70ch]">Contenido basado en normas comunes en Latinoamérica. Límites de velocidad, tasas de alcohol y algunas señales cambian según el país o el estado: confirma con el manual oficial de tu examen.</p>
+        ${confirmReset
+          ? html`<span className="flex shrink-0 items-center gap-2"><span className="text-slate-300">¿Borrar todo el progreso?</span>
+              <button type="button" className="rounded-lg px-2 py-1 text-slate-300 hover:text-white" onClick=${() => setConfirmReset(false)}>Cancelar</button>
+              <button type="button" className="rounded-lg bg-rose-500/20 px-2 py-1 font-semibold text-rose-300 hover:bg-rose-500/30" onClick=${() => { onReset(); setConfirmReset(false); }}>Borrar</button></span>`
+          : html`<button type="button" className="shrink-0 self-start rounded-lg px-2 py-1 text-slate-500 underline-offset-4 hover:text-slate-300 hover:underline" onClick=${() => setConfirmReset(true)}>Reiniciar progreso</button>`}
+      </footer>
+    </div>`;
+  }
+
+  /* ───────── App ───────── */
+  const TABS = [
+    { id: 'inicio', label: 'Inicio', icon: 'home' },
+    { id: 'simulacro', label: 'Simulacro', icon: 'clipboard' },
+    { id: 'practica', label: 'Práctica', icon: 'target' },
+    { id: 'senales', label: 'Señales', icon: 'layers' },
+    { id: 'errores', label: 'Errores', icon: 'alert' }
+  ];
+  const tabFromHash = () => { const h = (location.hash || '').slice(1); return TABS.some((t) => t.id === h) ? h : 'inicio'; };
+
+  const LOGO = '<svg viewBox="0 0 40 40" aria-hidden="true" style="width:100%;height:100%"><defs><linearGradient id="lg-logo" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#10b981"/><stop offset="1" stop-color="#6366f1"/></linearGradient></defs><rect width="40" height="40" rx="11" fill="url(#lg-logo)"/><path d="M15 33 L18.5 7 M25 33 L21.5 7" stroke="#0b0f19" stroke-width="2.6" stroke-linecap="round" opacity=".85"/><path d="M20 30v-3.5M20 22v-3M20 14.5V12" stroke="#facc15" stroke-width="2.2" stroke-linecap="round"/></svg>';
+
+  function App() {
+    const [state, setState] = useState(loadState);
+    const [tab, setTab] = useState(tabFromHash);
+    const [exam, setExam] = useState(null);
+    const [now, setNow] = useState(Date.now());
+
+    useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* sin almacenamiento */ } }, [state]);
+    useEffect(() => { const f = () => setTab(tabFromHash()); window.addEventListener('hashchange', f); return () => window.removeEventListener('hashchange', f); }, []);
+
+    const go = useCallback((id) => {
+      setTab(id);
+      try { if (location.hash.slice(1) !== id) location.hash = id; } catch (e) { /* ignorar */ }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, []);
+
+    const onAnswer = useCallback((id, ok, review) => setState((s) => applyAnswer(s, id, ok, review)), []);
+
+    const finishExam = useCallback((ex) => {
+      if (!ex || ex.finished) return;
+      const res = ex.ids.map((id, i) => ({ id, chosen: ex.answers[i] ?? null, ok: ex.answers[i] === Q_BY_ID[id].answer, marked: ex.marks.includes(i) }));
+      const score = res.filter((r) => r.ok).length;
+      const used = Math.min(ex.duration, Date.now() - ex.start);
+      const passed = score / res.length >= PASS;
+      setState((s) => {
+        let n = s;
+        res.forEach((r) => { n = applyAnswer(n, r.id, r.ok, false); });
+        return { ...n, exams: [...n.exams, { date: Date.now(), score, total: res.length, passed, used }].slice(-30) };
+      });
+      setExam({ ...ex, finished: true, res, score, used, passed });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, []);
+
+    const startExam = useCallback(() => {
+      const t = Date.now();
+      setNow(t);
+      setExam({ ids: shuffle(Q.map((q) => q.id)).slice(0, EXAM_SIZE), answers: {}, marks: [], cur: 0, start: t, duration: EXAM_MINUTES * 60 * 1000, finished: false });
+      go('simulacro');
+    }, [go]);
+
+    const examRunning = !!exam && !exam.finished;
+    useEffect(() => {
+      if (!examRunning) return;
+      const t = setInterval(() => setNow(Date.now()), 1000);
+      return () => clearInterval(t);
+    }, [examRunning]);
+    useEffect(() => { if (exam && !exam.finished && now >= exam.start + exam.duration) finishExam(exam); }, [now, exam, finishExam]);
+
+    const toggleLearned = useCallback((id) => setState((s) => ({ ...s, signs: s.signs.includes(id) ? s.signs.filter((x) => x !== id) : [...s.signs, id] })), []);
+    const clearErrors = useCallback(() => setState((s) => ({ ...s, errors: [] })), []);
+    const onReset = useCallback(() => { setState({ ...DEFAULT }); setExam(null); }, []);
+
+    let view;
+    if (tab === 'simulacro') view = html`<${ExamView} exam=${exam} setExam=${setExam} startExam=${startExam} finishExam=${finishExam} now=${now} state=${state} go=${go} />`;
+    else if (tab === 'practica') view = html`<${PracticeView} state=${state} onAnswer=${onAnswer} />`;
+    else if (tab === 'senales') view = html`<${SignsView} state=${state} toggleLearned=${toggleLearned} />`;
+    else if (tab === 'errores') view = html`<${ErrorsView} state=${state} onAnswer=${onAnswer} clearErrors=${clearErrors} />`;
+    else view = html`<${Dashboard} state=${state} exam=${exam} now=${now} go=${go} onReset=${onReset} />`;
+
+    const badge = (id) => {
+      if (id === 'errores' && state.errors.length) return html`<span className="tnum absolute -right-1 -top-1 grid h-4 min-w-[16px] place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">${state.errors.length}</span>`;
+      if (id === 'simulacro' && examRunning) return html`<span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 animate-pulse rounded-full bg-indigo-400"></span>`;
+      return null;
+    };
+
+    return html`<div className="shell min-h-screen">
+      <div className="mx-auto max-w-[1100px] pb-32 pt-5 md:pb-14 md:pt-7">
+        <header className="mb-2 flex items-center justify-between gap-4">
+          <button type="button" onClick=${() => go('inicio')} className="flex items-center gap-3 rounded-xl text-left" aria-label="Ir al inicio">
+            <span className="h-10 w-10 shrink-0" dangerouslySetInnerHTML=${{ __html: LOGO }}></span>
+            <span>
+              <span className="block font-display text-2xl font-bold leading-none tracking-wide text-white">AutoDrive <span className="text-emerald-400">Master</span></span>
+              <span className="mt-1 block text-[11px] uppercase tracking-[0.16em] text-slate-500">Examen teórico de manejo</span>
+            </span>
+          </button>
+          <nav className="glass hidden items-center gap-1 p-1 md:flex" aria-label="Secciones">
+            ${TABS.map((t) => html`<button key=${t.id} type="button" onClick=${() => go(t.id)} aria-current=${tab === t.id ? 'page' : undefined}
+              className=${cx('relative flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium transition', tab === t.id ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white')}>
+              <${Icon} name=${t.icon} className="w-4 h-4" />${t.label}${badge(t.id)}
+            </button>`)}
+          </nav>
+        </header>
+        <div className="lane mb-6 mt-4"></div>
+        <main key=${tab} className="view">${view}</main>
+      </div>
+
+      <nav className="bottomnav md:hidden" aria-label="Secciones">
+        <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+          ${TABS.map((t) => html`<button key=${t.id} type="button" onClick=${() => go(t.id)} aria-current=${tab === t.id ? 'page' : undefined}
+            className=${cx('flex flex-col items-center gap-1 rounded-xl py-1.5 text-[11px] font-medium transition', tab === t.id ? 'text-white' : 'text-slate-500')}>
+            <span className=${cx('relative grid h-8 w-12 place-items-center rounded-full transition', tab === t.id && 'bg-indigo-500/25 text-indigo-200')}>
+              <${Icon} name=${t.icon} className="w-5 h-5" />${badge(t.id)}
+            </span>
+            ${t.label}
+          </button>`)}
+        </div>
+      </nav>
+    </div>`;
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(html`<${App} />`);
+})();
+</script>
