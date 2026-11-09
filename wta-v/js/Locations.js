@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import { CITY } from './Environment.js';
 import { WEAPONS } from './PlayerController.js';
-import { CATALOG, DEALER_MODELS, VehicleController } from './VehicleController.js';
+import { CATALOG, DEALER_MODELS, PLANE_MODELS, VehicleController } from './VehicleController.js';
 import { formatMoney } from './GameState.js';
 import { BUSINESSES, LEVELS } from './Properties.js';
 import { Environment } from './Environment.js';
 import * as CANNON from 'cannon-es';
-import { GROUPS, ISLAND } from './Environment.js';
+import { GROUPS, ISLAND, AIRPORT } from './Environment.js';
 import { stoneTexture, wallTexture, signTexture, makeCanvas, toTexture, addNoise } from './Textures.js';
 
 const INTERACT_RADIUS = 2.2;
@@ -29,6 +29,8 @@ const TYPE_STYLE = {
   hospital: { color: '#ffffff', letter: '+', sign: '#c62828' },
   police: { color: '#1565c0', letter: 'P', sign: '#0b2e5c' },
   mission: { color: '#fdd835', letter: '!', sign: '#8a6d00' },
+  hangar: { color: '#00acc1', letter: '✈', sign: '#00616e' },
+  job: { color: '#ffb300', letter: '!', sign: '#8a5a00' },
 };
 
 const rc = (i) => -CITY.HALF + i * CITY.PERIOD;
@@ -167,6 +169,14 @@ export class Locations {
     add('mission', 'Taller de Lucho', [3, 2, 'S'], { id: 'lucho', passive: true });
     add('mission', 'Oficina de Vera', [4, 3, 'N'], { id: 'vera', passive: true });
     add('mission', 'Villa Aurelio', [1, 2, 'E'], { id: 'aurelio', passive: true });
+    // Aeropuerto: venta de aviones y agencia de vuelos chárter; encargos en las islas
+    const top = AIRPORT.top;
+    add('hangar', 'Aeronaves Sombra', { pos: [-560, top, 694], normal: [0, 1] }, { id: 'hangar' });
+    add('job', 'Agencia Chárter', { pos: [-330, top, 654.5], normal: [0, -1] }, { id: 'charter' });
+    const sp = env.islandSpots || {};
+    if (sp.tortuga) add('job', 'Bigotes (contrabandista)', { pos: sp.tortuga.pos, normal: sp.tortuga.normal }, { id: 'tortuga' });
+    if (sp.volcan) add('job', 'Observatorio del Volcán', { pos: sp.volcan.pos, normal: sp.volcan.normal }, { id: 'volcan' });
+    if (sp.cayo) add('job', 'Recepción del resort', { pos: sp.cayo.pos, normal: sp.cayo.normal }, { id: 'cayo' });
     env.poiSpots = this.pois.map((p) => p.pos);
 
     for (const poi of this.pois) this.buildPoi(poi);
@@ -265,6 +275,7 @@ export class Locations {
 
   isAvailable(poi) {
     if (poi.type === 'bank') return this.game.missions.bankAvailable(poi.id);
+    if (poi.type === 'job') return !this.game.missions.active && !!this.game.missions.nextJob(poi.id);
     return true;
   }
 
@@ -277,6 +288,12 @@ export class Locations {
         return 'Armería';
       case 'dealer':
         return 'Concesionario';
+      case 'hangar':
+        return 'Comprar un avión';
+      case 'job': {
+        const j = this.game.missions.nextJob(poi.id);
+        return j ? `Encargo: ${j.title} (${poi.name})` : poi.name;
+      }
       case 'store':
         return `Entrar en ${poi.name}`;
       case 'bank': {
@@ -308,6 +325,14 @@ export class Locations {
       case 'dealer':
         game.menus.open(this.dealerMenu(poi));
         break;
+      case 'hangar':
+        game.menus.open(this.planeMenu(poi));
+        break;
+      case 'job': {
+        const j = game.missions.nextJob(poi.id);
+        if (j) game.missions.start(j);
+        break;
+      }
       case 'business':
         game.menus.open(this.businessMenu(poi));
         break;
@@ -372,6 +397,37 @@ export class Locations {
         });
         return list;
       },
+    };
+  }
+
+  /** Venta de aviones: quedan en tu garaje y te esperan en la cabecera de la pista. */
+  planeMenu(poi) {
+    const game = this.game;
+    const st = game.state;
+    return {
+      title: 'Aeronaves Sombra',
+      subtitle: 'Tu avión te espera en la cabecera de la pista. Pídelo luego desde P › Mis coches.',
+      closeOnBuy: true,
+      items: () =>
+        PLANE_MODELS.map((type) => {
+          const c = CATALOG[type];
+          const owned = st.cars.filter((car) => car.type === type).length;
+          return {
+            label: `${c.label} · ${c.kind}`,
+            detail: `${Math.round(c.flyMax * 3.6)} km/h · despega a ${Math.round(c.vRot * 3.6)} km/h${c.seaplane ? ' · amariza' : ''}${owned ? ` · ya tienes ${owned}` : ''}`,
+            price: c.price,
+            action: () => {
+              st.spend(c.price);
+              const car = st.addCar({ type, color: c.colors[0] });
+              st.save();
+              const af = game.env.airfields[0];
+              const v = this.spawnOwnedCar(car, af.spawn.pos, af.spawn.heading);
+              game.waypoint = { pos: af.spawn.pos.clone(), label: `Tu ${c.label}` };
+              game.hud.notify(`${v.label} es tuyo: te espera en la cabecera de la pista (ruta en el GPS).`, 5);
+              game.emit('carBought', { type });
+            },
+          };
+        }),
     };
   }
 

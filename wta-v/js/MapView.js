@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CATALOG } from './VehicleController.js';
 import { formatMoney } from './GameState.js';
 import { BUSINESSES } from './Properties.js';
-import { DISTRICT_LABELS } from './Environment.js';
+import { DISTRICT_LABELS, coastZ } from './Environment.js';
 
 /**
  * Mapa a pantalla completa (tecla M) con ruta por las calles.
@@ -18,6 +18,7 @@ export class MapView {
     this.listEl = document.getElementById('map-list');
     this.open = false;
     this.index = 0;
+    this.view = 'city'; // 'city' | 'world' (tecla Z)
     this.routeTimer = 0;
     this.wasLocked = false;
 
@@ -30,6 +31,13 @@ export class MapView {
   // ------------------------------------------------------------------
   /** A* por la red de calles (respeta el sentido de la glorieta). Devuelve puntos en el mundo. */
   computeRoute(from, to) {
+    // Fuera de la red de calles (aeropuerto, islas, en el aire): línea recta
+    const env = this.game.env;
+    const offNet = (p) => Math.abs(p.x) > env.mapSize / 2 || p.z > coastZ(p.x) + 2 || p.y > 25;
+    if (offNet(from) || offNet(to)) {
+      const pts = [new THREE.Vector3(from.x, 0, from.z), new THREE.Vector3(to.x, 0, to.z)];
+      return { points: pts, length: pts[0].distanceTo(pts[1]) };
+    }
     const path = this.game.env.findPath(from, to).map((n) => n.pos.clone());
     const pts = [new THREE.Vector3(from.x, 0, from.z), ...path, new THREE.Vector3(to.x, 0, to.z)];
     let length = 0;
@@ -69,13 +77,18 @@ export class MapView {
     const st = game.state;
     const list = [];
     const m = game.missions;
-    if (m.target && st.mode === 'story') list.push({ label: `Misión: ${m.targetLabel || 'objetivo'}`, pos: m.target.clone(), color: '#fdd835' });
-    const order = ['safehouse', 'gunshop', 'dealer', 'bank', 'store', 'business', 'hospital', 'police'];
+    if (m.target && (st.mode === 'story' || m.active)) list.push({ label: `Misión: ${m.targetLabel || 'objetivo'}`, pos: m.target.clone(), color: '#fdd835' });
+    const order = ['safehouse', 'gunshop', 'dealer', 'hangar', 'job', 'bank', 'store', 'business', 'hospital', 'police'];
     const pois = game.locations.pois.filter((p) => order.includes(p.type) && (!p.marker || p.marker.visible));
     pois.sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type));
     for (const p of pois) {
       let extra = '';
       if (p.type === 'business') extra = st.businesses.has(p.id) ? ' (tuyo)' : ` · ${formatMoney(BUSINESSES[p.id].price)}`;
+      if (p.type === 'job') {
+        const j = game.missions.nextJob(p.id);
+        if (!j) continue;
+        extra = ` · encargo: ${j.title}`;
+      }
       list.push({ label: `${p.name}${extra}`, pos: p.pos.clone(), color: p.style.color, letter: p.style.letter });
     }
     for (const v of game.vehicles) {
@@ -98,6 +111,9 @@ export class MapView {
     this.open = true;
     game.mapOpen = true;
     this.index = 0;
+    // Fuera de la ciudad se abre el mapa del mundo (aeropuerto e islas)
+    const f = game.getFocusPosition();
+    this.view = Math.abs(f.x) > game.env.mapSize / 2 || f.z > game.env.mapSize / 2 ? 'world' : 'city';
     this.el.classList.remove('hidden');
     // Para poder hacer clic en el mapa se libera el ratón (sin pausar el juego)
     this.wasLocked = game.input.locked;
@@ -142,6 +158,9 @@ export class MapView {
         this.game.waypoint = null;
         this.game.route = null;
         break;
+      case 'KeyZ':
+        this.view = this.view === 'city' ? 'world' : 'city';
+        break;
       case 'KeyM':
       case 'KeyQ':
       case 'Escape':
@@ -158,19 +177,26 @@ export class MapView {
   // ------------------------------------------------------------------
   // Dibujo
   // ------------------------------------------------------------------
-  worldToMap(x, z) {
+  /** Rectángulo del mundo que se ve: la ciudad o el mapa grande con las islas. */
+  bounds() {
     const env = this.game.env;
+    if (this.view === 'world' && env.worldMap) return { x0: env.worldMap.x0, z0: env.worldMap.z0, size: env.worldMap.size };
+    return { x0: -env.mapSize / 2, z0: -env.mapSize / 2, size: env.mapSize };
+  }
+
+  worldToMap(x, z) {
+    const b = this.bounds();
     const size = this.canvas.width;
-    return [((x + env.mapSize / 2) / env.mapSize) * size, ((z + env.mapSize / 2) / env.mapSize) * size];
+    return [((x - b.x0) / b.size) * size, ((z - b.z0) / b.size) * size];
   }
 
   onClick(e) {
-    const env = this.game.env;
     const r = this.canvas.getBoundingClientRect();
     const u = (e.clientX - r.left) / r.width;
     const v = (e.clientY - r.top) / r.height;
-    const x = u * env.mapSize - env.mapSize / 2;
-    const z = v * env.mapSize - env.mapSize / 2;
+    const b = this.bounds();
+    const x = b.x0 + u * b.size;
+    const z = b.z0 + v * b.size;
     this.setDestination(new THREE.Vector3(x, 0, z), 'Punto del mapa');
     this.render();
   }
@@ -179,19 +205,25 @@ export class MapView {
     const game = this.game;
     const ctx = this.ctx;
     const size = this.canvas.width;
-    ctx.drawImage(game.env.mapCanvas, 0, 0, size, size);
+    const world = this.view === 'world' && game.env.worldMap;
+    ctx.drawImage(world ? game.env.worldMap.canvas : game.env.mapCanvas, 0, 0, size, size);
     ctx.fillStyle = 'rgba(10,14,20,0.25)';
     ctx.fillRect(0, 0, size, size);
 
-    // Barrios
+    // Barrios (o islas en la vista del mundo)
     ctx.font = "bold 15px 'Rajdhani', sans-serif";
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    for (const [name, x, z] of DISTRICT_LABELS) {
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    for (const [name, x, z] of world ? game.env.worldLabels : DISTRICT_LABELS) {
       const [mx, my] = this.worldToMap(x, z);
       ctx.fillText(name, mx, my);
     }
+    ctx.font = "bold 12px 'Rajdhani', sans-serif";
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.textAlign = 'left';
+    ctx.fillText(world ? 'Z: ver la ciudad' : 'Z: ver el mundo (aeropuerto e islas)', 10, size - 12);
+    ctx.textAlign = 'center';
 
     // Ruta
     if (game.route) {

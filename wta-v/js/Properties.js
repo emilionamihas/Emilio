@@ -246,9 +246,20 @@ export class Properties {
       items: () => {
         const list = st.cars.map((car) => ({
           label: this.carLabel(car),
-          detail: `${Math.round(CATALOG[car.type].maxSpeed * 3.6)} km/h · ${this.findVehicle(car) ? 'en la calle' : 'en el garaje'}`,
+          detail: CATALOG[car.type].plane
+            ? `Avión · ${Math.round(CATALOG[car.type].flyMax * 3.6)} km/h · ${this.findVehicle(car) ? 'fuera' : 'en el hangar'}`
+            : `${Math.round(CATALOG[car.type].maxSpeed * 3.6)} km/h · ${this.findVehicle(car) ? 'en la calle' : 'en el garaje'}`,
           submenu: () => this.carDetail(car),
         }));
+        list.push({
+          label: 'Comprar un avión',
+          detail: 'Marca el hangar del aeropuerto en el GPS',
+          tag: 'GPS',
+          action: () => {
+            this.setWaypoint(this.game.locations.byId('hangar').pos, 'Aeronaves Sombra');
+            return 'Hangar del aeropuerto marcado en el GPS.';
+          },
+        });
         list.push({
           label: 'Comprar otro coche',
           detail: 'Marca Autos Velasco en el GPS',
@@ -290,6 +301,21 @@ export class Properties {
           action: () => this.restyle(car, { [field]: hex }),
         })),
     });
+    if (CATALOG[car.type].plane) {
+      return {
+        title: CATALOG[car.type].label,
+        subtitle: () => `Tu ${CATALOG[car.type].kind.toLowerCase()}`,
+        items: () => [
+          {
+            label: 'Llevarlo al aeródromo más cercano',
+            detail: 'Un piloto lo deja en la cabecera de la pista (ruta en el GPS)',
+            price: DELIVERY_FEE,
+            action: () => this.deliverPlane(car),
+          },
+          { label: 'Pintura', detail: 'Color del fuselaje', submenu: colorMenu('color', 'Pintura') },
+        ],
+      };
+    }
     return {
       title: CATALOG[car.type].label,
       subtitle: () => `Tu ${CATALOG[car.type].kind.toLowerCase()}: nadie te busca por conducirlo`,
@@ -343,6 +369,20 @@ export class Properties {
   }
 
   /** Trae un coche propio: gratis a la puerta de casa (desde dentro) o a la calle más cercana por 250. */
+  /** Avión: al aeródromo más cercano a ti (aeropuerto o pista de una isla). */
+  deliverPlane(car) {
+    const game = this.game;
+    if (game.interior) return 'Sal a la calle primero.';
+    if (!this.state.spend(DELIVERY_FEE)) return 'No tienes dinero para el traslado.';
+    const p = game.getFocusPosition();
+    const af = game.env.airfields.slice().sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z))[0];
+    game.locations.spawnOwnedCar(car, af.spawn.pos, af.spawn.heading);
+    game.waypoint = { pos: af.spawn.pos.clone(), label: `Tu ${CATALOG[car.type].label}` };
+    game.menus.close();
+    game.hud.notify(`${CATALOG[car.type].label} en ${af.name}, en la cabecera de la pista.`, 4);
+    return 'Hecho.';
+  }
+
   deliverCar(car) {
     const game = this.game;
     const home = game.locations.byId('casa');

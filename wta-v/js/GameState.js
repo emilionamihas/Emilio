@@ -64,6 +64,7 @@ export class GameState {
     this.savedAt = null;
     this.storyStep = 0;   // índice de la siguiente misión
     this.storyDone = false;
+    this.jobsDone = []; // encargos de las islas y del aeropuerto ya cumplidos
     this.bankCooldown = {};
     this.stats = { robberies: 0, banks: 0, earned: 0, cars: 0 };
     this.infiniteAmmo = false;
@@ -109,6 +110,7 @@ export class GameState {
     this.savedAt = d.savedAt ?? null;
     this.storyStep = d.storyStep ?? 0;
     this.storyDone = !!d.storyDone;
+    this.jobsDone = Array.isArray(d.jobsDone) ? d.jobsDone : [];
     this.stats = { ...this.stats, ...(d.stats || {}) };
     this.infiniteAmmo = !!d.infiniteAmmo;
     this.cheated = !!d.cheated;
@@ -131,6 +133,7 @@ export class GameState {
       outfit: this.outfit,
       storyStep: this.storyStep,
       storyDone: this.storyDone,
+      jobsDone: this.jobsDone,
       stats: this.stats,
       infiniteAmmo: this.infiniteAmmo,
       cheated: this.cheated,

@@ -112,14 +112,58 @@ export const CATALOG = {
     wheel: { r: 0.36, x: 0.18, zf: 0.8, zr: -0.72, rest: 0.42 },
     style: 'cross', bike: true, offroad: true, colors: [0xff6d00, 0x1e88e5, 0xfdd835, 0x43a047, 0xd50000],
   },
-  // Avioneta: solo con el código WTAFLY. En tierra rueda con su tren; en el aire, vuelo arcade
+  // Aviones: se compran en el hangar del aeropuerto. En tierra ruedan con su tren (o flotadores);
+  // en el aire, vuelo arcade. vLift: velocidad a la que empieza a sustentar; vRot: rotación de despegue;
+  // stall: pérdida; turn: agilidad en el giro; fuse: semilargo de la caja de colisión.
   avioneta: {
-    label: 'Gaviota', kind: 'Avioneta', price: 0, mass: 900, drive: 'rwd', power: 0, maxSpeed: 62,
+    label: 'Gaviota', kind: 'Avioneta', price: 30000, mass: 900, drive: 'rwd', power: 0, maxSpeed: 62,
     brakeDecel: 6, handbrakeDecel: 4, maxSteer: 0.4, gripFront: 1.6, gripRear: 1.7, drift: 1,
     stiffness: 30, damping: [2.4, 4.2], health: 130,
     body: { w: 0.6, l: 3.0, h: 1.1 }, cabin: null,
     wheel: { r: 0.3, x: 1.25, xf: 0.12, zf: 2.1, zr: -0.25, rest: 0.4 },
-    style: 'plane', plane: true, thrust: 9000, flyMax: 62, colors: [0xf2f2f2, 0xc62828, 0x1565c0, 0xf9c80e],
+    style: 'plane', plane: true, thrust: 9000, flyMax: 62, airAcc: 6, vLift: 18, vRot: 22, stall: 19, turn: 1.15, fuse: 2.4, camDist: 12,
+    look: { kl: 1, kh: 1, fw: 1.1, wing: 'high', span: 9, engine: 'nose', tail: 'normal' },
+    colors: [0xf2f2f2, 0xc62828, 0x1565c0, 0xf9c80e],
+  },
+  halcon: {
+    label: 'Halcón', kind: 'Avioneta deportiva', price: 85000, mass: 1000, drive: 'rwd', power: 0, maxSpeed: 74,
+    brakeDecel: 6, handbrakeDecel: 4, maxSteer: 0.4, gripFront: 1.6, gripRear: 1.7, drift: 1,
+    stiffness: 32, damping: [2.4, 4.2], health: 120,
+    body: { w: 0.6, l: 3.2, h: 1.0 }, cabin: null,
+    wheel: { r: 0.3, x: 1.5, xf: 0.1, zf: 2.3, zr: -0.2, rest: 0.34 },
+    style: 'plane', plane: true, thrust: 11500, flyMax: 74, airAcc: 8, vLift: 20, vRot: 25, stall: 21, turn: 1.4, fuse: 2.6, camDist: 12,
+    look: { kl: 1.1, kh: 0.9, fw: 1.05, wing: 'low', span: 8.6, engine: 'nose', tail: 'normal' },
+    colors: [0xd50000, 0x111111, 0xffc107, 0x1e88e5],
+  },
+  albatros: {
+    label: 'Albatros', kind: 'Hidroavión', price: 140000, mass: 1300, drive: 'rwd', power: 0, maxSpeed: 56,
+    brakeDecel: 5, handbrakeDecel: 4, maxSteer: 0.4, gripFront: 1.5, gripRear: 1.5, drift: 1,
+    stiffness: 28, damping: [2.4, 4.2], health: 150,
+    body: { w: 0.7, l: 3.2, h: 1.2 }, cabin: null,
+    wheel: { r: 0.3, x: 1.4, xf: 1.4, zf: 1.7, zr: -1.3, rest: 0.5 },
+    style: 'plane', plane: true, seaplane: true, thrust: 10500, flyMax: 56, airAcc: 5.5, vLift: 17, vRot: 21, stall: 18, turn: 1.05, fuse: 2.6, camDist: 13,
+    look: { kl: 1.15, kh: 1.05, fw: 1.2, wing: 'high', span: 11.5, engine: 'nose', tail: 'normal', floats: true },
+    colors: [0xfdd835, 0xf2f2f2, 0x00897b, 0xd84315],
+  },
+  pelicano: {
+    label: 'Pelícano', kind: 'Bimotor de carga', price: 260000, mass: 3200, drive: 'rwd', power: 0, maxSpeed: 66,
+    brakeDecel: 6, handbrakeDecel: 4, maxSteer: 0.35, gripFront: 1.6, gripRear: 1.7, drift: 1,
+    stiffness: 30, damping: [2.6, 4.4], health: 260,
+    body: { w: 1.0, l: 4.5, h: 1.7 }, cabin: null,
+    wheel: { r: 0.45, x: 2.4, xf: 0.15, zf: 4.0, zr: -0.3, rest: 0.5 },
+    style: 'plane', plane: true, thrust: 30000, flyMax: 66, airAcc: 5, vLift: 20, vRot: 25, stall: 22, turn: 0.85, fuse: 4.2, camDist: 19,
+    look: { kl: 1.75, kh: 1.45, fw: 2.0, wing: 'high', span: 16, engine: 'twin', tail: 'normal' },
+    colors: [0xeceff1, 0x37474f, 0x2e7d32, 0x0d47a1],
+  },
+  condor: {
+    label: 'Cóndor', kind: 'Jet privado', price: 750000, mass: 5000, drive: 'rwd', power: 0, maxSpeed: 105,
+    brakeDecel: 7, handbrakeDecel: 4, maxSteer: 0.32, gripFront: 1.7, gripRear: 1.8, drift: 1,
+    stiffness: 32, damping: [2.6, 4.4], health: 220,
+    body: { w: 0.95, l: 5.0, h: 1.6 }, cabin: null,
+    wheel: { r: 0.42, x: 2.0, xf: 0.15, zf: 4.6, zr: -0.5, rest: 0.48 },
+    style: 'plane', plane: true, jet: true, thrust: 60000, flyMax: 105, airAcc: 11, vLift: 27, vRot: 33, stall: 30, turn: 0.95, ceiling: 320, fuse: 4.8, camDist: 19,
+    look: { kl: 1.9, kh: 1.35, fw: 1.8, wing: 'low', span: 13, sweep: 0.42, engine: 'jet', tail: 'T' },
+    colors: [0xf5f5f5, 0x101820, 0xb0bec5, 0x6a1b9a],
   },
   police: {
     label: 'Patrulla', kind: 'Policía', price: 0, mass: 1300, drive: 'rwd', power: 8600, maxSpeed: 56,
@@ -135,7 +179,9 @@ export const CATALOG = {
 CATALOG.civil = CATALOG.sedan;
 
 /** Vehículos que se pueden comprar en el concesionario, del más barato al más caro. */
-export const DEALER_MODELS = Object.keys(CATALOG).filter((k) => CATALOG[k].price > 0 && k !== 'civil').sort((a, b) => CATALOG[a].price - CATALOG[b].price);
+export const DEALER_MODELS = Object.keys(CATALOG).filter((k) => CATALOG[k].price > 0 && k !== 'civil' && !CATALOG[k].plane).sort((a, b) => CATALOG[a].price - CATALOG[b].price);
+/** Aviones a la venta en el hangar del aeropuerto. */
+export const PLANE_MODELS = Object.keys(CATALOG).filter((k) => CATALOG[k].plane && CATALOG[k].price > 0).sort((a, b) => CATALOG[a].price - CATALOG[b].price);
 
 /** Mezcla del tráfico civil (pesos relativos). */
 export const TRAFFIC_MIX = { compact: 5, sedan: 6, taxi: 2, suv: 3, pickup: 3, van: 2, muscle: 1.5, sport: 1, super: 0.3 };
@@ -234,8 +280,8 @@ const _q = new THREE.Quaternion();
 const _bodyQ = new THREE.Quaternion();
 const _v3 = new THREE.Vector3();
 const _zAxis = new THREE.Vector3(0, 0, 1);
-// Límites del mundo para la avioneta (los mismos muros que el mapa)
-const WORLD_FLY = { minX: -530, maxX: 530, minZ: -545, maxZ: 560 };
+// Límites de vuelo: la ciudad y el mar con las islas
+const WORLD_FLY = { minX: -1350, maxX: 1350, minZ: -545, maxZ: 2150 };
 const _pv1 = new CANNON.Vec3();
 const _pv2 = new CANNON.Vec3();
 const _pf = new CANNON.Vec3();
@@ -322,7 +368,7 @@ export class VehicleController {
     const b = s.body;
     if (s.plane) {
       // Fuselaje más corto y elevado: la cola no roza la pista al rotar para despegar
-      chassis.addShape(new CANNON.Box(new CANNON.Vec3(b.w, b.h / 2, 2.4)), new CANNON.Vec3(0, b.h / 2 + 0.3, 0.4));
+      chassis.addShape(new CANNON.Box(new CANNON.Vec3(b.w, b.h / 2, s.fuse || 2.4)), new CANNON.Vec3(0, b.h / 2 + 0.3, 0.4));
     } else chassis.addShape(new CANNON.Box(new CANNON.Vec3(b.w, b.h / 2, b.l)), new CANNON.Vec3(0, b.h / 2, 0));
     if (s.cabin) {
       chassis.addShape(
@@ -611,14 +657,21 @@ export class VehicleController {
   }
 
   /** Avioneta de ala alta: fuselaje, cabina, alas, cola, hélice, tren triciclo y luces de navegación. */
+  /**
+   * Aviones: un mismo constructor con parámetros de aspecto (s.look): longitud y altura del
+   * fuselaje, ala alta o baja (con flecha en el reactor), motor de morro, dos motores en las alas o
+   * dos reactores traseros, cola normal o en T, y flotadores en el hidroavión.
+   */
   createPlaneMeshes(color) {
     const s = this.spec;
+    const L = s.look;
     const group = new THREE.Group();
     group.userData.vehicle = this;
     const paint = color ?? s.colors[0];
     this.paintMat = coat(new THREE.MeshPhysicalMaterial({ color: paint, metalness: 0.4, roughness: 0.3, clearcoat: 0.8, clearcoatRoughness: 0.15 }));
-    const accent = new THREE.MeshStandardMaterial({ color: 0xc62828, roughness: 0.4 });
+    const accent = new THREE.MeshStandardMaterial({ color: s.jet ? 0x1a237e : 0xc62828, roughness: 0.4 });
     const glass = new THREE.MeshStandardMaterial({ color: 0x0e1419, metalness: 0.9, roughness: 0.05, envMapIntensity: 1.4 });
+    const metal = new THREE.MeshStandardMaterial({ color: 0xb0b6bc, metalness: 0.8, roughness: 0.35 });
     this.headMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff4d6, emissiveIntensity: 0.6 });
     this.tailMat = new THREE.MeshStandardMaterial({ color: 0x550000, emissive: 0xff1a1a, emissiveIntensity: 1 });
     this.reverseMat = this.tailMat;
@@ -631,56 +684,133 @@ export class VehicleController {
       return m;
     };
     const box = (w, h, d, mat, x, y, z) => add(new THREE.BoxGeometry(w, h, d), mat, x, y, z);
+    const cyl = (r1, r2, len, mat, x, y, z, seg = 14) => {
+      const g = new THREE.CylinderGeometry(r1, r2, len, seg);
+      g.rotateX(Math.PI / 2); // a lo largo de Z
+      return add(g, mat, x, y, z);
+    };
+    const kl = L.kl;
+    const kh = L.kh;
     const y0 = 0.1; // base del fuselaje sobre el origen del chasis
-    // Fuselaje: perfil lateral extruido
-    add(
-      extrudeProfile(
-        [[3.0, y0 + 0.55], [2.75, y0 + 0.25], [1.2, y0 + 0.05], [-1.5, y0 + 0.35], [-3.1, y0 + 0.75], [-3.3, y0 + 1.0], [-1.6, y0 + 1.1], [0.3, y0 + 1.35], [1.6, y0 + 1.25], [2.75, y0 + 0.95]],
-        1.1,
-        0.12
-      ),
-      this.paintMat
-    );
-    // Cabina acristalada
-    add(extrudeProfile([[1.55, y0 + 1.22], [0.45, y0 + 1.75], [-0.6, y0 + 1.75], [-0.9, y0 + 1.3]], 1.0, 0.06), glass);
-    // Alas (ala alta) con franja y puntas con luces de navegación
-    box(9, 0.14, 1.5, this.paintMat, 0, y0 + 1.82, 0.1);
-    box(9.02, 0.15, 0.25, accent, 0, y0 + 1.83, -0.45);
-    box(0.12, 0.18, 0.3, this.tailMat, -4.5, y0 + 1.82, 0.1); // derecha (+X es la izquierda)
-    box(0.12, 0.18, 0.3, this.navGreen, 4.5, y0 + 1.82, 0.1);
-    for (const sx of [-1, 1]) box(0.06, 1.0, 0.08, SHARED.trim, sx * 1.6, y0 + 1.3, 0.3); // montantes
+    const P = (pts) => pts.map(([z, y]) => [z * kl, y0 + y * kh]);
+    // Fuselaje: perfil lateral extruido (el del reactor es más afilado)
+    const body = s.jet
+      ? [[3.25, 0.7], [2.9, 0.38], [1.9, 0.12], [-1.6, 0.25], [-2.9, 0.75], [-3.15, 1.2], [-2.4, 1.6], [0, 1.72], [2.0, 1.6], [2.85, 1.2]]
+      : [[3.0, 0.55], [2.75, 0.25], [1.2, 0.05], [-1.5, 0.35], [-3.1, 0.75], [-3.3, 1.0], [-1.6, 1.1], [0.3, 1.35], [1.6, 1.25], [2.75, 0.95]];
+    add(extrudeProfile(P(body), L.fw, 0.12 * kh), this.paintMat);
+    const top = y0 + (s.jet ? 1.72 : 1.35) * kh; // techo del fuselaje
+    const bottom = y0 + 0.08 * kh;
+    // Cabina acristalada (en el reactor, parabrisas y una fila de ventanillas)
+    if (s.jet) {
+      add(extrudeProfile(P([[2.55, 1.45], [2.1, 1.66], [1.7, 1.66], [1.65, 1.45]]), L.fw * 0.86, 0.04), glass);
+      for (let k = 0; k < 6; k++) box(L.fw + 0.02, 0.28, 0.4, glass, 0, y0 + 1.2 * kh, (1.1 - k * 0.42) * kl);
+    } else {
+      add(extrudeProfile(P([[1.55, 1.22], [0.45, 1.75 / (kh > 1.2 ? 1.25 : 1)], [-0.6, 1.75 / (kh > 1.2 ? 1.25 : 1)], [-0.9, 1.3]]), L.fw * 0.9, 0.06), glass);
+      if (kl > 1.5) for (let k = 0; k < 5; k++) box(L.fw + 0.02, 0.35, 0.45, glass, 0, y0 + 0.95 * kh, (-0.3 - k * 0.42) * kl);
+    }
+    // Alas
+    const span = L.span;
+    const chord = 1.5 * Math.sqrt(kl);
+    const wingY = L.wing === 'high' ? top + 0.08 : bottom + 0.35 * kh;
+    const wingZ = L.wing === 'high' ? 0.1 * kl : 0.25 * kl;
+    if (L.sweep) {
+      for (const sd of [-1, 1]) {
+        const half = new THREE.BoxGeometry(span / 2, 0.16, chord);
+        half.translate((sd * span) / 4, 0, 0);
+        const m = add(half, this.paintMat, 0, wingY, wingZ);
+        m.rotation.y = sd * L.sweep;
+        // winglets
+        const wl = box(0.1, 0.9, chord * 0.6, accent, 0, 0, 0);
+        wl.position.set(sd * (span / 2) * Math.cos(L.sweep), wingY + 0.4, wingZ - (span / 2) * Math.sin(L.sweep));
+      }
+    } else {
+      box(span, 0.14 * Math.sqrt(kh), chord, this.paintMat, 0, wingY, wingZ);
+      box(span + 0.02, 0.15, 0.25, accent, 0, wingY + 0.01, wingZ - chord * 0.35);
+    }
+    const tipZ = L.sweep ? wingZ - (span / 2) * Math.sin(L.sweep) : wingZ;
+    const tipX = L.sweep ? (span / 2) * Math.cos(L.sweep) : span / 2;
+    box(0.12, 0.18, 0.3, this.tailMat, -tipX, wingY, tipZ); // derecha (+X es la izquierda)
+    box(0.12, 0.18, 0.3, this.navGreen, tipX, wingY, tipZ);
+    if (L.wing === 'high' && !L.floats) for (const sx of [-1, 1]) box(0.06, 1.0 * kh, 0.08, SHARED.trim, sx * L.fw * 1.4, wingY - 0.5 * kh, wingZ + 0.2); // montantes
     // Cola
-    box(3.2, 0.1, 0.9, this.paintMat, 0, y0 + 1.0, -3.0);
-    box(0.1, 1.2, 1.0, this.paintMat, 0, y0 + 1.55, -3.05);
-    box(0.11, 0.4, 0.6, accent, 0, y0 + 1.95, -3.2);
-    // Capó del motor y buje
-    box(0.95, 0.75, 0.6, SHARED.trim, 0, y0 + 0.6, 2.85);
-    box(0.2, 0.15, 0.06, this.headMat, 0, y0 + 0.35, 3.18);
-    // Hélice (gira según la potencia)
-    this.prop = new THREE.Group();
-    this.prop.position.set(0, y0 + 0.6, 3.2);
-    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.9, 0.05), SHARED.trim);
-    const hub = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.35, 10), SHARED.chrome);
-    hub.rotation.x = Math.PI / 2;
-    hub.position.z = 0.12;
-    this.prop.add(blade, hub);
-    group.add(this.prop);
-    // Tren de aterrizaje
+    const tailZ = (s.jet ? -2.85 : -3.0) * kl;
+    const finH = 1.2 * kh;
+    box(0.1, finH, 1.1 * kl, this.paintMat, 0, top - 0.2 + finH / 2, tailZ - 0.05);
+    box(0.11, finH * 0.35, 0.6 * kl, accent, 0, top - 0.2 + finH * 0.75, tailZ - 0.2);
+    const stabY = L.tail === 'T' ? top - 0.2 + finH : y0 + 1.0 * kh;
+    box(3.2 * Math.sqrt(kl), 0.1, 0.9 * Math.sqrt(kl), this.paintMat, 0, stabY, tailZ - (L.tail === 'T' ? 0.3 : 0));
+    // Motores
+    this.props = [];
+    const prop = (x, y, z, r) => {
+      const g = new THREE.Group();
+      g.position.set(x, y, z);
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.14, r * 2, 0.05), SHARED.trim);
+      const blade2 = blade.clone();
+      blade2.rotation.z = Math.PI / 2;
+      const hub = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.35, 10), SHARED.chrome);
+      hub.rotation.x = Math.PI / 2;
+      hub.position.z = 0.12;
+      g.add(blade, hub);
+      if (r > 1) g.add(blade2);
+      group.add(g);
+      this.props.push(g);
+    };
+    const noseZ = (s.jet ? 3.25 : 3.0) * kl;
+    if (L.engine === 'nose') {
+      box(0.95 * L.fw, 0.75 * kh, 0.6, SHARED.trim, 0, y0 + 0.6 * kh, noseZ - 0.15);
+      prop(0, y0 + 0.6 * kh, noseZ + 0.2, 0.95);
+    } else if (L.engine === 'twin') {
+      for (const sx of [-1, 1]) {
+        const ex = sx * span * 0.21;
+        cyl(0.55, 0.45, 3.2, this.paintMat, ex, wingY - 0.35, wingZ + 0.9);
+        cyl(0.42, 0.42, 0.3, SHARED.trim, ex, wingY - 0.35, wingZ + 2.55);
+        prop(ex, wingY - 0.35, wingZ + 2.75, 1.25);
+      }
+    } else if (L.engine === 'jet') {
+      this.exhaustMat = new THREE.MeshStandardMaterial({ color: 0x331100, emissive: 0xff7a1a, emissiveIntensity: 0.3 });
+      for (const sx of [-1, 1]) {
+        const ex = sx * (L.fw / 2 + 0.6);
+        const ez = -2.05 * kl;
+        cyl(0.5, 0.42, 2.6, metal, ex, top - 0.35, ez);
+        cyl(0.42, 0.42, 0.05, SHARED.grille, ex, top - 0.35, ez + 1.31);
+        cyl(0.36, 0.36, 0.06, this.exhaustMat, ex, top - 0.35, ez - 1.31);
+        box(0.6, 0.12, 0.8, this.paintMat, sx * (L.fw / 2 + 0.25), top - 0.3, ez); // pilón
+      }
+    }
+    box(0.2, 0.15, 0.06, this.headMat, 0, y0 + 0.35 * kh, noseZ + 0.02);
+    // Tren de aterrizaje o flotadores
     const w = s.wheel;
-    for (const sx of [-1, 1]) box(0.08, 0.5, 0.08, SHARED.trim, sx * w.x, 0.0, w.zr);
-    box(0.08, 0.5, 0.08, SHARED.trim, 0, 0.0, w.zf);
-    const wheelGeo = new THREE.CylinderGeometry(w.r, w.r, 0.16, 16);
+    const xf = w.xf ?? w.x;
+    if (L.floats) {
+      for (const sx of [-1, 1]) {
+        const fx = sx * w.x;
+        const fy = -w.rest - 0.03 + 0.22;
+        box(0.55, 0.45, 4.6, this.paintMat, fx, fy, (w.zf + w.zr) / 2 + 0.2);
+        const tip = new THREE.ConeGeometry(0.32, 1.2, 4);
+        tip.rotateX(Math.PI / 2);
+        tip.rotateZ(Math.PI / 4);
+        add(tip, this.paintMat, fx, fy, (w.zf + w.zr) / 2 + 2.5 + 0.6).scale.set(1.2, 0.95, 1);
+        for (const sz of [w.zf - 0.2, w.zr + 0.4]) box(0.07, -fy + y0 + 0.1, 0.07, SHARED.trim, fx * 0.7, (fy + y0 + 0.1) / 2, sz);
+      }
+    } else {
+      for (const sx of [-1, 1]) box(0.08, 0.5, 0.08, SHARED.trim, sx * w.x, 0.0, w.zr);
+      box(0.08, 0.5, 0.08, SHARED.trim, 0, 0.0, w.zf);
+      if (w.x > 1.8) for (const sx of [-1, 1]) box(w.x * 0.9, 0.08, 0.1, SHARED.trim, sx * w.x * 0.5, 0.2, w.zr); // patas largas
+    }
+    const wheelGeo = new THREE.CylinderGeometry(w.r, w.r, 0.16 + w.r * 0.2, 16);
     wheelGeo.rotateZ(Math.PI / 2);
-    this.wheelMeshes = [0, 1, 2, 3].map(() => {
+    this.wheelMeshes = [0, 1, 2, 3].map((i) => {
       const wm = new THREE.Group();
       const tire = new THREE.Mesh(wheelGeo, SHARED.tire);
       tire.castShadow = true;
+      tire.visible = !L.floats && !(i === 1 && xf < 0.3); // con flotadores no se ven ruedas; la de morro es una
       wm.add(tire);
       wm.userData.vehicle = this;
       return wm;
     });
     this.mesh = group;
-    this.dims = { W: 1.1, L: 6.3, H: 1.3 };
+    const lenTot = (s.jet ? 6.4 : 6.3) * kl;
+    this.dims = { W: L.fw, L: lenTot, H: 1.3 * kh };
     this.stripes = new THREE.Group();
     group.add(this.stripes);
     this.thr = 0;
@@ -711,7 +841,8 @@ export class VehicleController {
     if (piloted && inp.throttle) this.thr = Math.min(1, this.thr + dt * 0.7);
     if (piloted && inp.reverse) this.thr = Math.max(0, this.thr - dt * 0.9);
     if (!piloted) this.thr = Math.max(0, this.thr - dt * 0.5);
-    this.prop.rotation.z += dt * (4 + this.thr * 55) * (this.destroyed ? 0 : 1);
+    for (const pr of this.props) pr.rotation.z += dt * (4 + this.thr * 55) * (this.destroyed ? 0 : 1);
+    if (this.exhaustMat) this.exhaustMat.emissiveIntensity = this.destroyed ? 0 : 0.3 + this.thr * 3;
     const night = this.game.env ? this.game.env.night : 0;
     this.headMat.emissiveIntensity = 0.4 + night * 2.5;
     const blink = Math.floor(performance.now() / 600) % 2;
@@ -748,12 +879,12 @@ export class VehicleController {
       v.setSteeringValue(this.steerValue, 1);
       // sustentación: a ~100 km/h supera el peso (antes con Espacio)
       // sin Espacio no llega a levantarla: así no rebota al aterrizar ni despega sola
-      const liftK = Math.min(1.3, Math.max(0, (speed - 18) / 10)) * (piloted && inp.up ? 1 : 0.6);
+      const liftK = Math.min(1.3, Math.max(0, (speed - s.vLift) / 10)) * (piloted && inp.up ? 1 : 0.6);
       const lift = liftK * mass * 9.82;
       body.applyForce(_pv2.set(up.x * lift, up.y * lift, up.z * lift), _zero);
       // rotación de despegue (hasta ~7° de morro)
       const pitchNow = Math.asin(Math.max(-1, Math.min(1, f.y)));
-      if (piloted && inp.up && speed > 22 && pitchNow < 0.12) {
+      if (piloted && inp.up && speed > s.vRot && pitchNow < 0.12) {
         const w = body.angularVelocity;
         const pc = w.dot(left);
         const target = -0.35;
@@ -761,7 +892,13 @@ export class VehicleController {
         w.y += left.y * (target - pc);
         w.z += left.z * (target - pc);
       }
-      if (!grounded && speed > 18) {
+      // Hidroavión en el agua: el casco frena más que unas ruedas y levanta espuma
+      const env = this.game.env;
+      if (s.seaplane && grounded && env && env.inSea(body.position.x, body.position.z)) {
+        if (vmag > 0.5) body.applyForce(_pv2.set(-vel.x * mass * 0.12, 0, -vel.z * mass * 0.12), _zero);
+        if (vmag > 6 && Math.random() < 0.5) this.game.effects.spawnSmoke(new THREE.Vector3(body.position.x - f.x * 3, 0.3, body.position.z - f.z * 3), new THREE.Vector3((Math.random() - 0.5) * 2, 1.5, (Math.random() - 0.5) * 2), 1.1);
+      }
+      if (!grounded && speed > s.vLift) {
         this.airTime += dt;
         if (this.airTime > 0.25) {
           this.airborne = true;
@@ -782,9 +919,9 @@ export class VehicleController {
     }
     const pitch = Math.asin(Math.max(-1, Math.min(1, f.y))); // morro arriba > 0
     const roll = Math.asin(Math.max(-1, Math.min(1, left.y))); // ala derecha abajo > 0
-    const stallSpeed = 19;
-    // En el aire empuja menos que en la carrera de despegue: crucero ~170 km/h, subida ~14 m/s
-    const airAcc = 6;
+    const stallSpeed = s.stall;
+    // En el aire empuja menos que en la carrera de despegue (la avioneta: crucero ~170 km/h)
+    const airAcc = s.airAcc;
     // en picado gana menos velocidad (resistencia del morro) y nunca pasa de ~250 km/h
     const sinP = Math.sin(pitch);
     let a = this.thr * airAcc - airAcc * (this.airSpeed / s.flyMax) ** 2 - 9.82 * sinP * (sinP < 0 ? 0.55 : 1);
@@ -796,8 +933,9 @@ export class VehicleController {
     let pitchRate = pitchIn ? pitchIn * 0.9 : piloted ? -pitch * 0.9 : -0.3;
     if (stall) pitchRate -= 0.7;
     // Techo de vuelo
-    if (body.position.y > 200) pitchRate = Math.min(pitchRate, 0);
-    if (body.position.y > 220) pitchRate = Math.min(pitchRate, -0.3);
+    const ceiling = s.ceiling || 200;
+    if (body.position.y > ceiling) pitchRate = Math.min(pitchRate, 0);
+    if (body.position.y > ceiling + 20) pitchRate = Math.min(pitchRate, -0.3);
     if (pitch > 0.5 && pitchRate > 0) pitchRate = 0;
     if (pitch < -0.7 && pitchRate < 0) pitchRate = 0;
     // Aterrizaje asistido: cerca del suelo endereza el morro y limita la caída
@@ -813,18 +951,18 @@ export class VehicleController {
     const M = 160;
     const out = p0.x < WORLD_FLY.minX + M || p0.x > WORLD_FLY.maxX - M || p0.z < WORLD_FLY.minZ + M || p0.z > WORLD_FLY.maxZ - M;
     if (out) {
-      const dx = -p0.x, dz = 40 - p0.z;
+      const dx = -p0.x, dz = 800 - p0.z;
       const cross = f.z * dx - f.x * dz;
       const dot = f.x * dx + f.z * dz;
       steerIn = dot > 0 && Math.abs(cross) < 0.15 * Math.hypot(dx, dz) ? steerIn * 0.3 : Math.sign(cross || 1);
       if (piloted && this.driver === 'player' && !this.edgeWarned) {
         this.edgeWarned = true;
-        this.game.hud.notify('Límite del mapa: la avioneta vuelve hacia la ciudad.', 2.5);
+        this.game.hud.notify('Límite del mapa: el avión da la vuelta solo.', 2.5);
       }
     } else this.edgeWarned = false;
     const rollTarget = -steerIn * 0.85;
     const rollRate = (rollTarget - roll) * 2.5;
-    const yawRate = -Math.sin(roll) * 1.15 * Math.min(1.2, Math.max(0.4, this.airSpeed / 30));
+    const yawRate = -Math.sin(roll) * s.turn * Math.min(1.2, Math.max(0.4, this.airSpeed / 30));
     const w = body.angularVelocity;
     w.set(left.x * -pitchRate + f.x * rollRate, left.y * -pitchRate + f.y * rollRate + yawRate, left.z * -pitchRate + f.z * rollRate);
     // Velocidad: hacia donde apunta el morro; en pérdida, cae

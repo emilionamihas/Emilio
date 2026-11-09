@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeVertices, mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { facadeTextures, storefrontTextures, addNoise, makeCanvas, toTexture } from './Textures.js';
+import { facadeTextures, storefrontTextures, addNoise, makeCanvas, toTexture, signTexture, wallTexture } from './Textures.js';
 
 // Grupos de colisión compartidos por todos los módulos.
 export const GROUPS = {
@@ -102,6 +102,31 @@ export function bayDeckY(z) {
 }
 
 const WORLD = { minX: -530, maxX: 530, minZ: -545, maxZ: 560 };
+
+/**
+ * Aeropuerto de Puerto Sombra: una explanada ganada al mar al sur del puerto, unida a la ciudad por
+ * una calzada. Pista de 490 m (este-oeste), calle de rodaje, plataforma, terminal, torre y hangares.
+ */
+export const AIRPORT = {
+  name: 'Aeropuerto de Puerto Sombra', x0: -600, x1: -60, z0: 645, z1: 880, top: 0.5,
+  runway: { z: 820, x0: -575, x1: -85, w: 30 }, taxi: { z: 772, w: 16 },
+};
+/** Calzada (puente bajo) del puerto al aeropuerto. */
+export const CAUSEWAY = { x: -250, z0: 296, z1: 645, deck: 4, w: 12, road: 284 };
+/**
+ * Islas lejanas (solo se llega volando). Forma de "estadio": rectángulo de largo L con extremos
+ * redondeados de radio R (L = 0: círculo). Todas tienen pista de aterrizaje a lo largo de X.
+ */
+export const ISLANDS = [
+  { id: 'tortuga', name: 'Isla Tortuga', x: 520, z: 1080, L: 210, R: 62, top: 0.3, strip: { dz: 0, len: 250, w: 22, dirt: true } },
+  { id: 'volcan', name: 'Isla Volcán', x: -560, z: 1420, L: 0, R: 215, top: 0.3, strip: { dz: 172, len: 205, w: 22, dirt: true }, volcano: { r: 140, h: 72, crater: 24 } },
+  { id: 'cayo', name: 'Cayo Palmeras', x: 300, z: 1700, L: 240, R: 70, top: 0.3, strip: { dz: 0, len: 320, w: 24, dirt: false } },
+];
+/** ¿Dentro de la isla (en planta)? margin > 0 la agranda. */
+function inIslandShape(I, x, z, margin = 0) {
+  const dx = Math.max(0, Math.abs(x - I.x) - I.L / 2);
+  return Math.hypot(dx, z - I.z) < I.R + margin;
+}
 const DAY_LENGTH = 480; // segundos reales por día de juego
 const PHASE = 11; // segundos por fase de semáforo (9 verde + 2 ámbar)
 const STREAM_IN = 170; // radio en el que los colisionadores estáticos están en el mundo físico
@@ -246,6 +271,7 @@ export class Environment {
 
     this.buildNetwork();
     this.buildMotocrossTerrain();
+    this.buildVolcano();
     this.createMaterials();
     this.createGround();
     this.createCityHills();
@@ -256,8 +282,12 @@ export class Environment {
     this.createIsland();
     this.createStuntRamps();
     this.createMotocross();
+    this.createCauseway();
+    this.createAirport();
+    this.createIslands();
     this.createBoundaries();
     this.createSkyAndLights();
+    this.buildWorldMap();
     this.update(0, new THREE.Vector3());
   }
 
@@ -1135,6 +1165,24 @@ export class Environment {
     SUMMIT_ROAD.forEach(([x, z], i) => (i ? ctx.lineTo(toPx(x), toPx(z)) : ctx.moveTo(toPx(x), toPx(z))));
     ctx.stroke();
 
+    // Avenida del Aeropuerto: de la circunvalación a la calzada (atraviesa el puerto)
+    ctx.lineCap = 'butt';
+    ctx.strokeStyle = '#a3a39c';
+    ctx.lineWidth = (CAUSEWAY.w + 4) * s;
+    ctx.beginPath();
+    ctx.moveTo(toPx(CAUSEWAY.x), toPx(CAUSEWAY.road));
+    ctx.lineTo(toPx(CAUSEWAY.x), toPx(coastZ(CAUSEWAY.x) + 2));
+    ctx.stroke();
+    ctx.strokeStyle = '#4a4c52';
+    ctx.lineWidth = CAUSEWAY.w * s;
+    ctx.stroke();
+    ctx.strokeStyle = '#dcae2e';
+    ctx.lineWidth = 0.3 * s;
+    ctx.setLineDash([3 * s, 5 * s]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    this.reserved.push({ minX: CAUSEWAY.x - 12, maxX: CAUSEWAY.x + 12, minZ: CAUSEWAY.road - 2, maxZ: coastZ(CAUSEWAY.x) + 2 });
+
     // Circuito de motocross: campo de tierra y la pista
     {
       const M = MOTOCROSS;
@@ -1515,10 +1563,13 @@ export class Environment {
 
   createSea() {
     const size = CITY.SIZE;
+    // Mar hasta más allá de las islas del sur
     const shape = new THREE.Shape();
-    shape.moveTo(-size, -size);
-    for (let x = -size; x <= size; x += 10) shape.lineTo(x, -coastZ(Math.max(-size / 2, Math.min(size / 2, x))));
-    shape.lineTo(size, -size);
+    const far = 2400;
+    const side = 1600;
+    shape.moveTo(-side, -far);
+    for (let x = -side; x <= side; x += 10) shape.lineTo(x, -coastZ(Math.max(-size / 2, Math.min(size / 2, x))));
+    shape.lineTo(side, -far);
     shape.closePath();
     const geo = new THREE.ShapeGeometry(shape);
     geo.rotateX(-Math.PI / 2);
@@ -1531,15 +1582,23 @@ export class Environment {
     // Malecón: muro bajo y sólido a lo largo de la costa (un solo cuerpo con muchas piezas)
     const wall = new CANNON.Body({ mass: 0, collisionFilterGroup: GROUPS.STATIC });
     const pieces = [];
-    // Tramos de 20 m con un hueco para el puente de la bahía
-    const gap = [BAY_BRIDGE.x - BAY_BRIDGE.w / 2 - 0.6, BAY_BRIDGE.x + BAY_BRIDGE.w / 2 + 0.6];
-    const spans = [];
-    for (let x = -size / 2; x < size / 2; x += 20) {
-      if (x + 20 <= gap[0] || x >= gap[1]) spans.push([x, x + 20]);
-      else {
-        if (x < gap[0]) spans.push([x, gap[0]]);
-        if (x + 20 > gap[1]) spans.push([gap[1], x + 20]);
+    // Tramos de 20 m con huecos para el puente de la bahía y la calzada del aeropuerto
+    const gaps = [
+      [BAY_BRIDGE.x - BAY_BRIDGE.w / 2 - 0.6, BAY_BRIDGE.x + BAY_BRIDGE.w / 2 + 0.6],
+      [CAUSEWAY.x - CAUSEWAY.w / 2 - 0.6, CAUSEWAY.x + CAUSEWAY.w / 2 + 0.6],
+    ];
+    let spans = [];
+    for (let x = -size / 2; x < size / 2; x += 20) spans.push([x, x + 20]);
+    for (const gap of gaps) {
+      const next = [];
+      for (const [a, b] of spans) {
+        if (b <= gap[0] || a >= gap[1]) next.push([a, b]);
+        else {
+          if (a < gap[0]) next.push([a, gap[0]]);
+          if (b > gap[1]) next.push([gap[1], b]);
+        }
       }
+      spans = next;
     }
     for (const [xa, xb] of spans) {
       const a = new THREE.Vector3(xa, 0, coastZ(xa) - 1);
@@ -1623,6 +1682,11 @@ export class Environment {
   /** Altura del suelo en (x, z): montaña, cuestas de la ciudad, motocross, isla o cero. Para colocar coches y la cámara. */
   groundHeight(x, z, refY = Infinity) {
     if (Math.hypot(x - ISLAND.x, z - ISLAND.z) < ISLAND.r) return ISLAND.top;
+    if (z > 600) {
+      if (x > AIRPORT.x0 && x < AIRPORT.x1 && z > AIRPORT.z0 && z < AIRPORT.z1) return AIRPORT.top;
+      for (const I of ISLANDS) if (inIslandShape(I, x, z)) return I.volcano ? Math.max(I.top, this.volcanoHeight(x, z)) : I.top;
+      return 0;
+    }
     // Dentro del túnel el suelo es la calzada (y = 0), no la montaña que hay encima.
     // refY = altura de quien pregunta: por debajo de la losa del túnel, estás dentro.
     if (refY < 9 && Math.abs(x) < RIDGE.corridor + 1.5 && Math.abs(z - RIDGE.zc) < RIDGE.tunnelHalf + 2) return 0;
@@ -1631,7 +1695,28 @@ export class Environment {
 
   /** ¿Es mar abierto (ni isla, ni bajo el puente con los pies en él)? */
   inSea(x, z) {
-    return z > coastZ(x) + 0.5 && Math.hypot(x - ISLAND.x, z - ISLAND.z) > ISLAND.r + 1;
+    if (z <= coastZ(x) + 0.5 || Math.hypot(x - ISLAND.x, z - ISLAND.z) <= ISLAND.r + 1) return false;
+    if (x > AIRPORT.x0 - 1 && x < AIRPORT.x1 + 1 && z > AIRPORT.z0 - 1 && z < AIRPORT.z1 + 1) return false;
+    if (Math.abs(x - CAUSEWAY.x) < CAUSEWAY.w / 2 + 1.5 && z < CAUSEWAY.z1 + 1) return false;
+    if (Math.abs(x - BAY_BRIDGE.x) < BAY_BRIDGE.w / 2 + 1.5 && z < BAY_BRIDGE.z3 + 1) return false;
+    for (const I of ISLANDS) if (inIslandShape(I, x, z, 1)) return false;
+    return true;
+  }
+
+  /** Orilla más cercana para rescatar a quien cae al mar: costa, aeropuerto o una isla. */
+  nearestShore(x, z) {
+    const cands = [];
+    const sx = Math.max(-500, Math.min(500, x));
+    cands.push([sx, coastZ(sx) - 8]);
+    cands.push([Math.max(AIRPORT.x0 + 10, Math.min(AIRPORT.x1 - 10, x)), Math.max(AIRPORT.z0 + 10, Math.min(AIRPORT.z1 - 10, z))]);
+    for (const I of [...ISLANDS, { x: ISLAND.x, z: ISLAND.z, L: 0, R: ISLAND.r }]) {
+      const cx = Math.max(I.x - I.L / 2, Math.min(I.x + I.L / 2, x));
+      const d = Math.hypot(x - cx, z - I.z) || 1;
+      const k = Math.max(0, (I.R - 12) / d);
+      cands.push([cx + (x - cx) * k, I.z + (z - I.z) * k]);
+    }
+    cands.sort((a, b) => Math.hypot(a[0] - x, a[1] - z) - Math.hypot(b[0] - x, b[1] - z));
+    return { x: cands[0][0], z: cands[0][1] };
   }
 
   /** Distancia horizontal a la carretera de la cumbre. */
@@ -2044,6 +2129,618 @@ export class Environment {
         this.scene.add(pole, head);
       }
     }
+  }
+
+  // ------------------------------------------------------------------
+  // Aeropuerto, calzada e islas lejanas
+  // ------------------------------------------------------------------
+  /**
+   * Isla Volcán: cono con cráter y una carretera en espiral de pendiente constante (12 %) que sube
+   * desde la pista hasta el borde del cráter. Junto a la carretera el cono se aplana en una cornisa.
+   */
+  buildVolcano() {
+    const I = ISLANDS.find((i) => i.volcano);
+    const V = I.volcano;
+    const cone = (r) => {
+      if (r >= V.r) return 0;
+      if (r >= V.crater) return V.h * Math.pow((V.r - r) / (V.r - V.crater), 1.15);
+      return V.h - 16 * Math.pow(1 - r / V.crater, 0.6);
+    };
+    const pts = [];
+    let r = V.r + 2;
+    let th = Math.PI / 2; // empieza mirando a la pista (al sur)
+    pts.push([I.x, I.z + I.strip.dz - 10, 0]);
+    while (r > V.crater + 5 && pts.length < 600) {
+      const ds = 2;
+      const sl = Math.max(0.06, (cone(r - 0.5) - cone(r + 0.5)));
+      r -= (0.12 * ds) / sl;
+      th += ds / Math.max(r, 12);
+      pts.push([I.x + Math.cos(th) * r, I.z + Math.sin(th) * r, cone(r)]);
+    }
+    const hash = new Map();
+    pts.forEach((p, i) => {
+      const k = `${Math.floor(p[0] / 12)},${Math.floor(p[1] / 12)}`;
+      if (!hash.has(k)) hash.set(k, []);
+      hash.get(k).push(i);
+    });
+    this.vol = { I, V, cone, road: pts, hash, top: pts[pts.length - 1] };
+  }
+
+  /** Altura del volcán (cono, cráter y cornisa de la carretera). */
+  volcanoHeight(x, z) {
+    const g = this.vol;
+    if (!g) return 0;
+    const r = Math.hypot(x - g.I.x, z - g.I.z);
+    if (r > g.V.r + 14) return 0; // (la cornisa de la carretera llega 11 m más allá del pie del cono)
+    let h = g.cone(r);
+    let bd = Infinity;
+    let rh = 0;
+    const cx = Math.floor(x / 12);
+    const cz = Math.floor(z / 12);
+    for (let a = -1; a <= 1; a++) {
+      for (let b = -1; b <= 1; b++) {
+        for (const i of g.hash.get(`${cx + a},${cz + b}`) || []) {
+          const p = g.road[i];
+          const d = (p[0] - x) ** 2 + (p[1] - z) ** 2;
+          if (d < bd) {
+            bd = d;
+            rh = p[2];
+          }
+        }
+      }
+    }
+    const d = Math.sqrt(bd);
+    if (d < 11) h = THREE.MathUtils.lerp(rh, h, smooth(4.5, 11, d));
+    return h;
+  }
+
+  /** Calzada del puerto al aeropuerto: tablero continuo con rampas, pretiles y farolas. */
+  createCauseway() {
+    const C = CAUSEWAY;
+    const coast = coastZ(C.x);
+    const deckY = (z) => {
+      if (z <= C.z0) return 0.03;
+      if (z < coast - 4) return 0.03 + (C.deck - 0.03) * easeRamp((z - C.z0) / (coast - 4 - C.z0));
+      if (z < C.z1 - 30) return C.deck;
+      return AIRPORT.top + 0.03 + (C.deck - AIRPORT.top - 0.03) * (1 - easeRamp((z - (C.z1 - 30)) / 32));
+    };
+    this.causewayDeck = deckY;
+    const pts = [];
+    for (let z = C.z0; z <= C.z1 + 2.001; z += 2) pts.push(new THREE.Vector3(C.x, deckY(z), z));
+    const topMat = new THREE.MeshStandardMaterial({ map: this.bridgeRoadTexture(), roughness: 0.85, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+    this.deckMesh(pts, C.w, 1.4, topMat, this.concreteMat);
+    const body = new CANNON.Body({ mass: 0, material: this.groundMaterial, collisionFilterGroup: GROUPS.STATIC });
+    const parapet = new THREE.MeshStandardMaterial({ color: 0xc9c6bd, roughness: 0.8 });
+    for (const sd of [-1, 1]) this.deckMesh(pts.map((p) => new THREE.Vector3(C.x + sd * (C.w / 2 - 0.2), p.y + 0.7, p.z)), 0.4, 0.7, parapet, parapet);
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i];
+      const b = pts[i + 1];
+      const d = new THREE.Vector3().subVectors(b, a);
+      const L = d.length();
+      const pitch = -Math.atan2(d.y, Math.hypot(d.x, d.z));
+      const q = new CANNON.Quaternion().setFromEuler(pitch, 0, 0, 'YXZ');
+      const c = a.clone().add(b).multiplyScalar(0.5);
+      const nrm = new THREE.Vector3(0, 1, 0).applyAxisAngle(new THREE.Vector3(1, 0, 0), pitch);
+      body.addShape(new CANNON.Box(new CANNON.Vec3(C.w / 2, 0.4, L / 2 + 0.05)), new CANNON.Vec3(c.x - nrm.x * 0.4, c.y - nrm.y * 0.4, c.z - nrm.z * 0.4), q);
+      for (const sd of [-1, 1]) body.addShape(new CANNON.Box(new CANNON.Vec3(0.2, 0.6, L / 2 + 0.05)), new CANNON.Vec3(c.x + sd * (C.w / 2 - 0.2), c.y + 0.6, c.z), q);
+    }
+    // Pilas cada 24 m sobre el agua y farolas
+    for (let z = coast + 10; z < C.z1 - 10; z += 24) {
+      const pile = new THREE.Mesh(new THREE.BoxGeometry(C.w - 2, C.deck + 1, 2), this.concreteMat);
+      pile.position.set(C.x, (C.deck - 1.4 - 1) / 2, z);
+      this.scene.add(pile);
+    }
+    const lampMat = (this.causewayLampMat = new THREE.MeshStandardMaterial({ color: 0x8a8a8a, emissive: 0xffd9a0, emissiveIntensity: 0 }));
+    for (let z = C.z0 + 20; z < C.z1; z += 28) {
+      const sd = Math.round(z / 28) % 2 ? 1 : -1;
+      const y = deckY(z);
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 6, 6), this.poleMaterial);
+      pole.position.set(C.x + sd * (C.w / 2 - 0.2), y + 3.6, z);
+      const head = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.14, 0.35), lampMat);
+      head.position.set(C.x + sd * (C.w / 2 - 0.9), y + 6.5, z);
+      this.scene.add(pole, head);
+    }
+    this.world.addBody(body);
+  }
+
+  /** Textura de la explanada del aeropuerto: hierba, plataforma, rodaje, pista con marcas y accesos. */
+  airportTexture() {
+    const A = AIRPORT;
+    const W = A.x1 - A.x0;
+    const H = A.z1 - A.z0;
+    const k = 4; // px por metro
+    const R = A.runway;
+    return toTexture(
+      makeCanvas(W * k, H * k, (ctx) => {
+        const X = (x) => (x - A.x0) * k;
+        const Z = (z) => (z - A.z0) * k;
+        const rect = (x0, z0, x1, z1, c) => {
+          ctx.fillStyle = c;
+          ctx.fillRect(X(x0), Z(z0), (x1 - x0) * k, (z1 - z0) * k);
+        };
+        rect(A.x0, A.z0, A.x1, A.z1, '#5d7a45'); // césped
+        rect(A.x0, A.z0, A.x1, A.z0 + 60, '#8d8b85'); // franja de edificios y aparcamiento
+        rect(-580, 700, -90, 760, '#a7a49b'); // plataforma
+        for (let x = -560; x < -100; x += 40) rect(x, 704, x + 0.4, 752, '#e8c840'); // puestos
+        rect(-580, A.taxi.z - A.taxi.w / 2, -90, A.taxi.z + A.taxi.w / 2, '#55575c'); // rodaje
+        for (const tx of [-560, -330, -110]) rect(tx - 8, 755, tx + 8, R.z, '#55575c'); // conexiones
+        rect(R.x0 - 10, R.z - R.w / 2 - 3, R.x1 + 10, R.z + R.w / 2 + 3, '#6a6c6a'); // franja de seguridad
+        rect(R.x0, R.z - R.w / 2, R.x1, R.z + R.w / 2, '#3c3e43'); // pista
+        // Marcas de la pista
+        rect(R.x0, R.z - R.w / 2 + 1, R.x1, R.z - R.w / 2 + 1.6, '#eeeeea');
+        rect(R.x0, R.z + R.w / 2 - 1.6, R.x1, R.z + R.w / 2 - 1, '#eeeeea');
+        for (let x = R.x0 + 60; x < R.x1 - 60; x += 30) rect(x, R.z - 0.45, x + 18, R.z + 0.45, '#eeeeea');
+        for (const [x0, dir] of [[R.x0 + 4, 1], [R.x1 - 4, -1]]) {
+          for (let j = -R.w / 2 + 3; j < R.w / 2 - 2; j += 3) rect(Math.min(x0, x0 + dir * 30), R.z + j, Math.max(x0, x0 + dir * 30), R.z + j + 1.6, '#eeeeea');
+          ctx.save();
+          ctx.translate(X(x0 + dir * 45), Z(R.z));
+          ctx.rotate(dir > 0 ? Math.PI / 2 : -Math.PI / 2);
+          ctx.fillStyle = '#eeeeea';
+          ctx.font = `bold ${16 * k}px Arial, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(dir > 0 ? '09' : '27', 0, 0);
+          ctx.restore();
+          for (const m of [150, 300]) rect(x0 + dir * m, R.z - 9, x0 + dir * m + dir * 20, R.z - 6, '#eeeeea'); // zona de toma
+        }
+        // Línea amarilla de rodaje
+        rect(-580, A.taxi.z - 0.2, -90, A.taxi.z + 0.2, '#e8c840');
+        // Acceso desde la calzada, aparcamiento y rotonda de la terminal
+        rect(CAUSEWAY.x - CAUSEWAY.w / 2, A.z0, CAUSEWAY.x + CAUSEWAY.w / 2, 700, '#4a4c52');
+        rect(-290, 652, -205, 695, '#4a4c52');
+        for (let x = -286; x < -208; x += 5) rect(x, 654, x + 0.25, 664, '#eeeeea');
+        for (let x = -286; x < -208; x += 5) rect(x, 683, x + 0.25, 693, '#eeeeea');
+        addNoise(ctx, W * k, H * k, 10, this.rand);
+      }),
+      { repeat: false }
+    );
+  }
+
+  /**
+   * Aeropuerto: explanada (cuerpo plano), pista con luces, terminal con rótulo, torre de control,
+   * hangares (el primero vende aviones), un avión de línea aparcado y una manga de viento.
+   */
+  createAirport() {
+    const A = AIRPORT;
+    const W = A.x1 - A.x0;
+    const H = A.z1 - A.z0;
+    const cx = (A.x0 + A.x1) / 2;
+    const cz = (A.z0 + A.z1) / 2;
+    const body = new CANNON.Body({ mass: 0, material: this.groundMaterial, collisionFilterGroup: GROUPS.STATIC });
+    body.addShape(new CANNON.Box(new CANNON.Vec3(W / 2, 1.5, H / 2)), new CANNON.Vec3(cx, A.top - 1.5, cz));
+    const base = new THREE.Mesh(new THREE.BoxGeometry(W, 3, H), this.concreteMat);
+    base.position.set(cx, A.top - 1.5 - 0.02, cz);
+    base.receiveShadow = true;
+    this.scene.add(base);
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshStandardMaterial({ map: this.airportTexture(), roughness: 0.9 }));
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.set(cx, A.top + 0.01, cz);
+    ground.receiveShadow = true;
+    this.scene.add(ground);
+    this.shootables.push(ground);
+    const M = (o) => new THREE.MeshStandardMaterial(o);
+    const add = (mesh, collide = true) => {
+      mesh.castShadow = mesh.receiveShadow = true;
+      this.scene.add(mesh);
+      this.allColliders.push(mesh);
+      this.shootables.push(mesh);
+      (this.fixedColliders ||= []).push(mesh);
+      if (collide) {
+        mesh.updateMatrixWorld(true);
+        const bb = new THREE.Box3().setFromObject(mesh);
+        const c = bb.getCenter(new THREE.Vector3());
+        const h = bb.getSize(new THREE.Vector3()).multiplyScalar(0.5);
+        body.addShape(new CANNON.Box(new CANNON.Vec3(h.x, h.y, h.z)), new CANNON.Vec3(c.x, c.y, c.z));
+      }
+      return mesh;
+    };
+    const y0 = A.top;
+    // Terminal: cuerpo de cristal, marquesina y rótulo hacia la calle (norte)
+    const glass = this.facadeStyles.glass ? this.facadeStyles.glass[0] : M({ color: 0x5f7f99, metalness: 0.6, roughness: 0.2 });
+    const tGeo = new THREE.BoxGeometry(160, 14, 30);
+    Environment.meterUV(tGeo, 160, 14, 30, ...(glass.userData.tile || [8, 4]));
+    const term = add(new THREE.Mesh(tGeo, glass));
+    term.position.set(-385, y0 + 7, 672);
+    add(new THREE.Mesh(new THREE.BoxGeometry(164, 1.2, 36), this.corniceMat)).position.set(-385, y0 + 14.6, 672);
+    add(new THREE.Mesh(new THREE.BoxGeometry(120, 0.5, 8), M({ color: 0xeeeeee, roughness: 0.5 })), false).position.set(-385, y0 + 5, 653);
+    const sign = signTexture('AEROPUERTO DE PUERTO SOMBRA', '#0d3c75', '#fff', { w: 1024, h: 96 });
+    const signMat = M({ map: sign, emissive: 0xffffff, emissiveMap: sign, emissiveIntensity: 0.4 });
+    this.airportSignMat = signMat;
+    const signMesh = new THREE.Mesh(new THREE.PlaneGeometry(90, 8.5), signMat);
+    signMesh.position.set(-385, y0 + 10.5, 656.9);
+    signMesh.rotation.y = Math.PI;
+    this.scene.add(signMesh);
+    // Torre de control
+    const tower = add(new THREE.Mesh(new THREE.CylinderGeometry(2.6, 3.4, 32, 16), M({ color: 0xd8d8d0, roughness: 0.6 })));
+    tower.position.set(-185, y0 + 16, 678);
+    const cab = add(new THREE.Mesh(new THREE.CylinderGeometry(6, 4.5, 5, 12), M({ color: 0x223a4a, metalness: 0.7, roughness: 0.1 })), false);
+    cab.position.set(-185, y0 + 34.5, 678);
+    add(new THREE.Mesh(new THREE.CylinderGeometry(6.6, 6.6, 0.8, 12), M({ color: 0xeeeeee })), false).position.set(-185, y0 + 37.4, 678);
+    this.beaconMat = M({ color: 0x550000, emissive: 0xff2a1a, emissiveIntensity: 1 });
+    add(new THREE.Mesh(new THREE.SphereGeometry(0.6, 8, 6), this.beaconMat), false).position.set(-185, y0 + 38.6, 678);
+    // Hangares con tejado curvo; el primero es la tienda de aviones
+    const hangarMat = M({ color: 0x90a4ae, metalness: 0.5, roughness: 0.5 });
+    for (const [hx, label] of [[-560, 'AERONAVES SOMBRA'], [-505, 'HANGAR 2'], [-140, 'CARGA']]) {
+      const hw = 46;
+      const walls = add(new THREE.Mesh(new THREE.BoxGeometry(hw, 9, 38), hangarMat));
+      walls.position.set(hx, y0 + 4.5, 672);
+      const roof = new THREE.Mesh(new THREE.CylinderGeometry(hw / 2, hw / 2, 38, 24, 1, false, -Math.PI / 2, Math.PI), hangarMat);
+      roof.rotation.x = Math.PI / 2;
+      roof.rotation.z = Math.PI / 2;
+      roof.scale.set(0.35, 1, 1);
+      roof.position.set(hx, y0 + 9, 672);
+      add(roof, false);
+      const door = new THREE.Mesh(new THREE.PlaneGeometry(hw - 6, 8), M({ color: 0x37474f, metalness: 0.6, roughness: 0.4 }));
+      door.position.set(hx, y0 + 4.2, 691.05);
+      this.scene.add(door);
+      const st = signTexture(label, '#0d3c75', '#fff', { w: 512, h: 96 });
+      const sm = new THREE.Mesh(new THREE.PlaneGeometry(22, 4), M({ map: st, emissive: 0xffffff, emissiveMap: st, emissiveIntensity: 0.3 }));
+      sm.position.set(hx, y0 + 11, 691.2);
+      this.scene.add(sm);
+    }
+    // Avión de línea aparcado en la plataforma
+    this.createAirliner(body, -330, y0, 732, -Math.PI / 2);
+    // Luces de borde de pista (brillan de noche)
+    const R = A.runway;
+    const lights = [];
+    for (let x = R.x0; x <= R.x1; x += 20) for (const sd of [-1, 1]) lights.push([x, R.z + sd * (R.w / 2 + 1.5)]);
+    this.runwayLightMat = M({ color: 0xffffff, emissive: 0xfff2c0, emissiveIntensity: 0.3 });
+    const li = new THREE.InstancedMesh(new THREE.BoxGeometry(0.4, 0.3, 0.4), this.runwayLightMat, lights.length);
+    const mm = new THREE.Matrix4();
+    lights.forEach(([x, z], i) => li.setMatrixAt(i, mm.makeTranslation(x, y0 + 0.15, z)));
+    this.scene.add(li);
+    // Manga de viento
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 6, 6), this.poleMaterial);
+    pole.position.set(-100, y0 + 3, 848);
+    const sock = new THREE.Mesh(new THREE.ConeGeometry(0.6, 3, 10, 1, true), M({ color: 0xff6d00, side: THREE.DoubleSide }));
+    sock.rotation.z = Math.PI / 2;
+    sock.position.set(-98.5, y0 + 5.8, 848);
+    this.scene.add(pole, sock);
+    this.world.addBody(body);
+  }
+
+  /** Avión de línea (decorado, con colisión): fuselaje, alas, motores y cola. */
+  createAirliner(body, x, y, z, heading) {
+    const g = new THREE.Group();
+    const white = new THREE.MeshStandardMaterial({ color: 0xf4f4f4, roughness: 0.35, metalness: 0.3 });
+    const blue = new THREE.MeshStandardMaterial({ color: 0x0d47a1, roughness: 0.4 });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x1b2430, roughness: 0.3, metalness: 0.5 });
+    const part = (geo, mat, px, py, pz, rx = 0, ry = 0, rz = 0) => {
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(px, py, pz);
+      m.rotation.set(rx, ry, rz);
+      m.castShadow = true;
+      g.add(m);
+      return m;
+    };
+    part(new THREE.CylinderGeometry(2.2, 2.2, 30, 20), white, 0, 4.2, 0, Math.PI / 2);
+    part(new THREE.SphereGeometry(2.2, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), white, 0, 4.2, 15, Math.PI / 2).scale.set(1, 1.6, 1);
+    part(new THREE.ConeGeometry(2.2, 8, 20), white, 0, 4.7, -19, -Math.PI / 2).scale.set(1, 1, 0.75);
+    part(new THREE.BoxGeometry(4.5, 0.25, 30.2), blue, 0, 3.1, 0.2);
+    for (let k = 0; k < 16; k++) part(new THREE.BoxGeometry(4.46, 0.45, 0.6), dark, 0, 5.0, 11 - k * 1.5);
+    part(new THREE.BoxGeometry(3.6, 0.8, 1.2), dark, 0, 5.4, 15.4, -0.5);
+    for (const sd of [-1, 1]) {
+      const wing = part(new THREE.BoxGeometry(15, 0.45, 5), white, sd * 9.5, 3.0, 0.5, 0, sd * 0.45);
+      wing.position.z = -1.5;
+      part(new THREE.CylinderGeometry(1.15, 1.0, 4.5, 16), white, sd * 7, 2.0, 2.5, Math.PI / 2);
+      part(new THREE.CylinderGeometry(0.95, 0.95, 0.1, 16), dark, sd * 7, 2.0, 4.76, Math.PI / 2);
+      part(new THREE.BoxGeometry(5.5, 0.25, 2.5), white, sd * 3.5, 5.2, -18.5, 0, sd * 0.4);
+      part(new THREE.CylinderGeometry(0.45, 0.45, 0.5, 10), dark, sd * 2.6, 0.45, -1, 0, 0, Math.PI / 2);
+    }
+    part(new THREE.BoxGeometry(0.4, 7, 5), blue, 0, 8.6, -18.8, 0.35);
+    part(new THREE.CylinderGeometry(0.4, 0.4, 0.5, 10), dark, 0, 0.45, 12, 0, 0, Math.PI / 2);
+    g.position.set(x, y, z);
+    g.rotation.y = heading;
+    this.scene.add(g);
+    // Colisión: fuselaje y las dos alas (cajas en el sistema del avión)
+    const q = new CANNON.Quaternion().setFromAxisAngle(new CANNON.Vec3(0, 1, 0), heading);
+    const at = (lx, ly, lz) => {
+      const v = new THREE.Vector3(lx, ly, lz).applyAxisAngle(new THREE.Vector3(0, 1, 0), heading);
+      return new CANNON.Vec3(x + v.x, y + v.y, z + v.z);
+    };
+    body.addShape(new CANNON.Box(new CANNON.Vec3(2.2, 2.2, 19)), at(0, 4.2, -1), q);
+    body.addShape(new CANNON.Box(new CANNON.Vec3(16, 0.3, 3)), at(0, 3.0, -1.5), q);
+    this.buildingRects.push({ minX: x - 18, maxX: x + 18, minZ: z - 18, maxZ: z + 18 });
+  }
+
+  /** Malla de la superficie de una isla en forma de estadio (con su textura) y faldón de playa. */
+  islandMesh(I, tex) {
+    const outline = [];
+    const n = 24;
+    const L2 = I.L / 2;
+    for (let k = 0; k <= n; k++) {
+      const a = -Math.PI / 2 + (Math.PI * k) / n;
+      outline.push([I.x + L2 + Math.cos(a) * I.R, I.z + Math.sin(a) * I.R]);
+    }
+    for (let k = 0; k <= n; k++) {
+      const a = Math.PI / 2 + (Math.PI * k) / n;
+      outline.push([I.x - L2 + Math.cos(a) * I.R, I.z + Math.sin(a) * I.R]);
+    }
+    const shape = new THREE.Shape();
+    outline.forEach(([x, z], i) => (i ? shape.lineTo(x, -z) : shape.moveTo(x, -z)));
+    const geo = new THREE.ShapeGeometry(shape, 4);
+    geo.rotateX(-Math.PI / 2);
+    const pos = geo.attributes.position;
+    const uv = geo.attributes.uv;
+    const W = I.L + 2 * I.R;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const z = pos.getZ(i);
+      pos.setY(i, I.top + 0.01);
+      uv.setXY(i, (x - (I.x - W / 2)) / W, 1 - (z - (I.z - I.R)) / (2 * I.R));
+    }
+    const top = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95 }));
+    top.receiveShadow = true;
+    this.scene.add(top);
+    this.shootables.push(top);
+    // Faldón: de la orilla hasta el fondo, 10 m hacia fuera
+    const sp = [];
+    const idx = [];
+    outline.forEach(([x, z], i) => {
+      const cxx = Math.max(I.x - L2, Math.min(I.x + L2, x));
+      const d = Math.hypot(x - cxx, z - I.z) || 1;
+      const ox = ((x - cxx) / d) * 10;
+      const oz = ((z - I.z) / d) * 10;
+      sp.push(x, I.top, z, x + ox, -1.5, z + oz);
+      if (i > 0) idx.push(i * 2 - 2, i * 2 - 1, i * 2, i * 2 - 1, i * 2 + 1, i * 2);
+    });
+    const sg = new THREE.BufferGeometry();
+    sg.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
+    sg.setIndex(idx);
+    sg.computeVertexNormals();
+    this.scene.add(new THREE.Mesh(sg, new THREE.MeshStandardMaterial({ color: 0xd9c79b, roughness: 1, side: THREE.DoubleSide })));
+  }
+
+  /** Textura de una isla: arena en el borde, hierba dentro y la pista (tierra o asfalto). */
+  islandTexture(I, paint) {
+    const W = I.L + 2 * I.R;
+    const H = 2 * I.R;
+    const k = 3;
+    return toTexture(
+      makeCanvas(Math.round(W * k), Math.round(H * k), (ctx) => {
+        const X = (x) => (x - (I.x - W / 2)) * k;
+        const Z = (z) => (z - (I.z - I.R)) * k;
+        ctx.fillStyle = '#d9c79b';
+        ctx.fillRect(0, 0, W * k, H * k);
+        // Hierba: el mismo estadio, 14 m más pequeño
+        ctx.fillStyle = I.volcano ? '#5b6b40' : '#5b8a3f';
+        ctx.beginPath();
+        const r = I.R - 14;
+        ctx.moveTo(X(I.x - I.L / 2), Z(I.z - r));
+        ctx.lineTo(X(I.x + I.L / 2), Z(I.z - r));
+        ctx.arc(X(I.x + I.L / 2), Z(I.z), r * k, -Math.PI / 2, Math.PI / 2);
+        ctx.lineTo(X(I.x - I.L / 2), Z(I.z + r));
+        ctx.arc(X(I.x - I.L / 2), Z(I.z), r * k, Math.PI / 2, Math.PI * 1.5);
+        ctx.fill();
+        const S = I.strip;
+        const sx0 = I.x - S.len / 2;
+        const sz = I.z + S.dz;
+        ctx.fillStyle = S.dirt ? '#8a6a45' : '#3c3e43';
+        ctx.fillRect(X(sx0), Z(sz - S.w / 2), S.len * k, S.w * k);
+        ctx.fillStyle = S.dirt ? 'rgba(255,255,255,0.85)' : '#eeeeea';
+        if (S.dirt) {
+          for (let x = sx0; x < sx0 + S.len; x += 12) for (const sd of [-1, 1]) ctx.fillRect(X(x), Z(sz + sd * (S.w / 2 - 0.5)) - 2, 1.2 * k, 1.2 * k);
+        } else {
+          for (let x = sx0 + 20; x < sx0 + S.len - 20; x += 24) ctx.fillRect(X(x), Z(sz) - 1, 14 * k, 0.8 * k);
+          for (const x0 of [sx0 + 3, sx0 + S.len - 25]) for (let j = -S.w / 2 + 3; j < S.w / 2 - 2; j += 3) ctx.fillRect(X(x0), Z(sz + j), 22 * k, 1.4 * k);
+        }
+        if (paint) paint(ctx, X, Z, k);
+        addNoise(ctx, Math.round(W * k), Math.round(H * k), 12, this.rand);
+      }),
+      { repeat: false }
+    );
+  }
+
+  /** Islas lejanas: Tortuga (contrabandistas), Volcán (con carretera al cráter) y Cayo Palmeras (resort). */
+  createIslands() {
+    this.islandSpots = {};
+    this.airfields = [
+      { id: 'aeropuerto', name: 'Aeropuerto de Puerto Sombra', x: (AIRPORT.runway.x0 + AIRPORT.runway.x1) / 2, z: AIRPORT.runway.z, radius: 260, spawn: { pos: new THREE.Vector3(-555, 0, AIRPORT.runway.z), heading: Math.PI / 2 } },
+    ];
+    const M = (o) => new THREE.MeshStandardMaterial(o);
+    const wood = M({ color: 0x7a5534, roughness: 0.9 });
+    for (const I of ISLANDS) {
+      const body = new CANNON.Body({ mass: 0, material: this.groundMaterial, collisionFilterGroup: GROUPS.STATIC });
+      if (I.L > 0) body.addShape(new CANNON.Box(new CANNON.Vec3(I.L / 2, 1, I.R)), new CANNON.Vec3(I.x, I.top - 1, I.z));
+      for (const ex of I.L > 0 ? [I.x - I.L / 2, I.x + I.L / 2] : [I.x]) body.addShape(new CANNON.Cylinder(I.R, I.R, 2, 32), new CANNON.Vec3(ex, I.top - 1, I.z));
+      const S = I.strip;
+      this.islandMesh(I, this.islandTexture(I));
+      this.airfields.push({ id: I.id, name: I.name, x: I.x, z: I.z + S.dz, radius: S.len / 2 + 30, spawn: { pos: new THREE.Vector3(I.x - S.len / 2 + 14, 0, I.z + S.dz), heading: Math.PI / 2 } });
+      // Manga de viento y conos de la pista
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 5, 6), this.poleMaterial);
+      pole.position.set(I.x + S.len / 2 - 10, I.top + 2.5, I.z + S.dz - S.w / 2 - 6);
+      const sock = new THREE.Mesh(new THREE.ConeGeometry(0.5, 2.4, 10, 1, true), M({ color: 0xff6d00, side: THREE.DoubleSide }));
+      sock.rotation.z = Math.PI / 2;
+      sock.position.set(pole.position.x + 1.2, I.top + 4.7, pole.position.z);
+      this.scene.add(pole, sock);
+      const box = (w, h, d, mat, x, y, z, ry = 0, collide = true) => {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+        m.position.set(x, y, z);
+        m.rotation.y = ry;
+        m.castShadow = m.receiveShadow = true;
+        this.scene.add(m);
+        if (collide) {
+          this.allColliders.push(m);
+          this.shootables.push(m);
+          (this.fixedColliders ||= []).push(m);
+          body.addShape(new CANNON.Box(new CANNON.Vec3(w / 2, h / 2, d / 2)), new CANNON.Vec3(x, y, z), new CANNON.Quaternion().setFromAxisAngle(new CANNON.Vec3(0, 1, 0), ry));
+        }
+        return m;
+      };
+      const t = I.top;
+      if (I.id === 'tortuga') {
+        // Cabaña de los contrabandistas, cajas, barriles, muelle y un barco varado
+        const sx = I.x - 60;
+        const sz = I.z - 38;
+        box(10, 4, 7, wood, sx, t + 2, sz);
+        const roof = new THREE.Mesh(new THREE.CylinderGeometry(6.3, 6.3, 7.6, 3), M({ color: 0x4e3b2a, roughness: 1 }));
+        roof.rotation.set(Math.PI / 2, 0, Math.PI / 2);
+        roof.scale.set(0.45, 1, 1);
+        roof.position.set(sx, t + 5.4, sz);
+        this.scene.add(roof);
+        for (let k = 0; k < 7; k++) box(1.4, 1.4, 1.4, M({ color: 0x9c7a4a }), sx + 9 + (k % 3) * 1.6, t + 0.7 + Math.floor(k / 3) * 1.4, sz + 3 + (k % 2) * 0.4, 0, k < 3);
+        for (let k = 0; k < 4; k++) {
+          const b = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 1.1, 10), M({ color: 0x2e5d32 }));
+          b.position.set(sx - 8 + k * 1.1, t + 0.55, sz + 4);
+          this.scene.add(b);
+        }
+        box(4, 0.4, 26, wood, I.x + 40, 0.6, I.z - I.R - 8, 0, true);
+        const hull = new THREE.Mesh(new THREE.BoxGeometry(3.4, 1.6, 10), M({ color: 0x8d6e63, roughness: 0.9 }));
+        hull.position.set(I.x + 110, t + 0.5, I.z + 38);
+        hull.rotation.set(0.25, 0.8, 0.35);
+        this.scene.add(hull);
+        this.islandSpots.tortuga = { pos: [sx, t, sz + 5], normal: [0, 1] };
+      } else if (I.id === 'cayo') {
+        // Resort: hotel rosa con balcones, piscina, sombrillas y embarcadero
+        const hotelMat = M({ map: wallTexture('#e9a6a0', this.rand), roughness: 0.8 });
+        const hx = I.x - 40;
+        const hz = I.z - 46;
+        box(56, 13, 14, hotelMat, hx, t + 6.5, hz);
+        box(57, 0.6, 15, this.corniceMat, hx, t + 13.3, hz);
+        for (let f = 0; f < 3; f++) for (let k = 0; k < 9; k++) box(4, 0.2, 1.4, M({ color: 0xffffff }), hx - 24 + k * 6, t + 3.2 + f * 3.6, hz + 7.6, 0, false);
+        for (let f = 0; f < 3; f++) for (let k = 0; k < 9; k++) box(2.4, 1.8, 0.1, M({ color: 0x223344, metalness: 0.6, roughness: 0.1 }), hx - 24 + k * 6, t + 2.3 + f * 3.6 + 0.9, hz + 7.05, 0, false);
+        const hs = signTexture('CAYO PALMERAS RESORT', '#ad1457', '#fff', { w: 512, h: 96 });
+        const sm = new THREE.Mesh(new THREE.PlaneGeometry(26, 4.5), M({ map: hs, emissive: 0xffffff, emissiveMap: hs, emissiveIntensity: 0.4 }));
+        sm.position.set(hx, t + 15.8, hz + 7.2);
+        this.scene.add(sm);
+        const pool = new THREE.Mesh(new THREE.PlaneGeometry(20, 9), M({ color: 0x29b6f6, roughness: 0.05, metalness: 0.2, emissive: 0x0a3a50, emissiveIntensity: 0.3 }));
+        pool.rotation.x = -Math.PI / 2;
+        pool.position.set(I.x + 30, t + 0.04, I.z - 40);
+        this.scene.add(pool);
+        for (let k = 0; k < 10; k++) {
+          const ux = I.x - 100 + k * 20;
+          const uz = I.z + 50;
+          const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.4, 5), this.poleMaterial);
+          pole.position.set(ux, t + 1.2, uz);
+          const um = new THREE.Mesh(new THREE.ConeGeometry(1.6, 0.6, 10), M({ color: k % 2 ? 0xff7043 : 0xffffff }));
+          um.position.set(ux, t + 2.5, uz);
+          this.scene.add(pole, um);
+        }
+        box(4, 0.4, 30, wood, I.x + 90, 0.6, I.z + I.R + 10, 0, true);
+        this.islandSpots.cayo = { pos: [hx, t, hz + 9.5], normal: [0, 1] };
+      } else if (I.id === 'volcan') {
+        // Volcán: malla del cono con colores por altura, carretera al cráter, lava y observatorio
+        const g = this.vol;
+        const V = I.volcano;
+        const es = 2;
+        const n = Math.ceil((V.r + 16) * 2 / es);
+        const x0 = I.x - (n * es) / 2;
+        const z0 = I.z - (n * es) / 2;
+        const geo = new THREE.PlaneGeometry(n * es, n * es, n, n);
+        geo.rotateX(-Math.PI / 2);
+        geo.translate(I.x, 0, I.z);
+        const pos = geo.attributes.position;
+        const colors = new Float32Array(pos.count * 3);
+        const col = new THREE.Color();
+        for (let i = 0; i < pos.count; i++) {
+          const x = pos.getX(i);
+          const z = pos.getZ(i);
+          const h = this.volcanoHeight(x, z);
+          const r = Math.hypot(x - I.x, z - I.z);
+          pos.setY(i, h > 0.05 ? h + t : r < V.r + 16 ? t - 0.2 : -1);
+          const k = Math.min(1, h / V.h);
+          col.setRGB(0.36 - k * 0.12 + this.rand() * 0.03, 0.42 - k * 0.25 + this.rand() * 0.03, 0.25 - k * 0.1, THREE.SRGBColorSpace);
+          colors[i * 3] = col.r;
+          colors[i * 3 + 1] = col.g;
+          colors[i * 3 + 2] = col.b;
+        }
+        geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        geo.computeVertexNormals();
+        const cone = new THREE.Mesh(geo, M({ vertexColors: true, roughness: 1 }));
+        cone.receiveShadow = true;
+        cone.castShadow = true;
+        this.scene.add(cone);
+        this.shootables.push(cone);
+        this.addHeightfield(x0, z0, n, n, es, (x, z) => {
+          const h = this.volcanoHeight(x, z);
+          return h > 0.05 ? h + t : 0;
+        });
+        this.terrainRibbon(g.road.map((p) => [p[0], p[1]]), { width: 8, tex: this.bridgeRoadTexture(), heightFn: (x, z) => this.volcanoHeight(x, z) + t });
+        this.lavaMat = M({ color: 0x401000, emissive: 0xff4a10, emissiveIntensity: 2 });
+        const lava = new THREE.Mesh(new THREE.CircleGeometry(V.crater - 6, 24), this.lavaMat);
+        lava.rotation.x = -Math.PI / 2;
+        lava.position.set(I.x, t + V.h - 15.5, I.z);
+        this.scene.add(lava);
+        this.craterTop = new THREE.Vector3(I.x, t + V.h, I.z);
+        // Observatorio junto a la pista
+        const ox = I.x - 70;
+        const oz = I.z + I.strip.dz - 26;
+        box(10, 5, 8, M({ color: 0xeeeeee, roughness: 0.6 }), ox, t + 2.5, oz);
+        const dome = new THREE.Mesh(new THREE.SphereGeometry(3.4, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), M({ color: 0xcfd8dc, metalness: 0.5, roughness: 0.3 }));
+        dome.position.set(ox, t + 5, oz);
+        this.scene.add(dome);
+        this.islandSpots.volcan = { pos: [ox, t, oz + 5], normal: [0, 1] };
+        this.islandSpots.crater = g.top;
+      }
+      this.world.addBody(body);
+    }
+  }
+
+  /**
+   * Mapa del mundo (2900 m): mar, la ciudad (su propio mapa encima), la calzada, el aeropuerto y las
+   * islas. Lo usan el mapa grande (vista "mundo") y el radar fuera de la ciudad.
+   */
+  buildWorldMap() {
+    const B = { x0: -1450, z0: -700, size: 2900 };
+    const px = 2048;
+    const s = px / B.size;
+    const X = (x) => (x - B.x0) * s;
+    const Z = (z) => (z - B.z0) * s;
+    const canvas = makeCanvas(px, px, (ctx) => {
+      ctx.fillStyle = '#1f4a63';
+      ctx.fillRect(0, 0, px, px);
+      ctx.fillStyle = '#3f5a31';
+      ctx.fillRect(X(-1450), Z(-700), 2900 * s, (coastZ(0) + 700) * s);
+      ctx.drawImage(this.mapCanvas, X(-this.mapSize / 2), Z(-this.mapSize / 2), this.mapSize * s, this.mapSize * s);
+      // Calzada y aeropuerto
+      ctx.fillStyle = '#55585e';
+      ctx.fillRect(X(CAUSEWAY.x - 5), Z(coastZ(CAUSEWAY.x)), 10 * s, (CAUSEWAY.z1 - coastZ(CAUSEWAY.x)) * s);
+      const A = AIRPORT;
+      ctx.fillStyle = '#7d7c76';
+      ctx.fillRect(X(A.x0), Z(A.z0), (A.x1 - A.x0) * s, (A.z1 - A.z0) * s);
+      ctx.fillStyle = '#3c3e43';
+      ctx.fillRect(X(A.runway.x0), Z(A.runway.z - 15), (A.runway.x1 - A.runway.x0) * s, 30 * s);
+      ctx.fillStyle = '#9e9a90';
+      ctx.fillRect(X(-470), Z(655), 300 * s, 40 * s);
+      // Islas
+      for (const I of ISLANDS) {
+        const shape = (r) => {
+          ctx.beginPath();
+          ctx.moveTo(X(I.x - I.L / 2), Z(I.z - r));
+          ctx.lineTo(X(I.x + I.L / 2), Z(I.z - r));
+          ctx.arc(X(I.x + I.L / 2), Z(I.z), r * s, -Math.PI / 2, Math.PI / 2);
+          ctx.lineTo(X(I.x - I.L / 2), Z(I.z + r));
+          ctx.arc(X(I.x - I.L / 2), Z(I.z), r * s, Math.PI / 2, Math.PI * 1.5);
+          ctx.fill();
+        };
+        ctx.fillStyle = '#d9c79b';
+        shape(I.R);
+        ctx.fillStyle = I.volcano ? '#5b6b40' : '#5b8a3f';
+        shape(I.R - 14);
+        if (I.volcano) {
+          for (let r = I.volcano.r; r > 10; r -= 14) {
+            const k = 1 - r / I.volcano.r;
+            ctx.fillStyle = `rgb(${90 - k * 30},${100 - k * 60},${64 - k * 30})`;
+            ctx.beginPath();
+            ctx.arc(X(I.x), Z(I.z), r * s, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.fillStyle = '#ff5a1a';
+          ctx.beginPath();
+          ctx.arc(X(I.x), Z(I.z), 14 * s, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = I.strip.dirt ? '#8a6a45' : '#3c3e43';
+        ctx.fillRect(X(I.x - I.strip.len / 2), Z(I.z + I.strip.dz - I.strip.w / 2), I.strip.len * s, I.strip.w * s);
+      }
+    });
+    this.worldMap = { canvas, ...B };
+    this.worldLabels = [
+      ['AEROPUERTO', (AIRPORT.x0 + AIRPORT.x1) / 2, AIRPORT.z1 + 40],
+      ...ISLANDS.map((I) => [I.name.toUpperCase(), I.x, I.z + I.R + 45]),
+      ['ISLA FARO', ISLAND.x, ISLAND.z + 60],
+      ['PUERTO SOMBRA', 0, 0],
+    ];
   }
 
   /** Rampas de salto con franjas amarillas y negras. */
@@ -3060,6 +3757,23 @@ export class Environment {
       if (Math.hypot(x - ISLAND.x - 18, z - ISLAND.z - 22) < 6) continue; // faro
       trees.push([x, ISLAND.top, z, true]);
     }
+    // Palmeras de las islas lejanas (fuera de la pista, del volcán y de los edificios)
+    for (const I of ISLANDS) {
+      const want = I.volcano ? 70 : 45;
+      for (let k = 0, made = 0; k < 600 && made < want; k++) {
+        const x = I.x - I.L / 2 - I.R + this.rand() * (I.L + 2 * I.R);
+        const z = I.z - I.R + this.rand() * 2 * I.R;
+        if (!inIslandShape(I, x, z, -8)) continue;
+        if (Math.abs(z - (I.z + I.strip.dz)) < I.strip.w / 2 + 9) continue;
+        if (I.volcano && Math.hypot(x - I.x, z - I.z) < I.volcano.r + 6) continue;
+        if (I.volcano && this.vol.road.some((p) => Math.hypot(p[0] - x, p[1] - z) < 10)) continue; // carretera del volcán
+        const spot = this.islandSpots && this.islandSpots[I.id];
+        if (spot && Math.hypot(x - spot.pos[0], z - spot.pos[2]) < 34) continue;
+        if (I.id === 'cayo' && z < I.z - 25 && Math.abs(x - I.x) < 90) continue; // hotel y piscina
+        trees.push([x, I.top, z, true]);
+        made++;
+      }
+    }
     // Bosque de la montaña: fuera de la carretera de la cumbre y del barranco; con cuerpo (se puede conducir por ahí)
     for (let k = 0; k < 900; k++) {
       const x = RIDGE.xc - 215 + this.rand() * 430;
@@ -3375,6 +4089,20 @@ export class Environment {
     this.updateEnvironmentMap();
     if (this.lampHeadMat) this.lampHeadMat.emissiveIntensity = glow * 2.5;
     if (this.bridgeLampMat) this.bridgeLampMat.emissiveIntensity = glow * 2.5;
+    if (this.causewayLampMat) this.causewayLampMat.emissiveIntensity = glow * 2.5;
+    if (this.runwayLightMat) this.runwayLightMat.emissiveIntensity = 0.3 + glow * 3;
+    if (this.airportSignMat) this.airportSignMat.emissiveIntensity = 0.4 + glow * 1.2;
+    if (this.beaconMat) this.beaconMat.emissiveIntensity = Math.floor(performance.now() / 700) % 2 ? 3 : 0.3;
+    if (this.lavaMat) this.lavaMat.emissiveIntensity = 1.6 + Math.sin(performance.now() / 400) * 0.5 + glow;
+    // Fumarola del volcán (solo si estás cerca)
+    if (this.craterTop && this.game.effects && focus && Math.hypot(focus.x - this.craterTop.x, focus.z - this.craterTop.z) < 900) {
+      this.smokeTimer = (this.smokeTimer || 0) - dt;
+      if (this.smokeTimer <= 0) {
+        this.smokeTimer = 0.25;
+        const c = this.craterTop;
+        this.game.effects.spawnSmoke(new THREE.Vector3(c.x + (Math.random() - 0.5) * 12, c.y - 4, c.z + (Math.random() - 0.5) * 12), new THREE.Vector3((Math.random() - 0.5) * 2, 6 + Math.random() * 3, (Math.random() - 0.5) * 2), 5, true);
+      }
+    }
 
     if (this.lighthouseLamp) this.lighthouseLamp.emissiveIntensity = 0.4 + glow * 4;
     this.updateSignals();

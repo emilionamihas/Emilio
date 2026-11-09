@@ -616,10 +616,10 @@ export class ThirdPersonCamera {
       if (plane) {
         const fy = v.getForward().y;
         pitchTarget = -0.16 + Math.asin(Math.max(-1, Math.min(1, fy))) * 0.7;
-        pivot.y += 0.8;
+        pivot.y += 0.8 * (v.spec.look ? v.spec.look.kh : 1);
       }
       if (this.freeLookTimer <= 0) this.pitch += (pitchTarget - this.pitch) * (1 - Math.exp(-(plane ? 4 : 2) * dt));
-      distance = plane ? 12 + Math.min(speed, 60) * 0.05 : 7 + Math.min(speed, 45) * 0.06;
+      distance = plane ? (v.spec.camDist || 12) + Math.min(speed, 90) * 0.05 : 7 + Math.min(speed, 45) * 0.06;
       fov = 68 + Math.min(speed, 50) * 0.3;
       stiffness = THREE.MathUtils.lerp(3, 14, settle);
     }

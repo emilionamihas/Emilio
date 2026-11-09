@@ -232,6 +232,98 @@ export const STORY = [
   },
 ];
 
+/** Aeródromo por id (aeropuerto o isla). */
+const field = (g, id) => g.env.airfields.find((a) => a.id === id);
+
+/**
+ * Encargos del aeropuerto y de las islas: se cogen en su marcador (E), en historia y en modo libre,
+ * y cada uno se cumple una vez. `giver` es el id del lugar donde se aceptan.
+ */
+export const JOBS = [
+  {
+    id: 'vuelo-vip',
+    title: 'Vuelo VIP',
+    giver: 'charter',
+    reward: 15000,
+    timeLimit: 300,
+    side: true,
+    steps: [
+      { type: 'say', lines: ['Agencia: Una estrella de cine quiere ir a Cayo Palmeras, y odia las turbulencias.', 'Agencia: Te prestamos un Halcón. Nada de giros bruscos ni picados, y aterriza con mimo: si se asusta, no paga.'] },
+      { type: 'spawnVehicle', vehicle: 'halcon', color: 0xffc107, gift: true, at: (g) => field(g, 'aeropuerto').spawn },
+      { type: 'getInVehicle', text: 'Sube al Halcón de la cabecera de la pista', tagged: true },
+      { type: 'landAt', text: 'Lleva a la estrella a Cayo Palmeras (al sur) y aterriza en su pista', field: 'cayo', comfort: true },
+      { type: 'say', lines: ['Estrella: El vuelo más tranquilo de mi vida. Toma, una propina.'] },
+    ],
+  },
+  {
+    id: 'tour-islas',
+    title: 'Tour de las islas',
+    giver: 'charter',
+    reward: 25000,
+    side: true,
+    steps: [
+      { type: 'say', lines: ['Agencia: Un millonario quiere ver todas las islas desde el aire, en nuestro jet.', 'Agencia: Paga por minuto, pero odia esperar. Sigue los aros y vuelve aquí.'] },
+      { type: 'spawnVehicle', vehicle: 'condor', color: 0xf5f5f5, gift: true, at: (g) => field(g, 'aeropuerto').spawn },
+      { type: 'getInVehicle', text: 'Sube al Cóndor de la cabecera de la pista', tagged: true },
+      {
+        type: 'rings',
+        text: 'Despega y pasa por los aros sobre las islas',
+        time: 260,
+        rings: [[-60, 40, 830], [120, 60, 545], [560, 55, 960], [600, 45, 1200], [330, 50, 1590], [-120, 60, 1680], [-560, 112, 1420], [-470, 60, 1120], [-360, 40, 900]],
+      },
+      { type: 'landAt', text: 'Aterriza en el aeropuerto', field: 'aeropuerto' },
+      { type: 'say', lines: ['Millonario: Precioso. Compraré una isla. O dos.'] },
+    ],
+  },
+  {
+    id: 'contrabando',
+    title: 'Contrabando',
+    giver: 'tortuga',
+    reward: 20000,
+    timeLimit: 260,
+    side: true,
+    steps: [
+      { type: 'say', lines: ['Bigotes: ¿Has venido en avión? Perfecto. Ya te he cargado unas cajas que no existen.', 'Bigotes: Llévalas al hangar de CARGA del aeropuerto. El radar de la costa está encendido: vuela por debajo de 35 metros.'] },
+      { type: 'boardPlane', text: 'Sube a tu avión (las cajas ya están dentro)' },
+      { type: 'landAt', text: 'Vuela bajo hasta el aeropuerto y aterriza', field: 'aeropuerto', maxAlt: 35 },
+      { type: 'goto', text: 'Rueda hasta el hangar de CARGA (al este de la terminal)', pos: () => v3(-140, 0, 700), label: 'Hangar de carga', radius: 16 },
+      { type: 'say', lines: ['Bigotes (por radio): Nadie ha visto nada. Tu parte ya está en tu cuenta.'] },
+    ],
+  },
+  {
+    id: 'muestras',
+    title: 'Muestras del volcán',
+    giver: 'volcan',
+    reward: 18000,
+    timeLimit: 200,
+    side: true,
+    steps: [
+      { type: 'say', lines: ['Dra. Ceniza: ¡El volcán está a punto de despertar! Necesito una muestra de gas del cráter, ya.', 'Dra. Ceniza: Coge el todoterreno y sube por la carretera en espiral. Rápido, pero sin caerte por la ladera.'] },
+      { type: 'spawnVehicle', vehicle: 'suv', color: 0xff6d00, gift: true, at: (g) => { const R = g.env.vol.road; return { pos: v3(R[0][0] - 5, 0, R[0][1]), heading: Math.atan2(R[1][0] - R[0][0], R[1][1] - R[0][1]) }; } },
+      { type: 'getInVehicle', text: 'Sube al todoterreno naranja', tagged: true },
+      { type: 'goto', text: 'Sube por la carretera hasta el cráter', pos: (g) => v3(g.env.vol.top[0], 0, g.env.vol.top[1]), label: 'Cráter', radius: 10, erupt: true },
+      { type: 'goto', text: 'Baja y lleva la muestra al observatorio', poi: 'volcan', radius: 6, erupt: true },
+      { type: 'say', lines: ['Dra. Ceniza: ¡Justo a tiempo! Con esto sabremos cuándo explota. Yo que tú volvería a tu avión.'] },
+    ],
+  },
+  {
+    id: 'rescate',
+    title: 'Rescate en el mar',
+    giver: 'cayo',
+    reward: 22000,
+    timeLimit: 260,
+    side: true,
+    steps: [
+      { type: 'say', lines: ['Recepción: ¡Un yate de clientes se ha hundido al este de la isla! Están en una balsa.', 'Recepción: Llévate nuestro hidroavión: amariza junto a la balsa, súbelos y tráelos de vuelta.'] },
+      { type: 'spawnVehicle', vehicle: 'albatros', color: 0xfdd835, gift: true, at: (g) => field(g, 'cayo').spawn },
+      { type: 'getInVehicle', text: 'Sube al hidroavión amarillo', tagged: true },
+      { type: 'waterLand', text: 'Amariza junto a la balsa (humo rojo) y detente', pos: () => v3(700, 0, 1560), radius: 45, hold: 4 },
+      { type: 'landAt', text: 'Vuelve a Cayo Palmeras y aterriza en la pista', field: 'cayo' },
+      { type: 'say', lines: ['Recepción: ¡Los tienes a todos! Habitación gratis para siempre... bueno, una semana.'] },
+    ],
+  },
+];
+
 /** Índice de la misión en la que se atraca cada banco (desbloqueo en la historia). */
 const BANK_MISSION = { puerto: 3, colinas: 3, central: 7, reserva: 8 };
 
@@ -259,6 +351,12 @@ export class Missions {
 
   get story() {
     return this.game.state.mode === 'story';
+  }
+
+  /** Siguiente encargo pendiente de un lugar (o null). */
+  nextJob(giver) {
+    const done = this.game.state ? this.game.state.jobsDone || [] : [];
+    return JOBS.find((j) => j.giver === giver && !done.includes(j.id)) || null;
   }
 
   bankAvailable(id) {
@@ -306,7 +404,7 @@ export class Missions {
       flags: {},
     };
     this.giverMarker.visible = false;
-    game.hud.missionBanner(mission.title.toUpperCase(), mission.chapter || 'MISIÓN');
+    game.hud.missionBanner(mission.title.toUpperCase(), mission.chapter || (mission.side ? 'ENCARGO' : 'MISIÓN'));
     this.advance();
   }
 
@@ -397,12 +495,16 @@ export class Missions {
       mv.damageScale = 1;
       game.hud.notify(`${mv.label} ya es tuya (P › Mis coches).`, 4);
     }
-    st.storyStep = a.index + 1;
-    if (st.storyStep >= STORY.length) st.storyDone = true;
+    if (a.mission.side) {
+      if (!st.jobsDone.includes(a.mission.id)) st.jobsDone.push(a.mission.id);
+    } else {
+      st.storyStep = a.index + 1;
+      if (st.storyStep >= STORY.length) st.storyDone = true;
+    }
     st.save();
-    game.hud.missionBanner('MISIÓN SUPERADA', `+${formatMoney(a.mission.reward)}`);
+    game.hud.missionBanner(a.mission.side ? 'ENCARGO CUMPLIDO' : 'MISIÓN SUPERADA', `+${formatMoney(a.mission.reward)}`);
     this.cleanup(true);
-    if (st.storyDone) {
+    if (st.storyDone && !a.mission.side) {
       this.say(['HISTORIA COMPLETADA. Puerto Sombra es tuya: todos los bancos y negocios siguen disponibles.']);
     }
   }
@@ -457,7 +559,7 @@ export class Missions {
   update(dt) {
     const game = this.game;
     this.updateSubtitles(dt);
-    if (!this.story) return;
+    if (!this.story && !this.active) return;
 
     // Marcador del siguiente encargo
     if (!this.active) {
@@ -568,6 +670,7 @@ export class Missions {
       case 'goto': {
         const poi = step.poi ? game.locations.byId(step.poi) : null;
         const pos = poi ? poi.pos : (a.flags.pos ||= step.pos(game));
+        if (step.erupt) this.eruption(dt);
         this.setTarget(pos, poi ? poi.name : step.label, true);
         const p = game.getFocusPosition();
         if (Math.hypot(p.x - pos.x, p.z - pos.z) < (step.radius || 4)) this.advance();
@@ -609,6 +712,20 @@ export class Missions {
       }
       case 'stunt':
         this.updateStunt(step, dt);
+        break;
+      case 'boardPlane': {
+        const inter = game.interaction;
+        if (inter.isDriving && inter.vehicle.spec.plane) {
+          a.missionVehicle = inter.vehicle; // a partir de aquí es "el avión de la misión"
+          this.advance();
+        }
+        break;
+      }
+      case 'landAt':
+        this.updateLandAt(step, dt);
+        break;
+      case 'waterLand':
+        this.updateWaterLand(step, dt);
         break;
       case 'race':
         this.updateRace(step, dt);
@@ -966,6 +1083,132 @@ export class Missions {
         if (s.count >= step.count) this.advance();
       }
     }
+  }
+
+  // ------------------------------------------------------------------
+  // Vuelos: aterrizar en un aeródromo (con radar o con pasajero), amerizar
+  // ------------------------------------------------------------------
+  /** Avión que pilotas ahora (el de la misión, o cualquiera si la misión no da uno). */
+  flyingPlane() {
+    const inter = this.game.interaction;
+    const v = inter.isDriving ? inter.vehicle : null;
+    if (!v || !v.spec.plane) return null;
+    const a = this.active;
+    if (a.missionVehicle && v !== a.missionVehicle) return null;
+    return v;
+  }
+
+  updateLandAt(step, dt) {
+    const game = this.game;
+    const a = this.active;
+    const f = field(game, step.field);
+    this.setTarget(new THREE.Vector3(f.x, 0, f.z), f.name, false);
+    const v = this.flyingPlane();
+    if (!v) {
+      game.hud.setObjective(a.missionVehicle ? 'Vuelve al avión' : 'Sube a un avión');
+      return;
+    }
+    let extra = '';
+    const agl = v.position.y - game.env.groundHeight(v.position.x, v.position.z, v.position.y);
+    // Pasajero: los giros fuertes, los picados y los golpes le quitan comodidad
+    if (step.comfort) {
+      if (a.comfort == null) {
+        a.comfort = 100;
+        a.lastHealth = v.health;
+      }
+      const fwd = v.getForward();
+      const left = v.chassisBody.quaternion.vmult(new v.chassisBody.position.constructor(1, 0, 0));
+      const roll = Math.abs(Math.asin(Math.max(-1, Math.min(1, left.y))));
+      const pitch = Math.asin(Math.max(-1, Math.min(1, fwd.y)));
+      if (v.airborne) {
+        if (roll > 0.5) a.comfort -= (roll - 0.5) * 45 * dt;
+        if (pitch < -0.25) a.comfort -= (-pitch - 0.25) * 60 * dt;
+        if (v.chassisBody.velocity.y < -9) a.comfort -= 8 * dt;
+      }
+      if (v.health < a.lastHealth) a.comfort -= (a.lastHealth - v.health) * 1.2;
+      a.lastHealth = v.health;
+      if (a.comfort <= 0) {
+        this.fail('Al pasajero le ha dado un ataque de pánico');
+        return;
+      }
+      extra = ` · comodidad del pasajero: ${Math.round(a.comfort)} %`;
+    }
+    // Radar: por encima de maxAlt te ve; más de 4 s seguidos y se acabó
+    if (step.maxAlt) {
+      a.radar = a.radar || 0;
+      if (v.airborne && agl > step.maxAlt) a.radar += dt;
+      else a.radar = Math.max(0, a.radar - dt * 0.5);
+      if (a.radar > 4) {
+        this.fail('Te ha detectado el radar de la costa');
+        return;
+      }
+      extra = a.radar > 0.2 ? ` · ¡TE VE EL RADAR! Baja de ${step.maxAlt} m (${Math.ceil(4 - a.radar)} s)` : ` · altura ${Math.round(agl)} m (máx. ${step.maxAlt})`;
+    }
+    const d = Math.hypot(v.position.x - f.x, v.position.z - f.z);
+    game.hud.setObjective(`${step.text} · ${Math.round(d)} m${extra}`);
+    if (!v.airborne && d < f.radius && Math.abs(v.getForwardSpeed()) < 2 && !game.env.inSea(v.position.x, v.position.z)) {
+      game.hud.notify(`En tierra en ${f.name}.`, 2);
+      this.advance();
+    }
+  }
+
+  updateWaterLand(step, dt) {
+    const game = this.game;
+    const a = this.active;
+    const pos = (a.flags.pos ||= step.pos(game));
+    if (!a.flags.raft) {
+      // Balsa naranja con náufragos y humo rojo para verla de lejos
+      const g = new THREE.Group();
+      const raft = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.6, 0.6, 12), new THREE.MeshStandardMaterial({ color: 0xff6d00, roughness: 0.7 }));
+      raft.position.y = 0.3;
+      g.add(raft);
+      for (let k = 0; k < 3; k++) {
+        const h = new HumanModel({ ...OUTFITS.verano, shirt: [0xffffff, 0x1e88e5, 0xe53935][k] });
+        h.root.position.set(Math.cos(k * 2.1) * 1.2, 0.55, Math.sin(k * 2.1) * 1.2);
+        h.root.scale.setScalar(0.9);
+        g.add(h.root);
+        for (let t = 0; t < 40; t++) h.animate(0.05, { pose: 'cower' });
+      }
+      g.position.set(pos.x, 0, pos.z);
+      game.scene.add(g);
+      (a.meshes ||= []).push(g);
+      a.flags.raft = g;
+      a.flags.smoke = 0;
+    }
+    a.flags.smoke -= dt;
+    if (a.flags.smoke <= 0) {
+      a.flags.smoke = 0.12;
+      game.effects.spawnSmoke(new THREE.Vector3(pos.x + 1, 1.2, pos.z), new THREE.Vector3((Math.random() - 0.5) * 1.5, 5, (Math.random() - 0.5) * 1.5), 2, false);
+    }
+    this.setTarget(pos, 'Balsa', true);
+    const v = this.flyingPlane();
+    if (!v) {
+      game.hud.setObjective('Vuelve al hidroavión');
+      return;
+    }
+    const d = Math.hypot(v.position.x - pos.x, v.position.z - pos.z);
+    const ok = !v.airborne && d < step.radius && Math.abs(v.getForwardSpeed()) < 3 && game.env.inSea(v.position.x, v.position.z);
+    a.flags.hold = ok ? (a.flags.hold || 0) + dt : 0;
+    game.hud.setObjective(ok ? `Subiendo a los náufragos… ${Math.ceil(step.hold - a.flags.hold)} s` : `${step.text} · ${Math.round(d)} m`);
+    if (a.flags.hold >= step.hold) {
+      game.scene.remove(a.flags.raft);
+      game.hud.notify('¡Náufragos a bordo!', 2.5);
+      this.advance();
+    }
+  }
+
+  /** El volcán se despierta: humo negro y chispas en el cráter, y algún temblor de aviso. */
+  eruption(dt) {
+    const game = this.game;
+    const c = game.env.craterTop;
+    if (!c) return;
+    const a = this.active;
+    a.eruptT = (a.eruptT || 0) - dt;
+    if (a.eruptT > 0) return;
+    a.eruptT = 0.15;
+    game.effects.spawnSmoke(new THREE.Vector3(c.x + (Math.random() - 0.5) * 10, c.y, c.z + (Math.random() - 0.5) * 10), new THREE.Vector3((Math.random() - 0.5) * 3, 10, (Math.random() - 0.5) * 3), 7, true);
+    if (Math.random() < 0.3) game.effects.spawnSparks(new THREE.Vector3(c.x, c.y - 2, c.z), new THREE.Vector3(0, 1, 0), 12, 0xff6a1a);
+    if (Math.random() < 0.01) game.hud.notify('El suelo tiembla…', 1.5);
   }
 
   isDrivingMissionCar() {

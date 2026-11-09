@@ -38,7 +38,7 @@ Si ya tenías la historia terminada, la segunda parte se abre sola al cargar la 
 
 Puerto Sombra mide algo más de un kilómetro de lado. El **Centro** conserva su cuadrícula de rascacielos, pero con una glorieta en medio y una avenida en diagonal que corta las manzanas. Alrededor hay una **circunvalación** de curvas amplias que conecta los barrios: el **Polígono** (naves industriales), **Jardines** y **Las Lomas** (casas con tejado a dos aguas y calles sinuosas), **Colinas** (mansiones) y la costa, con **El Puerto** (contenedores y almacenes) y **La Playa**, junto al mar. Entre el centro y Colinas se levanta el **Monte Sombra**, una montaña de 40 metros que se puede conducir: la **carretera de la cumbre** sube desde la Carretera del Oeste por una rampa larga, recorre la cresta, cruza un barranco por un **puente de arco** de acero (dos arcos que nacen de las paredes del barranco, montantes cada 3 metros y estribos de piedra), pasa por encima del túnel de la Avenida Norte y baja hasta la Carretera del Nordeste. Las laderas norte y sur son empinadas (se baja rodando, no se sube) y el bosque tiene árboles sólidos. Frente a La Playa, un **puente colgante** de 150 metros lleva a la **Isla Faro**, con faro, palmeras, tienda y chiringuito. El puente tiene un tablero continuo que sube y baja sin escalones, dos torres pórtico de 31 metros, cables principales anclados en tierra y en la isla, péndolas cada 4 metros y farolas.
 
-La ciudad ya no es plana en todas partes. Tres barrios tienen **cuestas** de verdad, con calles, aceras, edificios, tráfico y peatones que suben y bajan: **Las Lomas y Jardines** (al este, hasta 9 metros de desnivel), **Colinas** (al norte, hasta 8 metros) y la **Cuesta del Sur**, la Avenida Sur entre el centro y la playa, que sube a una loma y baja hacia el mar. En las cuestas los edificios se apoyan sobre un zócalo de piedra, y la pendiente máxima ronda el 25 %. Al oeste de la circunvalación, donde antes estaban Las Dunas, está el **circuito de Motocross Las Dunas**: una pista de tierra de casi 1,5 km en serpentín con cuatro rectas, curvas de herradura con peralte, saltos dobles, mesetas, "whoops", rodillos y una subida de 5 metros (La Cumbre). Tiene pórtico de salida, banderines, balas de paja y grada, y una moto de cross aparcada junto a la grada para probarla. La tierra y la hierba agarran menos que el asfalto (salvo con la moto de cross), y el nombre del suelo aparece bajo el del vehículo. Hay **rampas de salto** en la playa, el puerto, el polígono y la cumbre. Si caes al mar, te rescatan en la orilla (el coche se hunde; si era tuyo, se pide otra vez desde *Mis coches*). El tamaño del mapa no cambia. Los cruces entre avenidas tienen semáforo y paso de cebra, y el tráfico, la policía y el GPS siguen la red de calles, respetando el sentido de la glorieta.
+La ciudad ya no es plana en todas partes. Tres barrios tienen **cuestas** de verdad, con calles, aceras, edificios, tráfico y peatones que suben y bajan: **Las Lomas y Jardines** (al este, hasta 9 metros de desnivel), **Colinas** (al norte, hasta 8 metros) y la **Cuesta del Sur**, la Avenida Sur entre el centro y la playa, que sube a una loma y baja hacia el mar. En las cuestas los edificios se apoyan sobre un zócalo de piedra, y la pendiente máxima ronda el 25 %. Al oeste de la circunvalación, donde antes estaban Las Dunas, está el **circuito de Motocross Las Dunas**: una pista de tierra de casi 1,5 km en serpentín con cuatro rectas, curvas de herradura con peralte, saltos dobles, mesetas, "whoops", rodillos y una subida de 5 metros (La Cumbre). Tiene pórtico de salida, banderines, balas de paja y grada, y una moto de cross aparcada junto a la grada para probarla. La tierra y la hierba agarran menos que el asfalto (salvo con la moto de cross), y el nombre del suelo aparece bajo el del vehículo. Hay **rampas de salto** en la playa, el puerto, el polígono y la cumbre. Si caes al mar, te rescatan en la orilla (el coche se hunde; si era tuyo, se pide otra vez desde *Mis coches*). La ciudad mide lo mismo; el mar, el aeropuerto y las islas quedan al sur. Los cruces entre avenidas tienen semáforo y paso de cebra, y el tráfico, la policía y el GPS siguen la red de calles, respetando el sentido de la glorieta.
 
 | Radar | Lugar | Qué haces allí |
 |---|---|---|
@@ -89,11 +89,9 @@ Cada uno se puede reformar (x1,6) y llevar a lujo (x2,4). Mientras no juegas sig
 
 **Mapa y GPS.** La tecla **M** abre el mapa de la ciudad. Elige un destino de la lista (W/S y E) o haz clic en cualquier punto: la ruta se calcula por las calles y se dibuja en morado en el radar, con la distancia debajo.
 
-**Código secreto.** En el ordenador de tu casa, la última opción del menú (`>_`) abre una terminal. Escribe `WTASECRET` y pulsa Enter. También funciona tecleándolo de corrido mientras juegas. Da 10 millones de dólares, todas las armas con munición infinita, un vehículo de cada modelo, motos incluidas (propios, sin estrellas), los quince negocios al nivel máximo, salud y chaleco llenos y, en el modo historia, la historia completada con todos los bancos abiertos.
+**Código secreto.** En el ordenador de tu casa, la última opción del menú (`>_`) abre una terminal. Escribe `WTASECRET` y pulsa Enter. También funciona tecleándolo de corrido mientras juegas. Da 10 millones de dólares, todas las armas con munición infinita, un vehículo de cada modelo, motos y los cinco aviones incluidos (propios, sin estrellas), los quince negocios al nivel máximo, salud y chaleco llenos y, en el modo historia, la historia completada con todos los bancos abiertos.
 
 Hay un segundo código, `OLDSTYLE`, que se mete igual. Te viste con gorra beige hacia atrás, polo azul navy, pantalón beige y zapatillas blancas. Esos dos colores, azul navy y beige, no están en el vestidor normal: al usar el código quedan desbloqueados en todas las prendas, junto al conjunto "Old Style".
-
-El tercer código, `WTAFLY`, te da la **avioneta Gaviota**. Queda en tu garaje (P › Mis coches) y, si estás a pie en la calle, aparece aparcada en la calle más cercana con la ruta marcada en el GPS.
 
 **Armas.** Puños, pistola (400), subfusil (2.200), escopeta (3.200), rifle de asalto (6.500) y lanzacohetes (25.000). Cada arma viene con dos cargadores; luego la munición se compra por cajas. El chaleco (600) absorbe el 70 % del daño. A partir de tres estrellas la policía dispara.
 
@@ -122,7 +120,33 @@ Trece modelos (diez coches y tres motos) con física propia (masa, tracción, ag
 
 **Moto de cross (Barro).** Ligera, con suspensión larga y blanda y neumáticos de tacos: en tierra y hierba casi no pierde agarre y aguanta caídas de salto que dañarían otra moto. En el aire se mantiene derecha y busca caer sobre las ruedas; W baja el morro y S lo sube. Se compra en Autos Velasco, hay una en el circuito y el código WTASECRET también la da. En un salto los coches tampoco dan vueltas de campana: amortiguan el giro en el aire.
 
-**Avioneta.** Monoplaza de ala alta de 9 metros. W sube la potencia y S la baja (en tierra, con la potencia a cero, S frena y luego da marcha atrás despacio). Para despegar, potencia a tope en una recta larga y, pasados los 95 km/h, mantén Espacio para levantar el morro. En el aire, A/D la inclinan para girar, Espacio sube y Shift baja; al soltarlos el morro vuelve solo a horizontal. El techo es de unos 200 metros, por debajo de 70 km/h entra en pérdida y, cerca del borde del mapa, gira sola hacia la ciudad. Para aterrizar, baja la potencia y el morro hacia una calle recta: cerca del suelo saca los flaps, endereza y se posa sola (con Espacio sigues en vuelo rasante). Un aterrizaje duro o un choque la daña. Solo te puedes bajar con ella parada.
+**Aviones.** Se compran en **Aeronaves Sombra**, el primer hangar del aeropuerto, y te esperan en la cabecera de la pista. Luego se piden desde P › Mis coches: un piloto los deja en el aeródromo más cercano a ti (el aeropuerto o la pista de una isla).
+
+| Modelo | Tipo | Crucero | Despega a | Precio |
+|---|---|---|---|---|
+| Gaviota | Avioneta de ala alta | 200 km/h | 80 km/h | 30.000 |
+| Halcón | Avioneta deportiva de ala baja, la más ágil | 250 km/h | 90 km/h | 85.000 |
+| Albatros | Hidroavión con flotadores: despega y amariza en el agua | 180 km/h | 76 km/h | 140.000 |
+| Pelícano | Bimotor de carga, grande y resistente | 200 km/h | 90 km/h | 260.000 |
+| Cóndor | Jet privado con alas en flecha y cola en T | 355 km/h | 120 km/h | 750.000 |
+
+Se vuelan todos igual. W sube la potencia y S la baja (en tierra, con la potencia a cero, S frena y luego da marcha atrás despacio). Para despegar, potencia a tope en una recta y, pasada la velocidad de despegue, mantén Espacio para levantar el morro. En el aire, A/D lo inclinan para girar, Espacio sube y Shift baja; al soltarlos el morro vuelve solo a horizontal. Por debajo de cierta velocidad entra en pérdida y, cerca del borde del mundo, da la vuelta solo. Para aterrizar, baja la potencia y el morro hacia una pista: cerca del suelo saca los flaps, endereza y se posa solo (con Espacio sigues en vuelo rasante). Un aterrizaje duro o un choque lo dañan. Solo te puedes bajar con el avión parado. Si un avión que no es el hidroavión toca el agua, se hunde.
+
+**Aeropuerto e islas.** Al sur del puerto, la Avenida del Aeropuerto y una calzada de 350 metros sobre el mar llevan al **Aeropuerto de Puerto Sombra**: pista de 490 metros con marcas y luces, calle de rodaje, plataforma con un avión de línea, terminal, torre de control con baliza y tres hangares (uno vende aviones y otro es el de carga). Desde allí se vuela a tres islas, cada una con su pista:
+
+- **Isla Tortuga**, con la cabaña de un contrabandista, cajas, un muelle y un barco varado (pista de tierra de 250 m).
+- **Isla Volcán**, con un volcán de 72 metros que echa humo y tiene lava en el cráter, una carretera en espiral hasta la cima y un observatorio (pista de tierra de 205 m).
+- **Cayo Palmeras**, un resort con hotel, piscina, sombrillas y la pista más larga (320 m, asfaltada).
+
+El mapa (M) tiene dos vistas: la ciudad y el mundo entero con el aeropuerto y las islas (tecla Z). Si caes al mar lejos de la costa, te rescatan en la orilla más cercana.
+
+**Encargos del aeropuerto y las islas.** Se aceptan en su marcador (!) con E, en historia y en modo libre, y cada uno se cobra una vez:
+
+- **Vuelo VIP** (Agencia Chárter del aeropuerto): lleva a una estrella de cine a Cayo Palmeras en un Halcón. Los giros bruscos, los picados y los golpes le quitan comodidad; si llega a cero, le da un ataque de pánico.
+- **Tour de las islas** (Agencia Chárter): nueve aros sobre todas las islas con el jet Cóndor, contra reloj, y vuelta al aeropuerto.
+- **Contrabando** (Bigotes, en Isla Tortuga): con tu propio avión, lleva la carga al hangar de CARGA del aeropuerto volando por debajo de 35 metros; si el radar te ve más de 4 segundos, se acabó.
+- **Muestras del volcán** (Observatorio de Isla Volcán): sube en todoterreno por la carretera en espiral hasta el cráter mientras el volcán se despierta, y vuelve con la muestra.
+- **Rescate en el mar** (Recepción de Cayo Palmeras): amariza con el hidroavión junto a una balsa de náufragos (humo rojo), espera a que suban y vuelve al resort.
 
 Para volver a pasar las pruebas (solo hace falta Node):
 

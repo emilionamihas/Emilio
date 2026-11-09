@@ -237,19 +237,20 @@ export class HUD {
     // Dentro de un edificio el radar se queda mirando al norte
     const yaw = game.interior ? Math.PI : game.cameraRig.yaw;
     const scale = half / MAP_RADIUS_M; // px por metro en el radar
-    const mapPxPerM = env.mapCanvas.width / env.mapSize;
-
     ctx.save();
-    ctx.fillStyle = '#23331f';
+    ctx.fillStyle = '#1f4a63';
     ctx.fillRect(0, 0, size, size);
     ctx.translate(half, half);
-    // Lo que tiene delante la cámara queda hacia arriba en el radar
+    // Lo que tiene delante la cámara queda hacia arriba en el radar (unidades: metros)
     ctx.rotate(yaw);
-    ctx.scale(scale / mapPxPerM, scale / mapPxPerM);
-    const mx = (focus.x + env.mapSize / 2) * mapPxPerM;
-    const mz = (focus.z + env.mapSize / 2) * mapPxPerM;
+    ctx.scale(scale, scale);
     ctx.globalAlpha = 0.95;
-    ctx.drawImage(env.mapCanvas, -mx, -mz);
+    // Mapa del mundo (mar, aeropuerto e islas) y encima la ciudad con todo su detalle
+    const wm = env.worldMap;
+    if (wm && (Math.abs(focus.x) > env.mapSize / 2 - MAP_RADIUS_M * 1.5 || focus.z > env.mapSize / 2 - MAP_RADIUS_M * 1.5)) {
+      ctx.drawImage(wm.canvas, wm.x0 - focus.x, wm.z0 - focus.z, wm.size, wm.size);
+    }
+    ctx.drawImage(env.mapCanvas, -env.mapSize / 2 - focus.x, -env.mapSize / 2 - focus.z, env.mapSize, env.mapSize);
     ctx.globalAlpha = 1;
     ctx.restore();
 

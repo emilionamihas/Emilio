@@ -88,7 +88,8 @@ export class InteractionSystem {
     let bestD = ENTER_RADIUS;
     for (const v of this.game.vehicles) {
       if (!v.inWorld || v.driver === 'player') continue;
-      const d = Math.hypot(v.position.x - pos.x, v.position.z - pos.z);
+      // los aviones grandes: se sube desde junto al fuselaje (el centro queda más lejos)
+      const d = Math.hypot(v.position.x - pos.x, v.position.z - pos.z) - (v.spec.plane ? Math.min(2.5, v.spec.body.w * 1.6) : 0);
       if (d < bestD && Math.abs(v.position.y - pos.y) < 3) {
         bestD = d;
         best = v;
@@ -167,7 +168,7 @@ export class InteractionSystem {
       v.input.handbrake = false;
       this.state = 'driving';
       this.game.hud.showSpeedometer(true);
-      if (v.spec.plane) this.game.hud.notify('Avioneta: W/S potencia · A/D girar · Espacio subir (despega a unos 80 km/h) · Shift bajar.', 7);
+      if (v.spec.plane) this.game.hud.notify(`${v.spec.label}: W/S potencia · A/D girar · Espacio para despegar (a unos ${Math.round(v.spec.vRot * 3.6)} km/h) y subir · Shift bajar.${v.spec.seaplane ? ' Puede despegar y amerizar en el agua.' : ''}`, 7);
     }
   }
 

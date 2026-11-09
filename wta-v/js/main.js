@@ -230,10 +230,17 @@ function checkWater(dt) {
   const driving = game.interaction.isDriving;
   const p = driving ? game.interaction.vehicle.position : game.player.body.position;
   if (splashTimer > 0) {
+    // si sale del agua antes de hundirse (un avión que la roza y vuelve a subir), no pasa nada
+    if (p.y > 2.5 || !game.env.inSea(p.x, p.z)) {
+      splashTimer = 0;
+      return;
+    }
     splashTimer -= dt;
-    if (splashTimer <= 0) rescueFromWater(p.x);
+    if (splashTimer <= 0) rescueFromWater(p.x, p.z);
     return;
   }
+  // El hidroavión flota: no se hunde
+  if (driving && game.interaction.vehicle.spec.seaplane && !game.interaction.vehicle.destroyed) return;
   if (p.y < 1.6 && game.env.inSea(p.x, p.z)) {
     splashTimer = 1.2;
     const at = new THREE.Vector3(p.x, 0.3, p.z);
@@ -241,14 +248,15 @@ function checkWater(dt) {
     game.hud.notify('¡Al agua!', 2);
   }
 }
-function rescueFromWater(x) {
+function rescueFromWater(x, z) {
   const v = game.interaction.isDriving ? game.interaction.vehicle : null;
   if (v) {
     game.interaction.forceExit();
     v.removeFromWorld();
   }
-  const sx = Math.max(-500, Math.min(500, x));
-  game.player.teleport({ x: sx, y: 0, z: coastZ(sx) - 8 });
+  // A la orilla más cercana: la costa de la ciudad, el aeropuerto o una isla
+  const shore = game.env.nearestShore(x, z);
+  game.player.teleport({ x: shore.x, y: 0, z: shore.z });
   game.player.facing = Math.PI;
   game.hud.notify(v && v.ownedCar ? 'Te han sacado del agua. Tu coche se ha hundido: pídelo otra vez en P › Mis coches.' : 'Te han sacado del agua.', 4);
 }
