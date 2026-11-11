@@ -51,7 +51,13 @@ export class GamepadHandler {
 
   /** Debe llamarse una vez por tick antes de leer valores. */
   poll(): void {
-    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    let pads: ReadonlyArray<Gamepad | null> = [];
+    try {
+      // En iframes sin permiso "gamepad" el navegador lanza SecurityError.
+      pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    } catch {
+      pads = [];
+    }
     let active: Gamepad | null = null;
     for (const gp of pads) {
       if (!gp || !gp.connected) continue;
