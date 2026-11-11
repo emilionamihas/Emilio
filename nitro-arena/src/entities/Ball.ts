@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { BALL, MATERIALS } from '../config/PhysicsConstants';
 import type { PhysicsEngine } from '../core/PhysicsEngine';
+import type { Materials } from '../render/Materials';
+import { ballTexture } from '../render/Textures';
 
 /**
  * Balón: esfera dinámica con CCD, arrastre lineal y límites de velocidad lineal y
@@ -31,7 +33,10 @@ export class Ball {
   lastTouchTime = -1;
   visible = true;
 
-  constructor(private readonly physics: PhysicsEngine) {
+  constructor(
+    private readonly physics: PhysicsEngine,
+    mats: Materials,
+  ) {
     const R = physics.R;
     this.body = physics.world.createRigidBody(
       R.RigidBodyDesc.dynamic()
@@ -52,25 +57,7 @@ export class Ball {
     );
     physics.tag(this.collider, { kind: 'ball' });
 
-    const geo = new THREE.IcosahedronGeometry(BALL.RADIUS, 1);
-    const colors: number[] = [];
-    const light = new THREE.Color(0xf2f2f2);
-    const dark = new THREE.Color(0x8d96a8);
-    const posAttr = geo.getAttribute('position');
-    const centroid = new THREE.Vector3();
-    for (let i = 0; i < posAttr.count; i += 3) {
-      centroid.set(0, 0, 0);
-      for (let k = 0; k < 3; k++) centroid.add(new THREE.Vector3().fromBufferAttribute(posAttr, i + k));
-      centroid.normalize();
-      const isDark = Math.abs(centroid.y) > 0.9 || Math.abs(centroid.x) > 0.93 || Math.abs(centroid.z) > 0.93;
-      const c = isDark ? dark : light;
-      for (let k = 0; k < 3; k++) colors.push(c.r, c.g, c.b);
-    }
-    geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-    this.mesh = new THREE.Mesh(
-      geo,
-      new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, emissive: 0x3a3a3a }),
-    );
+    this.mesh = mats.realistic ? Ball.realisticMesh() : Ball.lowPolyMesh();
     this.mesh.castShadow = true;
 
     this.indicatorRing = new THREE.Mesh(
@@ -93,6 +80,38 @@ export class Ball {
 
     this.snapshot();
     this.snapshot();
+  }
+
+  /** Esfera suave con paneles de icosaedro truncado y acabado satinado. */
+  private static realisticMesh(): THREE.Mesh {
+    const mat = new THREE.MeshStandardMaterial({
+      map: ballTexture(),
+      roughness: 0.38,
+      metalness: 0.05,
+      emissive: 0xffffff,
+      emissiveIntensity: 0.06,
+    });
+    return new THREE.Mesh(new THREE.SphereGeometry(BALL.RADIUS, 48, 32), mat);
+  }
+
+  /** Icosaedro Low-Poly con caras claras y oscuras. */
+  private static lowPolyMesh(): THREE.Mesh {
+    const geo = new THREE.IcosahedronGeometry(BALL.RADIUS, 1);
+    const colors: number[] = [];
+    const light = new THREE.Color(0xf2f2f2);
+    const dark = new THREE.Color(0x8d96a8);
+    const posAttr = geo.getAttribute('position');
+    const centroid = new THREE.Vector3();
+    for (let i = 0; i < posAttr.count; i += 3) {
+      centroid.set(0, 0, 0);
+      for (let k = 0; k < 3; k++) centroid.add(new THREE.Vector3().fromBufferAttribute(posAttr, i + k));
+      centroid.normalize();
+      const isDark = Math.abs(centroid.y) > 0.9 || Math.abs(centroid.x) > 0.93 || Math.abs(centroid.z) > 0.93;
+      const c = isDark ? dark : light;
+      for (let k = 0; k < 3; k++) colors.push(c.r, c.g, c.b);
+    }
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    return new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, emissive: 0x3a3a3a }));
   }
 
   addTo(scene: THREE.Scene): void {

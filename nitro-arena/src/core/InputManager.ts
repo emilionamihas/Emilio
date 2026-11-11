@@ -54,7 +54,7 @@ export class InputManager {
     let v = 0;
     const p = this.profile;
     for (const b of p.bindings[action].pad) {
-      v = Math.max(v, this.gamepad.value(b, p.stickDeadzone, p.triggerDeadzone, p.sensitivity));
+      v = Math.max(v, this.gamepad.value(b, p.stickDeadzone, p.triggerDeadzone, p.deadzoneShape));
     }
     return v;
   }
@@ -77,11 +77,15 @@ export class InputManager {
 
   sample(): FrameInput {
     this.gamepad.poll();
-    const steer = clamp(this.value('steerRight') - this.value('steerLeft'), -1, 1);
-    const pitch = clamp(this.value('pitchUp') - this.value('pitchDown'), -1, 1);
+    const p = this.profile;
+    const steerRaw = this.value('steerRight') - this.value('steerLeft');
+    const pitchRaw = (this.value('pitchUp') - this.value('pitchDown')) * (p.invertPitch ? -1 : 1);
+    const steer = clamp(steerRaw * p.steeringSensitivity, -1, 1);
+    const air = p.aerialSensitivity;
+    const pitch = clamp(pitchRaw * air, -1, 1);
     const freeRoll = this.value('airRollFree') > 0.5;
     let roll = this.value('airRollRight') - this.value('airRollLeft');
-    if (freeRoll) roll += steer;
+    if (freeRoll) roll += steerRaw * air;
     const ballCamHeld = this.value('ballCam') > 0.5;
 
     const out: FrameInput = {
@@ -89,15 +93,15 @@ export class InputManager {
         throttle: clamp(this.value('accelerate') - this.value('brake'), -1, 1),
         steer,
         pitch,
-        yaw: freeRoll ? 0 : steer,
+        yaw: freeRoll ? 0 : clamp(steerRaw * air, -1, 1),
         roll: clamp(roll, -1, 1),
         jump: this.value('jump') > 0.5,
         boost: this.value('boost') > 0.5,
         handbrake: this.value('powerslide') > 0.5,
         dodgeDeadzone: this.profile.dodgeDeadzone,
       },
-      lookX: this.value('lookRight') - this.value('lookLeft'),
-      lookY: this.value('lookDown') - this.value('lookUp'),
+      lookX: clamp((this.value('lookRight') - this.value('lookLeft')) * p.lookSensitivity, -1, 1),
+      lookY: clamp((this.value('lookDown') - this.value('lookUp')) * p.lookSensitivity, -1, 1),
       ballCamHeld,
       ballCamPressed: this.pressed('ballCam'),
       scoreboardHeld: this.value('scoreboard') > 0.5,

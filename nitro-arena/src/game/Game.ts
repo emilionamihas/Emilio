@@ -6,7 +6,11 @@ import { GameLoop } from '../core/GameLoop';
 import { InputManager, type FrameInput } from '../core/InputManager';
 import { PhysicsEngine } from '../core/PhysicsEngine';
 import { StorageManager, STORAGE_KEYS } from '../core/StorageManager';
-import { emptyControls, TEAM_COLORS, type GameMode, type Team } from '../core/types';
+import { emptyControls, TEAM_COLORS, type BotDifficulty, type GameMode, type Team } from '../core/types';
+import { ACCENT_COLORS, CAR_PRESETS } from '../config/CarPresets';
+import { Profile } from '../core/Profile';
+import { createEnvironment, Materials } from '../render/Materials';
+import { Showroom } from '../render/Showroom';
 import { Arena } from '../entities/Arena';
 import { Ball } from '../entities/Ball';
 import { BoostPadManager } from '../entities/BoostPad';
@@ -42,6 +46,9 @@ export class Game {
   private readonly match: Match;
   private readonly interactions: Interactions;
   private readonly loop: GameLoop;
+  private readonly mats: Materials;
+  private readonly profile = new Profile();
+  private readonly showroom: Showroom;
 
   private cars: Car[] = [];
   private player: Car | null = null;
@@ -55,12 +62,19 @@ export class Game {
   private settingsFromPause = false;
   private lastInput: FrameInput | null = null;
   private goalFlash: [number, number] = [0, 0];
-  private menuOrbit = 0;
   private readonly tmp = new THREE.Vector3();
 
-  static async create(canvas: HTMLCanvasElement, uiRoot: HTMLElement): Promise<Game> {
+  static async create(
+    canvas: HTMLCanvasElement,
+    uiRoot: HTMLElement,
+    onProgress: (progress: number, step: string) => Promise<void>,
+  ): Promise<Game> {
+    await onProgress(0.15, 'Cargando motor de físicas');
     const physics = await PhysicsEngine.create();
-    return new Game(canvas, uiRoot, physics);
+    await onProgress(0.55, 'Generando arena, césped y balón');
+    const game = new Game(canvas, uiRoot, physics);
+    await onProgress(1, 'Preparando el garaje');
+    return game;
   }
 
   private constructor(
@@ -72,12 +86,21 @@ export class Game {
     this.gameSettings = StorageManager.load(STORAGE_KEYS.game, DEFAULT_GAME_SETTINGS);
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.mats = new Materials(this.gameSettings.quality);
+    let env: THREE.Texture | null = null;
+    if (this.mats.realistic) {
+      this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      this.renderer.toneMappingExposure = 1.05;
+      env = createEnvironment(this.renderer);
+      this.scene.environment = env;
+      this.scene.environmentIntensity = 0.4;
+    }
 
     this.scene.background = new THREE.Color(0x1a1d3a);
     this.scene.fog = new THREE.Fog(0x2a2850, 160, 420);
-    this.scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x2c3a2a, 1.45));
-    this.sun = new THREE.DirectionalLight(0xffffff, 1.7);
+    this.scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x2c3a2a, this.mats.realistic ? 0.9 : 1.45));
+    this.sun = new THREE.DirectionalLight(0xfff4e6, this.mats.realistic ? 2.4 : 1.7);
     this.sun.position.set(35, 70, 25);
     this.sun.target.position.set(0, 0, 0);
     this.sun.shadow.mapSize.set(2048, 2048);
@@ -91,9 +114,9 @@ export class Game {
     this.sun.shadow.bias = -0.0006;
     this.scene.add(this.sun, this.sun.target);
 
-    this.arena = new Arena(physics);
+    this.arena = new Arena(physics, this.mats, this.renderer.capabilities.getMaxAnisotropy());
     this.scene.add(this.arena.group);
-    this.ball = new Ball(physics);
+    this.ball = new Ball(physics, this.mats);
     this.ball.addTo(this.scene);
     this.scene.add(this.pads.group, this.particles.mesh);
 
@@ -111,10 +134,7 @@ export class Game {
         this.hud.showCenter('PRÓRROGA', 2.4);
         this.hud.showSub('Gol de oro', 2.4);
       },
-      onEnd: (winner) => {
-        this.hud.clearMessages();
-        this.menu.showResults(winner, this.match.scores, this.player?.team ?? 0);
-      },
+      onEnd: (winner) => this.onMatchEnd(winner),
       onSave: (car) => this.hud.feed(`${car.name} · ¡Parada!`, car.team),
       onShot: (car) => this.hud.feed(`${car.name} · Tiro a puerta`, car.team),
       onRespawn: (car) => this.trails.get(car.id)?.reset(),
@@ -175,13 +195,22 @@ export class Game {
       },
     });
 
-    this.menu = new MainMenu(uiRoot, {
+    this.showroom = new Showroom(this.mats, env, canvas);
+    this.showroom.setCar(this.profile.car, this.profile.data.accent);
+
+    this.menu = new MainMenu(uiRoot, this.profile, this.gameSettings.difficulty, {
       onPlay: (mode) => this.startMatch(mode),
-      onSettings: () => {
+      onDifficulty: (d: BotDifficulty) => {
+        this.gameSettings.difficulty = d;
+        StorageManager.save(STORAGE_KEYS.game, this.gameSettings);
+      },
+      onPreviewCar: (preset, accent) => this.showroom.setCar(preset, accent),
+      onSettings: (tab) => {
         this.settingsFromPause = this.inMatch;
         this.menu.showMain(false);
         this.menu.showPause(false);
-        this.settingsMenu.open();
+        this.settingsMenu.update(this.cameraSettings, this.gameSettings);
+        this.settingsMenu.open(tab);
       },
       onResume: () => this.setPaused(false),
       onRestart: () => this.startMatch(this.match.mode),
@@ -219,14 +248,20 @@ export class Game {
 
     const teamSize = mode === '2v2' ? 2 : mode === '3v3' ? 3 : 1;
     let id = 0;
-    const player = new Car(this.physics, id++, 0, this.gameSettings.playerName, false);
+    const prof = this.profile.data;
+    const player = new Car(this.physics, id++, 0, prof.name, false, this.profile.car, prof.accent, this.mats);
     this.cars.push(player);
     this.player = player;
     player.onEvent = this.onCarEvent;
     if (mode !== 'freeplay') {
       const names = BOT_NAMES.slice();
-      for (let i = 1; i < teamSize; i++) this.cars.push(new Car(this.physics, id++, 0, names.shift() ?? 'Bot', true));
-      for (let i = 0; i < teamSize; i++) this.cars.push(new Car(this.physics, id++, 1, names.shift() ?? 'Bot', true));
+      const bot = (team: Team): Car => {
+        const preset = CAR_PRESETS[Math.floor(Math.random() * CAR_PRESETS.length)];
+        const accent = ACCENT_COLORS[Math.floor(Math.random() * ACCENT_COLORS.length)].hex;
+        return new Car(this.physics, id++, team, names.shift() ?? 'Bot', true, preset, accent, this.mats);
+      };
+      for (let i = 1; i < teamSize; i++) this.cars.push(bot(0));
+      for (let i = 0; i < teamSize; i++) this.cars.push(bot(1));
     }
     for (const car of this.cars) {
       car.addTo(this.scene);
@@ -257,6 +292,7 @@ export class Game {
     this.menu.showPause(false);
     this.menu.hideResults();
     this.inMatch = true;
+    this.showroom.active = false;
     this.paused = false;
     this.input.syncEdges();
   }
@@ -269,6 +305,8 @@ export class Game {
     this.bots = [];
     this.player = null;
     this.inMatch = false;
+    this.showroom.active = true;
+    this.showroom.setCar(this.profile.car, this.profile.data.accent);
     this.paused = false;
     this.match.state = 'idle';
     this.ball.reset(0, BALL.RADIUS, 0);
@@ -288,6 +326,28 @@ export class Game {
     this.input.syncEdges();
   }
 
+  /** Fin del partido: resultados, MVP y estadísticas del perfil. */
+  private onMatchEnd(winner: Team | null): void {
+    this.hud.clearMessages();
+    const player = this.player;
+    if (!player) return;
+    const won = winner === null ? null : winner === player.team;
+    const winners = winner === null ? this.cars : this.cars.filter((c) => c.team === winner);
+    const top = winners.reduce<Car | null>((best, c) => (!best || c.stats.score > best.stats.score ? c : best), null);
+    const mvp = top === player && won !== false;
+    const s = player.stats;
+    const xp = this.profile.recordMatch({
+      won,
+      goals: s.goals,
+      assists: s.assists,
+      saves: s.saves,
+      shots: s.shots,
+      demos: s.demos,
+      mvp,
+    });
+    this.menu.showResults(winner, this.match.scores, player.team, xp, mvp);
+  }
+
   private onGoal(team: Team, scorer: Car | null, assist: Car | null, speed: number, pos: THREE.Vector3): void {
     this.hud.setScores(this.match.scores[0], this.match.scores[1]);
     this.hud.showCenter('¡GOL!', 2.6, team === 0 ? 'blue' : 'orange');
@@ -305,6 +365,7 @@ export class Game {
   private onCarEvent = (car: Car, e: CarEvent): void => {
     if (car !== this.player) return;
     if (e === 'flipReset') {
+      this.profile.addFlipReset();
       this.hud.showMechanic('FLIP RESET');
       this.rumble(0.4, 0.4, 100);
     }
@@ -383,10 +444,9 @@ export class Game {
       );
       this.updateHud(frameDt, player);
     } else {
-      this.menuOrbit += frameDt * 0.08;
-      const r = 62;
-      this.cameraCtl.camera.position.set(Math.cos(this.menuOrbit) * r, 22, Math.sin(this.menuOrbit) * r * 0.8);
-      this.cameraCtl.camera.lookAt(0, 2, 0);
+      this.showroom.update(Math.min(frameDt, 0.05));
+      this.renderer.render(this.showroom.scene, this.showroom.camera);
+      return;
     }
     this.renderer.render(this.scene, this.cameraCtl.camera);
   }
@@ -445,6 +505,7 @@ export class Game {
     const h = window.innerHeight;
     this.renderer.setSize(w, h, false);
     this.cameraCtl.resize(w, h);
+    this.showroom?.resize(w, h);
   };
 
   /** Dimensiones útiles para depuración desde la consola del navegador. */

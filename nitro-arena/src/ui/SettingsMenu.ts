@@ -2,6 +2,7 @@ import { CAMERA_SLIDERS, DEFAULT_CAMERA, type CameraSettings } from '../camera/C
 import type { InputManager } from '../core/InputManager';
 import type { GameSettings } from '../game/GameSettings';
 import type { BotDifficulty } from '../core/types';
+import type { QualityLevel } from '../render/Materials';
 import { button, el } from './dom';
 import { KeybindMenu } from './KeybindMenu';
 
@@ -202,19 +203,58 @@ export class SettingsMenu {
         changed();
       },
     });
+    this.select<'cruz' | 'circular'>('Forma de la zona muerta', p.deadzoneShape, [
+      ['cruz', 'Cruz (por eje)'],
+      ['circular', 'Circular (radial)'],
+    ], (v) => {
+      p.deadzoneShape = v;
+      changed();
+    });
+    el('div', 'section-title', this.body, 'Sensibilidad');
     this.slider({
-      label: 'Sensibilidad de los sticks',
-      desc: 'Multiplicador tras la zona muerta (1.0 = lineal)',
+      label: 'Sensibilidad de dirección',
+      desc: 'Giro en el suelo. Por encima de 1 llegas antes al giro máximo',
       min: 0.5,
-      max: 2,
+      max: 3,
       step: 0.05,
-      value: p.sensitivity,
+      value: p.steeringSensitivity,
       format: (v) => v.toFixed(2),
       onInput: (v) => {
-        p.sensitivity = v;
+        p.steeringSensitivity = v;
         changed();
       },
     });
+    this.slider({
+      label: 'Sensibilidad aérea',
+      desc: 'Pitch, yaw y air roll en el aire',
+      min: 0.5,
+      max: 3,
+      step: 0.05,
+      value: p.aerialSensitivity,
+      format: (v) => v.toFixed(2),
+      onInput: (v) => {
+        p.aerialSensitivity = v;
+        changed();
+      },
+    });
+    this.slider({
+      label: 'Sensibilidad de cámara',
+      desc: 'Giro manual con el stick derecho o las teclas de mirar',
+      min: 0.3,
+      max: 2,
+      step: 0.05,
+      value: p.lookSensitivity,
+      format: (v) => v.toFixed(2),
+      onInput: (v) => {
+        p.lookSensitivity = v;
+        changed();
+      },
+    });
+    this.toggle('Invertir pitch', p.invertPitch, (v) => {
+      p.invertPitch = v;
+      changed();
+    }, 'Stick hacia atrás = morro abajo');
+    el('div', 'section-title', this.body, 'Gatillos y dodge');
     this.slider({
       label: 'Zona muerta de gatillos (L2/R2 · LT/RT)',
       min: 0,
@@ -254,6 +294,18 @@ export class SettingsMenu {
   private buildVideo(): void {
     const g = this.game;
     const changed = (): void => this.cb.onGameChange(g);
+    el('div', 'section-title', this.body, 'Calidad');
+    this.select<QualityLevel>('Calidad gráfica', g.quality, [
+      ['realista', 'Realista (PBR, reflejos, texturas)'],
+      ['rendimiento', 'Rendimiento (Low-Poly)'],
+    ], (v) => {
+      g.quality = v;
+      changed();
+      note.textContent = 'Se aplica al recargar el juego.';
+    });
+    const note = el('p', 'hint', this.body, 'La calidad realista necesita una GPU dedicada para 144 FPS estables.');
+    const reloadRow = el('div', 'row', this.body);
+    button('Recargar ahora', reloadRow, () => window.location.reload());
     el('div', 'section-title', this.body, 'Rendimiento');
     this.slider({
       label: 'Escala de resolución',
@@ -309,17 +361,6 @@ export class SettingsMenu {
     });
     this.toggle('Demoliciones entre compañeros', g.friendlyDemos, (v) => {
       g.friendlyDemos = v;
-      changed();
-    });
-    const row = el('div', 'setting toggle', this.body);
-    el('label', '', row, 'Nombre del jugador');
-    const name = el('input', '', row);
-    name.type = 'text';
-    name.maxLength = 16;
-    name.value = g.playerName;
-    name.style.cssText = 'font:inherit;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:#1d2536;color:#fff;';
-    name.addEventListener('change', () => {
-      g.playerName = name.value.trim() || 'Jugador';
       changed();
     });
   }

@@ -10,18 +10,28 @@ const css = files.find((f) => f.endsWith('.css'));
 if (!js || !css) throw new Error('Ejecuta primero "vite build".');
 
 const script = readFileSync(join(assets, js), 'utf8').replace(/<\/script/gi, '<\\/script');
-const style = readFileSync(join(assets, css), 'utf8');
+let style = readFileSync(join(assets, css), 'utf8');
+
+// Los @import deben ir al principio de la hoja de estilos
+const imports = [];
+style = style.replace(/@import\s+url\([^)]*\)[^;]*;/g, (m) => {
+  imports.push(m);
+  return '';
+});
+
+// Marcado del <body> de index.html sin la etiqueta <script> del módulo
+const page = readFileSync(join('dist', 'index.html'), 'utf8');
+const body = page
+  .slice(page.indexOf('<body>') + 6, page.indexOf('</body>'))
+  .replace(/<script[\s\S]*?<\/script>/g, '')
+  .trim();
 
 const html = `<title>Nitro Arena</title>
 <style>
-:root { color-scheme: dark; background: #0b0f18; }
+${imports.join('\n')}
 ${style}
 </style>
-<div id="app">
-  <canvas id="game-canvas"></canvas>
-  <div id="ui-root"></div>
-  <div id="loading">Cargando motor de físicas…</div>
-</div>
+${body}
 <script type="module">
 ${script}
 </script>

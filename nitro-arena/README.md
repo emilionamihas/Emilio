@@ -24,6 +24,26 @@ npm run build
 npm run preview
 ```
 
+## Garaje, perfil y menú
+
+Al arrancar aparece una pantalla de carga y después la portada, con tu coche girando en un garaje 3D (puedes girarlo arrastrando). Desde el menú lateral entras en Jugar, Garaje, Perfil, Controles y Ajustes.
+
+En el garaje hay tres coches. Comparten aceleración, salto y control aéreo, igual que en el juego de referencia; lo que cambia es la carrocería y el hitbox:
+
+| Coche | Hitbox | Cómo se consigue |
+| --- | --- | --- |
+| Vector | Estándar (118 × 84 × 36 cm) | Disponible desde el principio |
+| Talon | Estándar, con carrocería cuadrada | Código secreto |
+| Bastion | Alto (121 × 77 × 42 cm) | Código secreto |
+
+El código se canjea en **Garaje > Código secreto**. También puedes elegir el color de acento. El color principal siempre es el de tu equipo, para que se distinga en el campo.
+
+El perfil guarda tu nombre, tu nivel (XP por partido, victoria, goles, paradas y MVP) y tus estadísticas acumuladas. Todo se guarda en `localStorage`, es decir, en este navegador.
+
+## Calidad gráfica
+
+En **Ajustes > Gráficos** eliges entre dos modos. El modo Realista, que es el predeterminado, usa materiales PBR con reflejos de entorno, pintura con barniz, césped texturizado y un balón con paneles. El modo Rendimiento usa Low-Poly con sombreado plano para equipos modestos. El cambio se aplica al recargar.
+
 ## Controles por defecto
 
 Todo se puede reasignar en **Ajustes > Asignación**, y el perfil se guarda en `localStorage`.
@@ -45,7 +65,7 @@ Todo se puede reasignar en **Ajustes > Asignación**, y el perfil se guarda en `
 | Reiniciar balón (juego libre) | R | R3 | RS |
 | Pausa | Esc | Options | Menu |
 
-Los gatillos son analógicos (acelerador y freno progresivos). Los sticks tienen zona muerta, sensibilidad y zona muerta de dodge configurables.
+Los gatillos son analógicos (acelerador y freno progresivos). En **Controles** puedes ajustar la sensibilidad de dirección, la sensibilidad aérea y la de cámara, la zona muerta de los sticks (en cruz o circular), la de los gatillos y la de dodge, además de invertir el pitch y activar o quitar la vibración.
 
 ## Qué incluye
 
@@ -71,19 +91,22 @@ Los gatillos son analógicos (acelerador y freno progresivos). Los sticks tienen
 
 ```
 src/
-  config/      Constantes físicas calibradas (uu convertidas a metros)
-  core/        GameLoop, PhysicsEngine, InputManager, StorageManager, tipos
+  config/      Constantes físicas calibradas y presets de coches
+  core/        GameLoop, PhysicsEngine, InputManager, StorageManager, Profile, tipos
+  render/      Materiales por calidad, texturas procedurales y garaje 3D (Showroom)
   controls/    GamepadHandler, KeyboardHandler, ControlMapper
-  entities/    Car, Ball, BoostPad, Arena
+  entities/    Car, CarModel, Ball, BoostPad, Arena
   camera/      CameraController, CameraSettings
   game/        Game (orquestador), Match (reglas), Interactions, BotController, GameSettings
   fx/          Particles (InstancedMesh), Trail (estela supersónica)
-  ui/          HUD, SettingsMenu, KeybindMenu, Scoreboard, MainMenu, estilos
+  ui/          HUD, MainMenu, GarageMenu, ProfileMenu, SettingsMenu, KeybindMenu, Scoreboard, estilos
 ```
 
 El orden de cada tick físico es este: entrada del jugador y de los bots, reglas de partida, fuerzas de cada coche (suspensión, conducción, saltos y control aéreo), paso de Rapier, interacciones (impulso de contacto, pinches, bumps y demoliciones), límites de velocidad y recogida de boost.
 
 Para depurar, en la consola del navegador puedes leer `nitro.debugInfo`.
+
+`npm run build:single` genera `dist/nitro-arena.html`, un único archivo con todo incrustado (código, estilos y el motor de físicas) que se puede abrir o publicar como página estática.
 
 ## Límites conocidos
 
@@ -94,3 +117,5 @@ El pinch es un modelo explícito. Rapier no sobrecorrige la penetración como Bu
 En un techo plano te caes, igual que en el original. Solo te mantienes pegado mientras la curvatura de las rampas te dé fuerza centrípeta.
 
 Los menús se manejan con el ratón. El mando sirve para jugar, pausar y reasignar controles, pero no para navegar por los menús.
+
+El código secreto vive en el código del cliente, así que no es una protección real: cualquiera que lea el código fuente lo encuentra. Sirve para desbloquear contenido, no para protegerlo.

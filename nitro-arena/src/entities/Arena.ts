@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { ARENA, BALL, MATERIALS } from '../config/PhysicsConstants';
 import type { PhysicsEngine } from '../core/PhysicsEngine';
+import type { Materials } from '../render/Materials';
+import { grassTexture } from '../render/Textures';
 import { TEAM_COLORS, type Team } from '../core/types';
 
 interface RingSample {
@@ -221,7 +223,11 @@ export class Arena {
   readonly colliders: RAPIER.Collider[] = [];
   private readonly goalGlow: THREE.MeshBasicMaterial[] = [];
 
-  constructor(private readonly physics: PhysicsEngine) {
+  constructor(
+    private readonly physics: PhysicsEngine,
+    private readonly mats: Materials,
+    private readonly maxAnisotropy = 8,
+  ) {
     const mesh = buildArenaMesh();
     this.buildPhysics(mesh);
     this.buildVisuals(mesh);
@@ -281,25 +287,31 @@ export class Arena {
   }
 
   private buildVisuals(mesh: ArenaMesh): void {
-    const floorGeo = this.makeGeometry(mesh, mesh.floorIndices, (_cx, _cy, cz, out) => {
-      const HL = ARENA.HALF_LENGTH;
-      if (Math.abs(cz) > HL) {
-        out.setHex(cz > 0 ? 0x5a3418 : 0x1b3a66);
+    const realistic = this.mats.realistic;
+    const HL = ARENA.HALF_LENGTH;
+    const floorColor = (_x: number, _y: number, z: number, out: THREE.Color): void => {
+      if (Math.abs(z) > HL + 0.01) {
+        out.setHex(z > 0 ? 0x5a3418 : 0x1b3a66);
         return;
       }
-      const stripe = Math.floor((cz + HL) / 6.4) % 2 === 0;
+      const tint = new THREE.Color(z > 0 ? TEAM_COLORS[1] : TEAM_COLORS[0]);
+      if (realistic) {
+        out.setHex(0xffffff).lerp(tint, Math.min(0.16, (Math.abs(z) / HL) * 0.16));
+        return;
+      }
+      const stripe = Math.floor((z + HL) / 6.4) % 2 === 0;
       out.setHex(stripe ? 0x3f8f4a : 0x37803f);
-      const tint = new THREE.Color(cz > 0 ? TEAM_COLORS[1] : TEAM_COLORS[0]);
-      out.lerp(tint, Math.min(0.22, (Math.abs(cz) / HL) * 0.22));
-    });
-    const floor = new THREE.Mesh(
-      floorGeo,
-      new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }),
-    );
+      out.lerp(tint, Math.min(0.22, (Math.abs(z) / HL) * 0.22));
+    };
+    const floorGeo = this.buildGeometry(mesh, mesh.floorIndices, floorColor, realistic);
+    const floorMat = realistic
+      ? this.mats.surface({ map: grassTexture(this.maxAnisotropy), roughness: 0.95 })
+      : this.mats.surface({});
+    const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.receiveShadow = true;
     this.group.add(floor);
 
-    // Parte baja opaca (rampas y zócalo) y parte alta de "cristal" para ver el estadio
+    // Parte baja opaca (rampas y zócalo) y parte alta de cristal para ver el estadio
     const GLASS_FROM = ARENA.GOAL_HEIGHT + 0.5;
     const lower: number[] = [];
     const upper: number[] = [];
@@ -308,36 +320,29 @@ export class Arena {
       for (let k = 0; k < 3; k++) cy += mesh.positions[mesh.shellIndices[t + k] * 3 + 1] / 3;
       (cy < GLASS_FROM ? lower : upper).push(mesh.shellIndices[t], mesh.shellIndices[t + 1], mesh.shellIndices[t + 2]);
     }
-    const shellColor = (cy: number, cz: number, out: THREE.Color): void => {
+    const shellColor = (_x: number, cy: number, cz: number, out: THREE.Color): void => {
       const team = new THREE.Color(cz > 0 ? TEAM_COLORS[1] : TEAM_COLORS[0]);
-      out.setHex(0x3a4766).lerp(team, 0.25 + 0.35 * Math.min(1, Math.abs(cz) / ARENA.HALF_LENGTH));
-      if (cy < ARENA.FILLET_RADIUS) out.lerp(new THREE.Color(0x3f8f4a), 0.45 * (1 - cy / ARENA.FILLET_RADIUS));
+      out.setHex(realistic ? 0x2a3245 : 0x3a4766).lerp(team, 0.25 + 0.35 * Math.min(1, Math.abs(cz) / HL));
+      if (cy < ARENA.FILLET_RADIUS) out.lerp(new THREE.Color(realistic ? 0x356f33 : 0x3f8f4a), 0.55 * (1 - cy / ARENA.FILLET_RADIUS));
+      if (cy > ARENA.HEIGHT - 0.05) out.setHex(0x6d86b8);
     };
-    const lowerGeo = this.makeGeometry(mesh, lower, (_cx, cy, cz, out) => shellColor(cy, cz, out));
-    const shell = new THREE.Mesh(lowerGeo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+    const lowerGeo = this.buildGeometry(mesh, lower, shellColor, realistic);
+    const shell = new THREE.Mesh(lowerGeo, this.mats.surface({ roughness: 0.45, metalness: 0.35 }));
     shell.receiveShadow = true;
     this.group.add(shell);
 
-    const upperGeo = this.makeGeometry(mesh, upper, (_cx, cy, cz, out) => {
-      shellColor(cy, cz, out);
-      if (cy > ARENA.HEIGHT - 0.05) out.setHex(0x6d86b8);
-    });
+    const upperGeo = this.buildGeometry(mesh, upper, shellColor, realistic);
     const glass = new THREE.Mesh(
       upperGeo,
-      new THREE.MeshLambertMaterial({
-        vertexColors: true,
-        flatShading: true,
-        transparent: true,
-        opacity: 0.22,
-        depthWrite: false,
-      }),
+      this.mats.surface({ roughness: 0.05, metalness: 0.2, transparent: true, opacity: realistic ? 0.16 : 0.22 }),
     );
     glass.renderOrder = 2;
     this.group.add(glass);
 
     const edgeMat = new THREE.LineBasicMaterial({ color: 0xb8d0ff, transparent: true, opacity: 0.28 });
-    this.group.add(new THREE.LineSegments(new THREE.EdgesGeometry(lowerGeo, 20), edgeMat));
-    this.group.add(new THREE.LineSegments(new THREE.EdgesGeometry(upperGeo, 20), edgeMat));
+    // Marcos de los paneles (las aristas del perfil de la malla)
+    this.group.add(new THREE.LineSegments(new THREE.EdgesGeometry(lowerGeo.index ? lowerGeo.toNonIndexed() : lowerGeo, 20), edgeMat));
+    this.group.add(new THREE.LineSegments(new THREE.EdgesGeometry(upperGeo.index ? upperGeo.toNonIndexed() : upperGeo, 20), edgeMat));
 
     this.buildFieldLines();
     this.buildGoals();
@@ -367,7 +372,8 @@ export class Arena {
       { r0: 58, r1: 74, y0: -1, y1: 14 },
       { r0: 76, r1: 92, y0: 16, y1: 32 },
     ];
-    const standMat = new THREE.MeshLambertMaterial({ color: 0x2b3147, flatShading: true, side: THREE.DoubleSide });
+    const standMat = this.mats.plastic(0x2b3147);
+    standMat.side = THREE.DoubleSide;
     const crowdPositions: THREE.Vector3[] = [];
     for (const t of tiers) {
       const geo = new THREE.CylinderGeometry(t.r1, t.r0, t.y1 - t.y0, 8, 1, true);
@@ -413,14 +419,49 @@ export class Arena {
     this.group.add(stadium);
   }
 
-  private makeGeometry(
+  /**
+   * Geometría de un subconjunto de triángulos. En calidad realista se comparte
+   * cada vértice (sombreado suave en rampas y esquinas) y se generan UV a partir
+   * de X/Z para el césped; en rendimiento cada triángulo tiene su color (flat).
+   */
+  private buildGeometry(
     mesh: ArenaMesh,
     indices: number[],
-    colorFn: (cx: number, cy: number, cz: number, out: THREE.Color) => void,
+    colorFn: (x: number, y: number, z: number, out: THREE.Color) => void,
+    smooth: boolean,
   ): THREE.BufferGeometry {
+    const color = new THREE.Color();
+    const geo = new THREE.BufferGeometry();
+    if (smooth) {
+      const remap = new Map<number, number>();
+      const pos: number[] = [];
+      const col: number[] = [];
+      const uv: number[] = [];
+      const idx: number[] = [];
+      for (const vi of indices) {
+        let ni = remap.get(vi);
+        if (ni === undefined) {
+          ni = pos.length / 3;
+          remap.set(vi, ni);
+          const x = mesh.positions[vi * 3];
+          const y = mesh.positions[vi * 3 + 1];
+          const z = mesh.positions[vi * 3 + 2];
+          pos.push(x, y, z);
+          colorFn(x, y, z, color);
+          col.push(color.r, color.g, color.b);
+          uv.push(x / 12.8, z / 12.8 + 0.5);
+        }
+        idx.push(ni);
+      }
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      geo.setIndex(idx);
+      geo.computeVertexNormals();
+      return geo;
+    }
     const pos = new Float32Array(indices.length * 3);
     const col = new Float32Array(indices.length * 3);
-    const color = new THREE.Color();
     for (let t = 0; t < indices.length; t += 3) {
       let cx = 0;
       let cy = 0;
@@ -437,7 +478,6 @@ export class Arena {
       colorFn(cx, cy, cz, color);
       for (let k = 0; k < 3; k++) color.toArray(col, (t + k) * 3);
     }
-    const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     geo.computeVertexNormals();
@@ -490,7 +530,7 @@ export class Arena {
     ([0, 1] as Team[]).forEach((team) => {
       const zs = team === 1 ? 1 : -1;
       const color = TEAM_COLORS[team];
-      const postMat = new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.6, flatShading: true });
+      const postMat = this.mats.light(color, 0.9);
       const g = new THREE.Group();
       for (const xs of [1, -1]) {
         const post = new THREE.Mesh(new THREE.CylinderGeometry(ARENA.POST_RADIUS, ARENA.POST_RADIUS, gh, 6), postMat);

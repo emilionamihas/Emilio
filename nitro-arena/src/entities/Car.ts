@@ -4,6 +4,9 @@ import { CAR, GRAVITY, MATERIALS, RULES, type WheelDef } from '../config/Physics
 import type { PhysicsEngine } from '../core/PhysicsEngine';
 import { emptyControls, TEAM_COLORS, type CarControls, type Team } from '../core/types';
 import type { BoostConsumer } from './BoostPad';
+import { buildCarModel } from './CarModel';
+import { presetInertia, type CarPreset } from '../config/CarPresets';
+import type { Materials } from '../render/Materials';
 import { approach, clamp, damp, evalCurve, lerp, projectOnPlane, sign } from '../utils/math';
 
 const LOCAL_FWD = new THREE.Vector3(1, 0, 0);
@@ -124,9 +127,12 @@ export class Car implements BoostConsumer {
     readonly team: Team,
     public name: string,
     readonly isBot: boolean,
+    readonly preset: CarPreset,
+    accent: number,
+    mats: Materials,
   ) {
     const R = physics.R;
-    const [ix, iy, iz] = CAR.INERTIA;
+    const [ix, iy, iz] = presetInertia(preset);
     this.body = physics.world.createRigidBody(
       R.RigidBodyDesc.dynamic()
         .setTranslation(0, CAR.SPAWN_HEIGHT, 0)
@@ -136,8 +142,8 @@ export class Car implements BoostConsumer {
         .setLinearDamping(0)
         .setAngularDamping(0),
     );
-    const [hx, hy, hz] = CAR.HITBOX_HALF;
-    const [ox, oy, oz] = CAR.HITBOX_OFFSET;
+    const [hx, hy, hz] = preset.hitboxHalf;
+    const [ox, oy, oz] = preset.hitboxOffset;
     this.collider = physics.world.createCollider(
       R.ColliderDesc.cuboid(hx, hy, hz)
         .setTranslation(ox, oy, oz)
@@ -150,11 +156,11 @@ export class Car implements BoostConsumer {
     );
     physics.tag(this.collider, { kind: 'car', carId: id });
 
-    const built = buildCarMesh(team);
+    const built = buildCarModel(preset, TEAM_COLORS[team], accent, mats);
     this.group.add(built.root);
     this.flame = built.flame;
     this.flameMat = built.flameMat;
-    CAR.WHEELS.forEach((def, i) => {
+    preset.wheels.forEach((def, i) => {
       this.wheels.push({
         def,
         local: new THREE.Vector3(def.x, 0, def.z),
@@ -653,115 +659,4 @@ export class Car implements BoostConsumer {
       this.flameMat.opacity = 0.75 + Math.random() * 0.25;
     }
   }
-}
-
-interface BuiltCar {
-  root: THREE.Group;
-  wheelPivots: THREE.Object3D[];
-  tires: THREE.Object3D[];
-  flame: THREE.Group;
-  flameMat: THREE.MeshBasicMaterial;
-}
-
-/** Coche Low-Poly flat-shaded (eje X = adelante). */
-function buildCarMesh(team: Team): BuiltCar {
-  const root = new THREE.Group();
-  const teamColor = new THREE.Color(TEAM_COLORS[team]);
-  const bodyMat = new THREE.MeshLambertMaterial({ color: teamColor, flatShading: true });
-  const darkMat = new THREE.MeshLambertMaterial({ color: 0x1b1f27, flatShading: true });
-  const accentMat = new THREE.MeshLambertMaterial({
-    color: teamColor.clone().lerp(new THREE.Color(0xffffff), 0.45),
-    emissive: teamColor,
-    emissiveIntensity: 0.35,
-    flatShading: true,
-  });
-  const glassMat = new THREE.MeshLambertMaterial({ color: 0x0e1622, emissive: 0x0a1a33, flatShading: true });
-
-  const chassisGeo = new THREE.BoxGeometry(1.2, 0.24, 0.8);
-  const cp = chassisGeo.getAttribute('position');
-  for (let i = 0; i < cp.count; i++) {
-    const x = cp.getX(i);
-    const y = cp.getY(i);
-    if (x > 0 && y > 0) cp.setY(i, y - 0.11);
-    if (x > 0) cp.setZ(i, cp.getZ(i) * 0.9);
-  }
-  chassisGeo.computeVertexNormals();
-  const chassis = new THREE.Mesh(chassisGeo, bodyMat);
-  chassis.position.set(0.13, 0.17, 0);
-  chassis.castShadow = true;
-  root.add(chassis);
-
-  const cabinGeo = new THREE.BoxGeometry(0.56, 0.17, 0.66);
-  const cb = cabinGeo.getAttribute('position');
-  for (let i = 0; i < cb.count; i++) {
-    if (cb.getY(i) > 0) {
-      cb.setX(i, cb.getX(i) > 0 ? cb.getX(i) - 0.16 : cb.getX(i) + 0.05);
-      cb.setZ(i, cb.getZ(i) * 0.78);
-    }
-  }
-  cabinGeo.computeVertexNormals();
-  const cabin = new THREE.Mesh(cabinGeo, glassMat);
-  cabin.position.set(-0.02, 0.37, 0);
-  cabin.castShadow = true;
-  root.add(cabin);
-
-  const stripe = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.03, 0.14), accentMat);
-  stripe.position.set(0.12, 0.3, 0);
-  stripe.rotation.z = -0.1;
-  root.add(stripe);
-
-  const spoiler = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.04, 0.78), accentMat);
-  spoiler.position.set(-0.46, 0.44, 0);
-  root.add(spoiler);
-  for (const zs of [1, -1]) {
-    const strut = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.14, 0.04), darkMat);
-    strut.position.set(-0.44, 0.36, zs * 0.28);
-    root.add(strut);
-  }
-  const bumper = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.78), darkMat);
-  bumper.position.set(0.74, 0.1, 0);
-  root.add(bumper);
-
-  const wheelPivots: THREE.Object3D[] = [];
-  const tires: THREE.Object3D[] = [];
-  const tireMat = new THREE.MeshLambertMaterial({ color: 0x15171c, flatShading: true });
-  for (const def of CAR.WHEELS) {
-    const pivot = new THREE.Group();
-    pivot.position.set(def.x, -(CAR.WHEEL_RAY_LENGTH - def.radius), def.z);
-    const tire = new THREE.Group();
-    const tireMesh = new THREE.Mesh(new THREE.CylinderGeometry(def.radius, def.radius, 0.13, 8), tireMat);
-    tireMesh.rotation.x = Math.PI / 2;
-    tireMesh.castShadow = true;
-    const hub = new THREE.Mesh(new THREE.CylinderGeometry(def.radius * 0.55, def.radius * 0.55, 0.135, 5), accentMat);
-    hub.rotation.x = Math.PI / 2;
-    tire.add(tireMesh, hub);
-    pivot.add(tire);
-    root.add(pivot);
-    wheelPivots.push(pivot);
-    tires.push(tire);
-  }
-
-  const flame = new THREE.Group();
-  const flameMat = new THREE.MeshBasicMaterial({
-    color: team === 0 ? 0x7fd0ff : 0xffb347,
-    transparent: true,
-    opacity: 0.9,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-  });
-  const outer = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.7, 6), flameMat);
-  outer.rotation.z = Math.PI / 2;
-  outer.position.x = -0.35;
-  const inner = new THREE.Mesh(
-    new THREE.ConeGeometry(0.06, 0.4, 5),
-    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }),
-  );
-  inner.rotation.z = Math.PI / 2;
-  inner.position.x = -0.22;
-  flame.add(outer, inner);
-  flame.position.set(-0.5, 0.2, 0);
-  flame.visible = false;
-  root.add(flame);
-
-  return { root, wheelPivots, tires, flame, flameMat };
 }

@@ -89,8 +89,11 @@ export class GamepadHandler {
     return this.pad?.axes[index] ?? 0;
   }
 
-  /** Valor 0..1 de un binding de mando con zonas muertas y sensibilidad. */
-  value(b: PadBinding, stickDeadzone: number, triggerDeadzone: number, sensitivity: number): number {
+  /**
+   * Valor 0..1 de un binding de mando tras la zona muerta (sin sensibilidad).
+   * Con zona muerta circular se usa la magnitud del stick completo (ejes 0-1 y 2-3).
+   */
+  value(b: PadBinding, stickDeadzone: number, triggerDeadzone: number, shape: 'cruz' | 'circular'): number {
     if (!this.pad) return 0;
     if (b.type === 'button') {
       const v = this.button(b.index);
@@ -100,9 +103,16 @@ export class GamepadHandler {
       return isTrigger ? Math.min(1, (v - dz) / (1 - dz)) : 1;
     }
     const raw = this.axis(b.index) * b.dir;
+    if (raw <= 0) return 0;
+    if (shape === 'circular' && b.index < 4) {
+      const other = this.axis(b.index ^ 1);
+      const mag = Math.hypot(raw, other);
+      if (mag <= stickDeadzone) return 0;
+      const scale = (mag - stickDeadzone) / (1 - stickDeadzone) / mag;
+      return Math.min(1, raw * scale);
+    }
     if (raw <= stickDeadzone) return 0;
-    const scaled = ((raw - stickDeadzone) / (1 - stickDeadzone)) * sensitivity;
-    return Math.min(1, scaled);
+    return Math.min(1, (raw - stickDeadzone) / (1 - stickDeadzone));
   }
 
   private rumbleUnsupported = false;

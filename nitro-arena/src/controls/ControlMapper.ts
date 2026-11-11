@@ -41,7 +41,15 @@ export interface ControlProfile {
   stickDeadzone: number;
   triggerDeadzone: number;
   dodgeDeadzone: number;
-  sensitivity: number;
+  /** Forma de la zona muerta del stick: por eje (cruz) o radial (circular) */
+  deadzoneShape: 'cruz' | 'circular';
+  /** Multiplicador del giro en el suelo */
+  steeringSensitivity: number;
+  /** Multiplicador de pitch, yaw y roll en el aire */
+  aerialSensitivity: number;
+  /** Multiplicador del giro de cámara con el stick derecho / teclas */
+  lookSensitivity: number;
+  invertPitch: boolean;
   ballCamToggle: boolean;
   vibration: boolean;
 }
@@ -105,7 +113,11 @@ export function defaultProfile(): ControlProfile {
     stickDeadzone: 0.12,
     triggerDeadzone: 0.05,
     dodgeDeadzone: 0.5,
-    sensitivity: 1.3,
+    deadzoneShape: 'cruz',
+    steeringSensitivity: 1.0,
+    aerialSensitivity: 1.0,
+    lookSensitivity: 1.0,
+    invertPitch: false,
     ballCamToggle: true,
     vibration: true,
   };
