@@ -49,20 +49,25 @@ export class Interactions {
       if (car.demolished) continue;
       if (!this.physics.touching(car.collider, this.ball.collider)) continue;
       const tick = this.physics.tick;
+      // Toque nuevo (estadísticas y eventos) si no había contacto en el tick anterior
       const isNewTouch = tick - car.lastBallTouchTick > 1;
       car.lastBallTouchTick = tick;
       const t = car.body.translation();
       const carPos = new THREE.Vector3(t.x, t.y, t.z);
 
-      if (isNewTouch) {
+      // Como RocketSim: mientras dura el contacto, el impulso extra se reaplica
+      // cada 2 ticks. Son los micro-empujones que sostienen dribbles y air dribbles.
+      let relSpeed = 0;
+      if (tick > car.lastExtraImpulseTick + 1 || car.lastExtraImpulseTick > tick) {
+        car.lastExtraImpulseTick = tick;
         const rel = new THREE.Vector3().subVectors(this.ball.velPre, car.velPre);
-        const relSpeed = Math.min(rel.length(), BALL_HIT.MAX_REL_SPEED);
-        if (relSpeed > 0.01) {
+        relSpeed = Math.min(rel.length(), BALL_HIT.MAX_REL_SPEED);
+        if (relSpeed > 0) {
           const n = new THREE.Vector3().subVectors(ballPos, carPos);
           n.y *= BALL_HIT.VERTICAL_SCALE;
-          n.addScaledVector(car.fwd, -BALL_HIT.FORWARD_ADJUST * n.dot(car.fwd));
-          if (n.lengthSq() > 1e-6) {
+          if (n.lengthSq() > 1e-8) {
             n.normalize();
+            n.addScaledVector(car.fwd, -BALL_HIT.FORWARD_ADJUST * n.dot(car.fwd)).normalize();
             const scale = evalCurve(BALL_HIT.SCALE_CURVE, relSpeed);
             const v = this.ball.body.linvel();
             this.ball.body.setLinvel(
@@ -71,6 +76,9 @@ export class Interactions {
             );
           }
         }
+      }
+      if (isNewTouch) {
+        if (relSpeed === 0) relSpeed = Math.min(this.ball.velPre.distanceTo(car.velPre), BALL_HIT.MAX_REL_SPEED);
         this.events.onBallTouch(car, relSpeed, this.ball.velPre.clone());
       }
       this.processPinch(car, carPos, ballPos, time);

@@ -87,6 +87,7 @@ export class Car implements BoostConsumer {
   demolished = false;
   respawnTimer = 0;
   lastBallTouchTick = -100;
+  lastExtraImpulseTick = -100;
   private prevJump = false;
   private wasOnGround = false;
 

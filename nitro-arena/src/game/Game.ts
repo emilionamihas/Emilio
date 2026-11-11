@@ -286,7 +286,7 @@ export class Game {
     this.hud.setScores(0, 0);
     if (mode === 'freeplay') {
       this.hud.setClockText('LIBRE');
-      this.hud.showSub('Juego libre · R / R3 reinicia el balón', 4);
+      this.hud.showSub('Juego libre · R reinicia · T lanza el balón para air dribbles', 5);
     }
     this.menu.showMain(false);
     this.menu.showPause(false);
@@ -324,6 +324,24 @@ export class Game {
     this.paused = p;
     this.menu.showPause(p);
     this.input.syncEdges();
+  }
+
+  /**
+   * Juego libre: coloca el balón delante del coche y lo lanza hacia arriba,
+   * con algo de velocidad hacia el coche, para practicar air dribbles.
+   */
+  private launchBallForPlayer(car: Car): void {
+    const fwd = new THREE.Vector3(car.fwd.x, 0, car.fwd.z);
+    if (fwd.lengthSq() < 0.01) fwd.set(0, 0, 1);
+    fwd.normalize();
+    const pos = car.currPos.clone().addScaledVector(fwd, 7);
+    pos.x = THREE.MathUtils.clamp(pos.x, -ARENA.HALF_WIDTH + 6, ARENA.HALF_WIDTH - 6);
+    pos.z = THREE.MathUtils.clamp(pos.z, -ARENA.HALF_LENGTH + 6, ARENA.HALF_LENGTH - 6);
+    pos.y = BALL.RADIUS + 0.4;
+    const vel = fwd.clone().multiplyScalar(-1.5).add(new THREE.Vector3(0, 8.5, 0));
+    this.ball.visible = true;
+    this.ball.setFrozen(false);
+    this.ball.launch(pos, vel);
   }
 
   /** Fin del partido: resultados, MVP y estadísticas del perfil. */
@@ -396,6 +414,7 @@ export class Game {
       this.cameraCtl.ballCam = this.cameraSettings.ballCamDefault ? !fi.ballCamHeld : fi.ballCamHeld;
     }
 
+    if (this.match.isFreeplay && fi.launchPressed && this.player && !this.player.demolished) this.launchBallForPlayer(this.player);
     if (this.match.isFreeplay && fi.resetPressed) {
       this.match.setupKickoff(this.cars);
       this.pads.reset();

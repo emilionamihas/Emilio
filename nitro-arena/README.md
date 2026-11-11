@@ -63,6 +63,7 @@ Todo se puede reasignar en **Ajustes > Asignación**, y el perfil se guarda en `
 | Mirar alrededor | J L I K | Stick der. | Stick der. |
 | Marcador | Tab | Share / Create | View |
 | Reiniciar balón (juego libre) | R | R3 | RS |
+| Lanzar balón para air dribbles (juego libre) | T | D-Pad ↑ | D-Pad ↑ |
 | Pausa | Esc | Options | Menu |
 
 Los gatillos son analógicos (acelerador y freno progresivos). En **Controles** puedes ajustar la sensibilidad de dirección, la sensibilidad aérea y la de cámara, la zona muerta de los sticks (en cruz o circular), la de los gatillos y la de dodge, además de invertir el pitch y activar o quitar la vibración.
@@ -75,9 +76,11 @@ Los gatillos son analógicos (acelerador y freno progresivos). En **Controles** 
 
 **Flip reset.** Los rayos de las ruedas también detectan el balón. Si las cuatro ruedas tocan cualquier superficie en el aire (balón, pared o techo), recuperas el dodge sin temporizador.
 
-**Contacto coche-balón.** Además de la colisión de Rapier (coche 180, balón 30, fricción 2,0 y restitución 0), se aplica el impulso extra que depende de la velocidad relativa, con la misma fórmula que ha medido la comunidad. Como el coche es un cuerpo rígido que gira, los flicks (musty, breezi, scoop) y los toques suaves de los air dribbles salen de la propia física.
+**Contacto coche-balón.** Además de la colisión de Rapier (coche 180, balón 30, fricción 2,0 y restitución 0), se aplica el impulso extra que depende de la velocidad relativa, con la misma fórmula que ha medido la comunidad. Igual que en RocketSim, mientras el contacto dura ese impulso se reaplica cada 2 ticks: son los micro-empujones que sostienen dribbles y air dribbles. Como el coche es un cuerpo rígido que gira, los flicks (musty, breezi, scoop) y los toques suaves de los air dribbles salen de la propia física.
 
 **Pinches.** Cuando el balón queda atrapado entre el coche y una superficie (pared, suelo o poste), la velocidad de cierre se libera en la dirección tangente de menor resistencia.
+
+**Techo.** Es sólido, con paneles y tiras de luz. Si subes por la pared y las ruedas tocan el techo, al caer conservas el dodge sin límite de tiempo (ceiling shot). En un techo plano te caes, igual que en el original.
 
 **Arena.** Octógono con chaflanes a 45°, esquinas redondeadas, rampas curvas entre suelo y pared y entre pared y techo, y porterías profundas con postes y larguero sólidos. Es una sola malla que sirve a la vez de collider trimesh y de geometría visible. Hay 36 boost pads: 6 grandes (100 %, 10 s) y 30 pequeños (12 %, 4 s).
 

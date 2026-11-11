@@ -311,20 +311,24 @@ export class Arena {
     floor.receiveShadow = true;
     this.group.add(floor);
 
-    // Parte baja opaca (rampas y zócalo) y parte alta de cristal para ver el estadio
+    // Tres zonas: zócalo opaco (rampas y parte baja), cristal en la parte alta
+    // de las paredes, y techo sólido (curva pared-techo + techo plano) para que
+    // se vea dónde se puede rodar y hacer ceiling shots.
     const GLASS_FROM = ARENA.GOAL_HEIGHT + 0.5;
+    const ROOF_FROM = ARENA.HEIGHT - ARENA.FILLET_RADIUS * 0.35;
     const lower: number[] = [];
     const upper: number[] = [];
+    const roof: number[] = [];
     for (let t = 0; t < mesh.shellIndices.length; t += 3) {
       let cy = 0;
       for (let k = 0; k < 3; k++) cy += mesh.positions[mesh.shellIndices[t + k] * 3 + 1] / 3;
-      (cy < GLASS_FROM ? lower : upper).push(mesh.shellIndices[t], mesh.shellIndices[t + 1], mesh.shellIndices[t + 2]);
+      const target = cy < GLASS_FROM ? lower : cy < ROOF_FROM ? upper : roof;
+      target.push(mesh.shellIndices[t], mesh.shellIndices[t + 1], mesh.shellIndices[t + 2]);
     }
     const shellColor = (_x: number, cy: number, cz: number, out: THREE.Color): void => {
       const team = new THREE.Color(cz > 0 ? TEAM_COLORS[1] : TEAM_COLORS[0]);
       out.setHex(realistic ? 0x2a3245 : 0x3a4766).lerp(team, 0.25 + 0.35 * Math.min(1, Math.abs(cz) / HL));
       if (cy < ARENA.FILLET_RADIUS) out.lerp(new THREE.Color(realistic ? 0x356f33 : 0x3f8f4a), 0.55 * (1 - cy / ARENA.FILLET_RADIUS));
-      if (cy > ARENA.HEIGHT - 0.05) out.setHex(0x6d86b8);
     };
     const lowerGeo = this.buildGeometry(mesh, lower, shellColor, realistic);
     const shell = new THREE.Mesh(lowerGeo, this.mats.surface({ roughness: 0.45, metalness: 0.35 }));
@@ -334,19 +338,47 @@ export class Arena {
     const upperGeo = this.buildGeometry(mesh, upper, shellColor, realistic);
     const glass = new THREE.Mesh(
       upperGeo,
-      this.mats.surface({ roughness: 0.05, metalness: 0.2, transparent: true, opacity: realistic ? 0.16 : 0.22 }),
+      this.mats.surface({ roughness: 0.05, metalness: 0.2, transparent: true, opacity: realistic ? 0.2 : 0.26 }),
     );
     glass.renderOrder = 2;
     this.group.add(glass);
 
+    const roofColor = (_x: number, _y: number, z: number, out: THREE.Color): void => {
+      const team = new THREE.Color(z > 0 ? TEAM_COLORS[1] : TEAM_COLORS[0]);
+      out.setHex(0x5a6684).lerp(team, 0.15 + 0.2 * Math.min(1, Math.abs(z) / HL));
+    };
+    const roofGeo = this.buildGeometry(mesh, roof, roofColor, realistic);
+    const roofMesh = new THREE.Mesh(roofGeo, this.mats.surface({ roughness: 0.6, metalness: 0.4 }));
+    this.group.add(roofMesh);
+    this.buildCeilingLights();
+
     const edgeMat = new THREE.LineBasicMaterial({ color: 0xb8d0ff, transparent: true, opacity: 0.28 });
     // Marcos de los paneles (las aristas del perfil de la malla)
-    this.group.add(new THREE.LineSegments(new THREE.EdgesGeometry(lowerGeo.index ? lowerGeo.toNonIndexed() : lowerGeo, 20), edgeMat));
-    this.group.add(new THREE.LineSegments(new THREE.EdgesGeometry(upperGeo.index ? upperGeo.toNonIndexed() : upperGeo, 20), edgeMat));
+    for (const g of [lowerGeo, upperGeo, roofGeo]) {
+      this.group.add(new THREE.LineSegments(new THREE.EdgesGeometry(g.index ? g.toNonIndexed() : g, 20), edgeMat));
+    }
 
     this.buildFieldLines();
     this.buildGoals();
     this.buildStadium();
+  }
+
+  /** Rejilla de tiras de luz en el techo y una franja marcando el borde. */
+  private buildCeilingLights(): void {
+    const y = ARENA.HEIGHT - 0.03;
+    const mat = this.mats.light(0xe8f0ff, 1.6);
+    const strips = new THREE.Group();
+    for (let x = -24; x <= 24; x += 12) {
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.04, 70), mat);
+      strip.position.set(x, y, 0);
+      strips.add(strip);
+    }
+    for (let z = -36; z <= 36; z += 18) {
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(56, 0.04, 0.35), mat);
+      strip.position.set(0, y - 0.01, z);
+      strips.add(strip);
+    }
+    this.group.add(strips);
   }
 
   /** Gradas Low-Poly con público instanciado y cielo en degradado (solo decorado). */

@@ -23,6 +23,7 @@ export type ActionId =
   | 'lookDown'
   | 'scoreboard'
   | 'resetShot'
+  | 'launchBall'
   | 'pause';
 
 export type PadBinding =
@@ -80,6 +81,7 @@ export const ACTIONS: readonly ActionMeta[] = [
   { id: 'lookDown', label: 'Mirar abajo', group: 'Cámara' },
   { id: 'scoreboard', label: 'Marcador', group: 'Interfaz' },
   { id: 'resetShot', label: 'Reiniciar balón (Juego libre)', group: 'Interfaz' },
+  { id: 'launchBall', label: 'Lanzar balón para air dribble (Juego libre)', group: 'Interfaz' },
   { id: 'pause', label: 'Pausa', group: 'Interfaz' },
 ];
 
@@ -108,6 +110,7 @@ export function defaultProfile(): ControlProfile {
       lookDown: { keys: ['KeyK'], pad: [axis(3, 1)] },
       scoreboard: { keys: ['Tab'], pad: [btn(8)] },
       resetShot: { keys: ['KeyR'], pad: [btn(11)] },
+      launchBall: { keys: ['KeyT'], pad: [btn(12)] },
       pause: { keys: ['Escape'], pad: [btn(9)] },
     },
     stickDeadzone: 0.12,

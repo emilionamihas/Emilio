@@ -14,6 +14,7 @@ export interface FrameInput {
   scoreboardHeld: boolean;
   pausePressed: boolean;
   resetPressed: boolean;
+  launchPressed: boolean;
   lastDevice: 'keyboard' | 'gamepad';
 }
 
@@ -107,6 +108,7 @@ export class InputManager {
       scoreboardHeld: this.value('scoreboard') > 0.5,
       pausePressed: this.pressed('pause'),
       resetPressed: this.pressed('resetShot'),
+      launchPressed: this.pressed('launchBall'),
       lastDevice: this.lastDevice,
     };
     this.keyboard.endSample();
