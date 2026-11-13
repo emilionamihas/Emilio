@@ -2319,7 +2319,10 @@ export class Environment {
     this.scene.add(ground);
     this.shootables.push(ground);
     const M = (o) => new THREE.MeshStandardMaterial(o);
-    const add = (mesh, collide = true) => {
+    // Se coloca la pieza ANTES de calcular su caja de colisión (si no, la caja queda en el origen:
+    // una pared invisible en la glorieta del centro)
+    const add = (mesh, collide = true, at = null) => {
+      if (at) mesh.position.set(...at);
       mesh.castShadow = mesh.receiveShadow = true;
       this.scene.add(mesh);
       this.allColliders.push(mesh);
@@ -2339,10 +2342,9 @@ export class Environment {
     const glass = this.facadeStyles.glass ? this.facadeStyles.glass[0] : M({ color: 0x5f7f99, metalness: 0.6, roughness: 0.2 });
     const tGeo = new THREE.BoxGeometry(160, 14, 30);
     Environment.meterUV(tGeo, 160, 14, 30, ...(glass.userData.tile || [8, 4]));
-    const term = add(new THREE.Mesh(tGeo, glass));
-    term.position.set(-385, y0 + 7, 672);
-    add(new THREE.Mesh(new THREE.BoxGeometry(164, 1.2, 36), this.corniceMat)).position.set(-385, y0 + 14.6, 672);
-    add(new THREE.Mesh(new THREE.BoxGeometry(120, 0.5, 8), M({ color: 0xeeeeee, roughness: 0.5 })), false).position.set(-385, y0 + 5, 653);
+    add(new THREE.Mesh(tGeo, glass), true, [-385, y0 + 7, 672]);
+    add(new THREE.Mesh(new THREE.BoxGeometry(164, 1.2, 36), this.corniceMat), true, [-385, y0 + 14.6, 672]);
+    add(new THREE.Mesh(new THREE.BoxGeometry(120, 0.5, 8), M({ color: 0xeeeeee, roughness: 0.5 })), false, [-385, y0 + 5, 653]);
     const sign = signTexture('AEROPUERTO DE PUERTO SOMBRA', '#0d3c75', '#fff', { w: 1024, h: 96 });
     const signMat = M({ map: sign, emissive: 0xffffff, emissiveMap: sign, emissiveIntensity: 0.4 });
     this.airportSignMat = signMat;
@@ -2351,19 +2353,16 @@ export class Environment {
     signMesh.rotation.y = Math.PI;
     this.scene.add(signMesh);
     // Torre de control
-    const tower = add(new THREE.Mesh(new THREE.CylinderGeometry(2.6, 3.4, 32, 16), M({ color: 0xd8d8d0, roughness: 0.6 })));
-    tower.position.set(-185, y0 + 16, 678);
-    const cab = add(new THREE.Mesh(new THREE.CylinderGeometry(6, 4.5, 5, 12), M({ color: 0x223a4a, metalness: 0.7, roughness: 0.1 })), false);
-    cab.position.set(-185, y0 + 34.5, 678);
-    add(new THREE.Mesh(new THREE.CylinderGeometry(6.6, 6.6, 0.8, 12), M({ color: 0xeeeeee })), false).position.set(-185, y0 + 37.4, 678);
+    add(new THREE.Mesh(new THREE.CylinderGeometry(2.6, 3.4, 32, 16), M({ color: 0xd8d8d0, roughness: 0.6 })), true, [-185, y0 + 16, 678]);
+    add(new THREE.Mesh(new THREE.CylinderGeometry(6, 4.5, 5, 12), M({ color: 0x223a4a, metalness: 0.7, roughness: 0.1 })), false, [-185, y0 + 34.5, 678]);
+    add(new THREE.Mesh(new THREE.CylinderGeometry(6.6, 6.6, 0.8, 12), M({ color: 0xeeeeee })), false, [-185, y0 + 37.4, 678]);
     this.beaconMat = M({ color: 0x550000, emissive: 0xff2a1a, emissiveIntensity: 1 });
-    add(new THREE.Mesh(new THREE.SphereGeometry(0.6, 8, 6), this.beaconMat), false).position.set(-185, y0 + 38.6, 678);
+    add(new THREE.Mesh(new THREE.SphereGeometry(0.6, 8, 6), this.beaconMat), false, [-185, y0 + 38.6, 678]);
     // Hangares con tejado curvo; el primero es la tienda de aviones
     const hangarMat = M({ color: 0x90a4ae, metalness: 0.5, roughness: 0.5 });
     for (const [hx, label] of [[-560, 'AERONAVES SOMBRA'], [-505, 'HANGAR 2'], [-140, 'CARGA']]) {
       const hw = 46;
-      const walls = add(new THREE.Mesh(new THREE.BoxGeometry(hw, 9, 38), hangarMat));
-      walls.position.set(hx, y0 + 4.5, 672);
+      add(new THREE.Mesh(new THREE.BoxGeometry(hw, 9, 38), hangarMat), true, [hx, y0 + 4.5, 672]);
       const roof = new THREE.Mesh(new THREE.CylinderGeometry(hw / 2, hw / 2, 38, 24, 1, false, -Math.PI / 2, Math.PI), hangarMat);
       roof.rotation.x = Math.PI / 2;
       roof.rotation.z = Math.PI / 2;
