@@ -5,8 +5,8 @@
   'use strict';
   const { FORMATS, assignSlots, slotKeys } = root.FTScoring;
 
-  const KEY = 'fantasyteam:data:v1';
-  const SESSION_KEY = 'fantasyteam:session:v1';
+  const KEY = 'fantasyteam:data:v2';
+  const SESSION_KEY = 'fantasyteam:session:v2';
   const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
   const r1 = (n) => Math.round((Number(n) || 0) * 10) / 10;
@@ -82,10 +82,11 @@
     const byId = Object.fromEntries(players.map((p) => [p.id, p]));
     const posOf = (id) => byId[id] && byId[id].pos;
 
-    const mk = (id, username, teamName, squad, formation, starters, captainId, daysAgo) => {
+    // Cada mánager es también un jugador de la plantilla (playerId).
+    const mk = (id, playerId, teamName, squad, formation, starters, captainId, daysAgo) => {
       const cost = squad.reduce((a, pid) => a + byId[pid].value, 0);
       return {
-        id, username, teamName,
+        id, username: byId[playerId].name, playerId, teamName,
         joinedAt: now - daysAgo * 86400000,
         money: r1(budget - cost),
         squad, formation,
@@ -95,9 +96,9 @@
     };
 
     const managers = [
-      mk('m_demo1', 'carlos', 'Los Galácticos', ['p01', 'p03', 'p04', 'p05', 'p07', 'p08', 'p10', 'p11'], '3-2-1', ['p01', 'p03', 'p04', 'p05', 'p07', 'p08', 'p10'], 'p10', 12),
-      mk('m_demo2', 'lucia', 'Atlético Barrio', ['p02', 'p03', 'p05', 'p07', 'p09', 'p10', 'p12'], '2-2-2', ['p02', 'p03', 'p05', 'p07', 'p09', 'p10', 'p12'], 'p07', 11),
-      mk('m_demo3', 'pedro', 'Real Sofá', ['p01', 'p04', 'p05', 'p06', 'p08', 'p09', 'p11', 'p12'], '3-1-2', ['p01', 'p04', 'p05', 'p06', 'p08', 'p11', 'p12'], 'p11', 10),
+      mk('m_demo1', 'p10', 'Los Galácticos', ['p01', 'p03', 'p04', 'p05', 'p07', 'p08', 'p10', 'p11'], '3-2-1', ['p01', 'p03', 'p04', 'p05', 'p07', 'p08', 'p10'], 'p10', 12),
+      mk('m_demo2', 'p07', 'Atlético Barrio', ['p02', 'p03', 'p05', 'p07', 'p09', 'p10', 'p12'], '2-2-2', ['p02', 'p03', 'p05', 'p07', 'p09', 'p10', 'p12'], 'p07', 11),
+      mk('m_demo3', 'p01', 'Real Sofá', ['p01', 'p04', 'p05', 'p06', 'p08', 'p09', 'p11', 'p12'], '3-1-2', ['p01', 'p04', 'p05', 'p06', 'p08', 'p11', 'p12'], 'p11', 10),
     ];
 
     const stats = {};

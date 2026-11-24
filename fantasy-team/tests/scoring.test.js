@@ -39,7 +39,8 @@ assert.strictEqual(seed.matchdays.length, 1);
 assert.match(seed.league.code, /^FT-[A-Z2-9]{6}$/);
 const md = seed.matchdays[0];
 const totals = Object.fromEntries(seed.managers.map((m) => [m.username, SC.lineupPoints(md.lineups[m.id], md.stats).total]));
-assert.deepStrictEqual(totals, { carlos: 45, lucia: 42, pedro: 22 });
+assert.deepStrictEqual(totals, { 'Carlos Vega': 45, 'Sergio Navarro': 42, 'Martín Ríos': 22 });
+seed.managers.forEach((m) => assert.strictEqual(seed.players.find((p) => p.id === m.playerId).name, m.username, 'cada mánager es un jugador'));
 seed.managers.forEach((m) => assert.ok(m.money >= 0, `${m.username} con saldo negativo`));
 
 console.log('OK: todas las pruebas de puntuación pasan', totals);

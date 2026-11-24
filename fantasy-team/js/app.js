@@ -8,6 +8,8 @@
 
   // Aviso: en una app sin servidor esta clave viaja en el código del navegador.
   const ADMIN_PASSWORD = 'secretteam';
+  // Valor de mercado con el que entra quien se registra; el admin lo ajusta luego.
+  const NEW_PLAYER_VALUE = 6;
 
   let S = Store.load();
   let session = Store.loadSession();
@@ -50,6 +52,9 @@
   const starters = (m) => SC.slotKeys(m.formation).map((k) => m.slots[k]).filter(Boolean);
   const squadValue = (m) => r1(m.squad.reduce((a, id) => a + ((getPlayer(id) || {}).value || 0), 0));
   const ownersCount = (pid) => S.managers.filter((m) => m.squad.includes(pid)).length;
+
+  const linkedPlayer = (m) => (m && m.playerId ? getPlayer(m.playerId) : null);
+  const linkedPos = (m) => { const p = linkedPlayer(m); return p ? ` · ${p.pos}` : ''; };
 
   function persist() {
     if (!Store.save(S)) toast('No se pudieron guardar los cambios en este dispositivo', 'error');
@@ -238,6 +243,7 @@
   }
 
   function appUrl() {
+    if (window.FT_EMBEDDED) return '';
     return /^https?:/.test(location.protocol) ? location.origin + location.pathname : '';
   }
 
@@ -245,7 +251,7 @@
     const L = S.league;
     const url = appUrl();
     return `¡Hola! Te invito a nuestra liga privada "${L.name}" en FantasyTeam.\n\n` +
-      `Entra en FantasyTeam${url ? ` (${url})` : ''}, ve a "Acceso para mánagers" y usa este código de liga:\n\n` +
+      `Entra en FantasyTeam${url ? ` (${url})` : ''}, ve a "Acceso para mánagers", pon tu nombre y tu posición y usa este código de liga:\n\n` +
       `${L.code}\n\n` +
       `Empiezas con ${fmtM(L.budget)} para fichar a los jugadores del equipo y armar tu ${FORMATS[L.format].label}. Nos vemos en la clasificación.`;
   }
@@ -307,13 +313,16 @@
         <form id="join-form" class="form" autocomplete="off" novalidate>
           <label>Código de acceso de liga
             <input class="input code-input" name="code" required placeholder="FT-XXXXXX" autocapitalize="characters" spellcheck="false" maxlength="12"></label>
-          <label>Nombre de usuario
-            <input class="input" name="username" required maxlength="20" placeholder="p. ej. carlos" autocapitalize="none" spellcheck="false"></label>
+          <label>Tu nombre y apellido
+            <input class="input" name="username" required maxlength="40" placeholder="p. ej. Carlos Vega" autocomplete="name"></label>
+          <fieldset><legend>Tu posición en el equipo</legend>
+            <div class="seg">${POSITIONS.map((pos) => radio('pos', pos, pos, false)).join('')}</div>
+            <small class="muted field-help">Entras también como jugador del mercado: tus compañeros podrán ficharte.</small></fieldset>
           <label>Nombre de tu equipo
             <input class="input" name="teamName" required maxlength="28" placeholder="p. ej. Los Galácticos"></label>
           <button class="btn btn-primary btn-block btn-lg" type="submit">${icon('ball')}Entrar a la liga</button>
         </form>
-        ${L && L.isDemo ? `<div class="hint">${icon('info')}<div>Hay una liga de ejemplo cargada. Usa el código <button type="button" class="code-chip" data-action="fill-demo">${esc(L.code)}</button> con el usuario <b>carlos</b> y el equipo <b>Los Galácticos</b>, o regístrate con un usuario nuevo.</div></div>` : ''}
+        ${L && L.isDemo ? `<div class="hint">${icon('info')}<div>Hay una liga de ejemplo cargada. Toca el código <button type="button" class="code-chip" data-action="fill-demo">${esc(L.code)}</button> para entrar como <b>Carlos Vega</b> (Los Galácticos), o regístrate con tu nombre y tu posición.</div></div>` : ''}
         ${!L ? `<div class="hint hint-warn">${icon('alert')}<div>Todavía no hay ninguna liga creada en este dispositivo. El administrador debe crearla desde el Panel Admin.</div></div>` : ''}
       </section>
 
@@ -331,7 +340,7 @@
     const tabs = [['equipo', 'Mi equipo', 'shirt'], ['mercado', 'Mercado', 'cart'], ['ranking', 'Ranking', 'trophy'], ['jornadas', 'Jornadas', 'calendar']];
     const views = { equipo: mgrTeam, mercado: mgrMarket, ranking: viewRanking, jornadas: viewMatchdays };
     const body = (views[ui.mgrTab] || mgrTeam)(m);
-    return topbar(`<div class="who"><b>${esc(m.teamName)}</b><small>@${esc(m.username)}</small></div>
+    return topbar(`<div class="who"><b>${esc(m.teamName)}</b><small>${esc(m.username)}</small></div>
         <button type="button" class="icon-btn" data-action="logout" aria-label="Cerrar sesión" title="Cerrar sesión">${icon('logout')}</button>`) +
       `<main class="page">${body}</main>` + bottomNav(tabs, ui.mgrTab, 'mgr-tab');
   }
@@ -353,7 +362,13 @@
 
     const squad = m.squad.map(getPlayer).filter(Boolean).sort((a, b) => posOrder(a.pos) - posOrder(b.pos) || b.value - a.value);
 
-    return `
+    const myP = linkedPlayer(m);
+    const myCard = myP ? `<section class="me-card">
+        ${avatar(myP)}
+        <div class="li-main"><small>Tu ficha como jugador</small><b>${esc(myP.name)} ${posBadge(myP.pos)} ${statusTag(myP)}</b>
+          <small>${fmtM(myP.value)} · ${playerPoints(myP.id).total} pts · en ${ownersCount(myP.id)} equipo${ownersCount(myP.id) === 1 ? '' : 's'}${m.squad.includes(myP.id) ? ' (incluido el tuyo)' : ''}</small></div>
+      </section>` : '';
+    return `${myCard}
     <section class="stats-grid">
       ${stat('Presupuesto', fmtM(m.money), 'disponible', 'accent')}
       ${stat('Plantilla', `${m.squad.length}/${max}`, `valor ${fmtM(squadValue(m))}`)}
@@ -402,7 +417,7 @@
     const pid = m.slots[key];
     const p = pid && getPlayer(pid);
     if (!p) {
-      return `<button type="button" class="slot empty" data-action="slot" data-slot="${key}" aria-label="Elegir ${POS_LABEL[pos]}">
+      return `<button type="button" class="slot is-empty" data-action="slot" data-slot="${key}" aria-label="Elegir ${POS_LABEL[pos]}">
         <span class="shirt-empty">${icon('plus')}</span><span class="slot-name">${pos}</span></button>`;
     }
     const cap = m.captainId === pid;
@@ -495,7 +510,7 @@
     const podium = st.length >= 3 ? `<div class="podium">${[st[1], st[0], st[2]].map((r, i) => `
         <div class="pod pod-${[2, 1, 3][i]} ${m && r.m.id === m.id ? 'me' : ''}">
           <div class="pod-badge">${[2, 1, 3][i]}</div>
-          <b>${esc(r.m.teamName)}</b><small>@${esc(r.m.username)}</small>
+          <b>${esc(r.m.teamName)}</b><small>${esc(r.m.username)}</small>
           <div class="pod-bar"><span>${r.total}</span><small>pts</small></div>
         </div>`).join('')}</div>` : '';
     return `<section class="card">
@@ -506,7 +521,7 @@
         <div class="tr th" role="row"><span>#</span><span>Equipo</span><span class="num">Últ.</span><span class="num">Total</span></div>
         ${st.map((r) => `<div class="tr ${m && r.m.id === m.id ? 'me' : ''}" role="row">
           <span class="rank r-${r.rank}">${r.rank}</span>
-          <span class="team"><b>${esc(r.m.teamName)}</b><small>@${esc(r.m.username)}</small></span>
+          <span class="team"><b>${esc(r.m.teamName)}</b><small>${esc(r.m.username)}</small></span>
           <span class="num muted">${r.last == null ? '–' : r.last}</span>
           <span class="num total">${r.total}</span></div>`).join('')}
       </div></section>`;
@@ -543,7 +558,7 @@
     <section class="card">
       <div class="card-head"><h2>Ranking de la jornada</h2></div>
       ${mdRank.length ? `<div class="table">${mdRank.map((x, i) => `<div class="tr ${m && x.m.id === m.id ? 'me' : ''}">
-        <span class="rank r-${i + 1}">${i + 1}</span><span class="team"><b>${esc(x.m.teamName)}</b><small>@${esc(x.m.username)}</small></span><span></span><span class="num total">${x.r.total}</span></div>`).join('')}</div>`
+        <span class="rank r-${i + 1}">${i + 1}</span><span class="team"><b>${esc(x.m.teamName)}</b><small>${esc(x.m.username)}</small></span><span></span><span class="num total">${x.r.total}</span></div>`).join('')}</div>`
         : '<p class="muted">Ningún mánager tenía alineación en esta jornada.</p>'}
     </section>
 
@@ -659,7 +674,7 @@
         ${avatar(p)}
         <div class="pc-main">
           <div class="pc-name">${esc(p.name)}</div>
-          <div class="pc-sub">${posBadge(p.pos)}${p.nickname ? `<span>“${esc(p.nickname)}”</span>` : ''}</div>
+          <div class="pc-sub">${posBadge(p.pos)}${p.nickname ? `<span>“${esc(p.nickname)}”</span>` : ''}${S.managers.some((m) => m.playerId === p.id) ? '<span class="tag tag-em">Mánager</span>' : ''}${p.selfRegistered ? '<span class="tag tag-gold">Revisar valor</span>' : ''}</div>
           <div class="pc-meta">${fmtM(p.value)} · ${pp.total} pts · en ${ownersCount(p.id)} equipos</div>
         </div>
         <div class="pc-side">
@@ -811,7 +826,7 @@
       <div class="card-head"><h2>Mánagers <span class="count">${st.length}</span></h2></div>
       ${st.length ? `<div class="list">${st.map((r) => `<div class="row-item">
         <span class="rank r-${r.rank}">${r.rank}</span>
-        <div class="li-main"><b>${esc(r.m.teamName)}</b><small>@${esc(r.m.username)} · desde ${fmtTs(r.m.joinedAt)} · ${r.m.squad.length} jugadores · ${fmtM(r.m.money)} libres</small></div>
+        <div class="li-main"><b>${esc(r.m.teamName)}</b><small>${esc(r.m.username)}${linkedPos(r.m)} · desde ${fmtTs(r.m.joinedAt)} · ${r.m.squad.length} jugadores · ${fmtM(r.m.money)} libres</small></div>
         <b class="pts">${r.total}</b>
         <button type="button" class="icon-btn sm danger" data-action="kick" data-id="${r.m.id}" aria-label="Expulsar a ${esc(r.m.username)}" title="Expulsar">${icon('ban')}</button>
       </div>`).join('')}</div>` : emptyState('users', 'Nadie se ha unido aún', 'Comparte el código desde la pestaña Liga.', `<button type="button" class="btn btn-primary" data-action="admin-tab" data-tab="liga">Ver código</button>`)}
@@ -819,7 +834,7 @@
     ${S.banned.length ? `<section class="card">
       <div class="card-head"><h2>Expulsados</h2></div>
       <p class="muted small">No pueden volver a entrar con el código mientras estén en esta lista.</p>
-      <div class="list">${S.banned.map((u) => `<div class="row-item"><div class="li-main"><b>@${esc(u)}</b></div>
+      <div class="list">${S.banned.map((u) => `<div class="row-item"><div class="li-main"><b>${esc(u)}</b></div>
         <button type="button" class="btn btn-xs btn-ghost" data-action="unban" data-u="${esc(u)}">Readmitir</button></div>`).join('')}</div>
     </section>` : ''}`;
   }
@@ -921,11 +936,23 @@
     commit(`Vendiste a ${p.name} por ${fmtM(p.value)}`);
   }
 
-  function exportData() {
-    const blob = new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' });
+  async function exportData() {
+    const json = JSON.stringify(S, null, 2);
+    const filename = `fantasyteam-${todayISO()}.json`;
+    if (window.claude && window.claude.use) {
+      try {
+        const dl = await window.claude.use('downloads');
+        if (dl) {
+          await dl.save({ filename, data: json });
+          return toast('Copia de seguridad descargada');
+        }
+      } catch (e) {
+        return toast('No se descargó la copia', 'info');
+      }
+    }
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `fantasyteam-${todayISO()}.json`;
+    a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
@@ -951,8 +978,10 @@
     'fill-demo'() {
       const f = $('#join-form');
       f.code.value = S.league.code;
-      f.username.value = 'carlos';
+      f.username.value = 'Carlos Vega';
       f.teamName.value = 'Los Galácticos';
+      const r = f.querySelector('input[name=pos][value=DEL]');
+      if (r) r.checked = true;
     },
     logout,
 
@@ -1148,16 +1177,15 @@
     // admin · mánagers
     async kick(el) {
       const m = getManager(el.dataset.id);
-      const ok = await confirmDialog({ title: `Expulsar a @${m.username}`, text: `Se eliminará el equipo "${m.teamName}" de la liga y no podrá volver a entrar con ese usuario.`, ok: 'Expulsar', danger: true });
+      const ok = await confirmDialog({ title: `Expulsar a ${m.username}`, text: `Se eliminará el equipo "${m.teamName}" de la liga y no podrá volver a entrar con ese nombre. Su ficha de jugador se mantiene en el mercado.`, ok: 'Expulsar', danger: true });
       if (!ok) return;
       S.managers = S.managers.filter((x) => x.id !== m.id);
-      const u = m.username.toLowerCase();
-      if (!S.banned.includes(u)) S.banned.push(u);
-      commit(`@${m.username} ha sido expulsado`);
+      if (!S.banned.some((b) => b.toLowerCase() === m.username.toLowerCase())) S.banned.push(m.username);
+      commit(`${m.username} ha sido expulsado`);
     },
     unban(el) {
       S.banned = S.banned.filter((u) => u !== el.dataset.u);
-      commit(`@${el.dataset.u} puede volver a entrar`, 'info');
+      commit(`${el.dataset.u} puede volver a entrar`, 'info');
     },
   };
 
@@ -1165,27 +1193,39 @@
   const forms = {
     'join-form'(f) {
       const code = f.code.value.trim().toUpperCase().replace(/\s+/g, '');
-      const username = f.username.value.trim();
+      const username = f.username.value.trim().replace(/\s+/g, ' ');
+      const pos = (f.querySelector('input[name=pos]:checked') || {}).value;
       const teamName = f.teamName.value.trim().replace(/\s+/g, ' ');
       const deny = (msg) => { toast(msg, 'error'); f.classList.remove('shake'); void f.offsetWidth; f.classList.add('shake'); };
-      if (!code || !username || !teamName) return deny('Completa el código, tu usuario y el nombre de tu equipo');
+      if (!code || !username || !teamName) return deny('Completa el código, tu nombre y el nombre de tu equipo');
       if (!S.league) return deny('No hay ninguna liga creada en este dispositivo');
       if (code !== S.league.code) return deny('Código de liga no válido. Acceso denegado.');
-      if (username.length < 2) return deny('El usuario debe tener al menos 2 caracteres');
-      if (S.banned.includes(username.toLowerCase())) return deny('Este usuario fue expulsado de la liga');
+      if (username.length < 3) return deny('Escribe tu nombre (al menos 3 letras)');
+      const lower = username.toLowerCase();
+      if (S.banned.some((b) => b.toLowerCase() === lower)) return deny('Fuiste expulsado de esta liga. Habla con el administrador.');
 
-      const existing = S.managers.find((m) => m.username.toLowerCase() === username.toLowerCase());
+      const existing = S.managers.find((m) => m.username.toLowerCase() === lower);
       if (existing) {
-        if (existing.teamName.toLowerCase() !== teamName.toLowerCase()) return deny('Ese usuario ya existe con otro nombre de equipo');
+        if (existing.teamName.toLowerCase() !== teamName.toLowerCase()) return deny('Ese nombre ya está registrado con otro equipo');
         session = { role: 'manager', managerId: existing.id };
         Store.saveSession(session);
         ui.mgrTab = 'equipo';
         render();
-        return toast(`Bienvenido de nuevo, ${existing.username}`);
+        return toast(`Bienvenido de nuevo, ${existing.username.split(' ')[0]}`);
       }
+      if (!POSITIONS.includes(pos)) return deny('Elige tu posición en el equipo');
       if (S.managers.some((m) => m.teamName.toLowerCase() === teamName.toLowerCase())) return deny('Ya hay un equipo con ese nombre');
+
+      // Cada participante es también un futbolista del mercado.
+      let player = S.players.find((p) => p.name.toLowerCase() === lower);
+      let created = false;
+      if (!player) {
+        player = { id: Store.uid('p'), name: username, nickname: '', pos, value: NEW_PLAYER_VALUE, status: 'available', createdAt: Date.now(), selfRegistered: true };
+        S.players.push(player);
+        created = true;
+      }
       const m = {
-        id: Store.uid('m'), username, teamName, joinedAt: Date.now(),
+        id: Store.uid('m'), username, teamName, playerId: player.id, joinedAt: Date.now(),
         money: r1(S.league.budget), squad: [], formation: FORMATS[S.league.format].formations[0], slots: {}, captainId: null,
       };
       S.managers.push(m);
@@ -1193,7 +1233,9 @@
       Store.saveSession(session);
       ui.mgrTab = 'mercado';
       ui.marketPos = 'ALL';
-      commit(`¡${teamName} ya está en la liga! Tienes ${fmtM(m.money)} para fichar.`);
+      commit(created
+        ? `¡${teamName} ya está en la liga! Entras al mercado como ${POS_LABEL[pos].toLowerCase()} (${fmtM(player.value)}). Tienes ${fmtM(m.money)} para fichar.`
+        : `¡${teamName} ya está en la liga! Ya figurabas en la plantilla como ${player.pos}. Tienes ${fmtM(m.money)} para fichar.`);
     },
     'admin-form'(f) {
       if (f.password.value === ADMIN_PASSWORD) {
@@ -1245,7 +1287,7 @@
       if (id) {
         const p = getPlayer(id);
         const posChanged = p.pos !== pos;
-        Object.assign(p, { name, nickname, pos, value, status });
+        Object.assign(p, { name, nickname, pos, value, status, selfRegistered: false });
         if (posChanged) S.managers.forEach(sanitizeManager);
         ui.sheet = null;
         commit(`${name} actualizado${posChanged ? '. Ha salido de las alineaciones por el cambio de posición.' : ''}`);

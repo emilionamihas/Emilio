@@ -4,7 +4,13 @@ Liga privada de Fantasy Fútbol para los jugadores de tu propio equipo. Es una w
 
 ## Cómo abrirla
 
-Abre `index.html` en el navegador. También puedes servir la carpeta:
+La forma más simple es abrir **`FantasyTeam.html`**: es la app entera en un solo archivo, y se abre con doble clic o se puede mandar por WhatsApp o correo. Se genera a partir del código fuente con:
+
+```bash
+python3 fantasy-team/build.py
+```
+
+Para desarrollar también puedes abrir `index.html` o servir la carpeta:
 
 ```bash
 cd fantasy-team && python3 -m http.server 8000
@@ -14,10 +20,10 @@ Y entra en http://localhost:8000. Para que el botón "Copiar invitación" incluy
 
 ## Accesos
 
-- **Mánagers:** código de liga + nombre de usuario + nombre del equipo. Si el usuario ya existe, el nombre del equipo tiene que coincidir para entrar.
+- **Mánagers:** código de liga + nombre y apellido + posición en el equipo (POR, DEF, MED o DEL) + nombre de su equipo fantasy. Al registrarse, cada participante entra también como jugador del mercado (valor inicial 6M, que el admin ajusta después) y sus compañeros pueden ficharlo. Para volver a entrar basta con el nombre y el equipo.
 - **Panel Admin:** botón de la esquina superior, contraseña `secretteam`.
 
-La primera vez se carga una liga de ejemplo con 12 jugadores, 3 mánagers (`carlos` / Los Galácticos, `lucia` / Atlético Barrio, `pedro` / Real Sofá) y una jornada jugada. El código de la liga de ejemplo aparece en la pantalla de inicio.
+La primera vez se carga una liga de ejemplo con 12 jugadores, 3 mánagers que también son jugadores (Carlos Vega / Los Galácticos, Sergio Navarro / Atlético Barrio, Martín Ríos / Real Sofá) y una jornada jugada. El código de la liga de ejemplo aparece en la pantalla de inicio.
 
 ## Funciones
 
@@ -55,6 +61,8 @@ Al guardar una jornada nueva se congelan las alineaciones y los capitanes de ese
 
 ```
 fantasy-team/
+├── FantasyTeam.html # app completa en un solo archivo (generado)
+├── build.py        # genera FantasyTeam.html
 ├── index.html
 ├── favicon.svg
 ├── css/styles.css
