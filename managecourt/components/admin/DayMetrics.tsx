@@ -58,7 +58,7 @@ export function DayMetrics({ date }: { date: string }) {
     {
       label: "Por cobrar en cancha",
       value: m.due,
-      sub: "Saldos de señas e impagos",
+      sub: "Saldos de adelantos e impagos",
       icon: <CircleDollarSign size={20} />,
       color: "#2563eb",
       money: true,

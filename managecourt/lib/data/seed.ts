@@ -16,15 +16,15 @@ function mulberry32(seed: number) {
 }
 
 const FIRST = [
-  "Martín", "Lucía", "Santiago", "Valentina", "Joaquín", "Camila", "Tomás", "Sofía",
-  "Facundo", "Florencia", "Nicolás", "Agustina", "Matías", "Julieta", "Lautaro", "Micaela",
-  "Bruno", "Carolina", "Ignacio", "Paula", "Gonzalo", "Rocío", "Franco", "Milagros",
+  "José", "María", "Luis", "Rosa", "Diego", "Valeria", "Renzo", "Camila",
+  "Jhon", "Fiorella", "Christian", "Milagros", "Paolo", "Ximena", "Kevin", "Andrea",
+  "Bruno", "Lucía", "Gianfranco", "Daniela", "Sebastián", "Alessandra", "Jorge", "Mariana",
 ];
 const LAST = [
-  "González", "Rodríguez", "Fernández", "López", "Martínez", "Pérez", "Gómez", "Díaz",
-  "Romero", "Sosa", "Álvarez", "Torres", "Ruiz", "Benítez", "Acosta", "Medina",
+  "Quispe", "Flores", "Rodríguez", "Huamán", "Chávez", "Mendoza", "Rojas", "Vargas",
+  "Castillo", "Torres", "Ramírez", "Gutiérrez", "Salazar", "Paredes", "Espinoza", "Ccahuana",
 ];
-const METHODS: PaymentMethod[] = ["efectivo", "transferencia", "mercadopago", "tarjeta"];
+const METHODS: PaymentMethod[] = ["yape", "yape", "plin", "efectivo", "transferencia", "tarjeta"];
 
 /** Demanda relativa por hora (0-1) */
 function demand(hour: number, weekend: boolean): number {
@@ -64,7 +64,8 @@ export function buildSeed(courts: Court[], today: string, nowHour: number): Seed
 
   const customer = () => {
     const name = `${pick(FIRST)} ${pick(LAST)}`;
-    const phone = `+54 9 11 ${String(Math.floor(rand() * 9000) + 1000)}-${String(Math.floor(rand() * 9000) + 1000)}`;
+    const n3 = () => String(Math.floor(rand() * 900) + 100);
+    const phone = `+51 9${n3().slice(1)} ${n3()} ${n3()}`;
     return { name, phone };
   };
 
@@ -86,7 +87,7 @@ export function buildSeed(courts: Court[], today: string, nowHour: number): Seed
       if (date < today || r < 0.45) paymentStatus = "paid";
       else if (r < 0.75) {
         paymentStatus = "deposit";
-        depositAmount = Math.round((total * 0.5) / 1000) * 1000;
+        depositAmount = Math.round((total * 0.5) / 10) * 10;
       }
     }
     bookings.push({

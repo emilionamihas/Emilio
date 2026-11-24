@@ -67,8 +67,8 @@ export function MyPasses() {
           >
             <Ticket size={28} className="text-muted" />
           </motion.div>
-          <p className="mt-4 font-semibold">{tab === "upcoming" ? "Todavía no tenés reservas próximas" : "Sin historial"}</p>
-          <p className="mt-1 max-w-xs text-sm text-muted">Los pases que solicites desde este dispositivo aparecen acá.</p>
+          <p className="mt-4 font-semibold">{tab === "upcoming" ? "Todavía no tienes reservas próximas" : "Sin historial"}</p>
+          <p className="mt-1 max-w-xs text-sm text-muted">Los pases que solicites desde este dispositivo aparecen aquí.</p>
           <Link href="/" className="mt-5 inline-flex h-11 items-center rounded-2xl bg-ink px-5 text-sm font-semibold text-white dark:bg-white dark:text-ink">
             Reservar una cancha
           </Link>

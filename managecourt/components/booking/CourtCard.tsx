@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, type Variants } from "framer-motion";
+import { motion, useMotionValue, useSpring, useTransform, type Variants } from "framer-motion";
 import { ArrowUpRight, Lightbulb, Sun, Users, Warehouse } from "lucide-react";
 import { PulseDot } from "@/components/ui/PulseDot";
 import { SportIcon } from "@/components/ui/SportIcon";
@@ -14,6 +14,22 @@ import type { Court, SlotInfo } from "@/lib/types";
 export const cardVariants: Variants = {
   hidden: { opacity: 0, y: 24, scale: 0.97 },
   show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 260, damping: 24 } },
+  hover: { y: -8, scale: 1.015, boxShadow: "var(--shadow-lift)", transition: { type: "spring", stiffness: 380, damping: 24 } },
+};
+
+/** Brillo que barre la cabecera al pasar el cursor */
+const shineVariants: Variants = {
+  hidden: { x: "-130%" },
+  show: { x: "-130%", transition: { duration: 0 } },
+  hover: { x: "130%", transition: { duration: 0.75, ease: "easeInOut" } },
+};
+const iconVariants: Variants = {
+  show: { rotate: 0, scale: 1 },
+  hover: { rotate: [0, -18, 14, -6, 0], scale: 1.15, transition: { duration: 0.6 } },
+};
+const arrowVariants: Variants = {
+  show: { rotate: 0, scale: 1 },
+  hover: { rotate: 45, scale: 1.12, transition: { type: "spring", stiffness: 400, damping: 15 } },
 };
 
 export const LIVE_META: Record<LiveStatus, { label: string; color: string; pulse: boolean }> = {
@@ -46,13 +62,30 @@ export function CourtCard({ court, slots, live, onSelect }: Props) {
   const next = free[0];
   const meta = live ? LIVE_META[live] : null;
 
+  // Inclinación 3D que sigue al puntero (solo con mouse; en táctil queda plana)
+  const px = useMotionValue(0);
+  const py = useMotionValue(0);
+  const rotateX = useSpring(useTransform(py, [-0.5, 0.5], [7, -7]), { stiffness: 220, damping: 18 });
+  const rotateY = useSpring(useTransform(px, [-0.5, 0.5], [-9, 9]), { stiffness: 220, damping: 18 });
+  const onPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (e.pointerType !== "mouse") return;
+    const r = e.currentTarget.getBoundingClientRect();
+    px.set((e.clientX - r.left) / r.width - 0.5);
+    py.set((e.clientY - r.top) / r.height - 0.5);
+  };
+  const onPointerLeave = () => {
+    px.set(0);
+    py.set(0);
+  };
+
   return (
     <motion.button
       variants={cardVariants}
-      layout
-      whileHover={{ y: -6, boxShadow: "var(--shadow-lift)" }}
-      whileTap={{ scale: 0.98 }}
-      transition={{ type: "spring", stiffness: 380, damping: 26 }}
+      whileHover="hover"
+      whileTap={{ scale: 0.97 }}
+      onPointerMove={onPointerMove}
+      onPointerLeave={onPointerLeave}
+      style={{ rotateX, rotateY, transformPerspective: 900 }}
       onClick={onSelect}
       className="group relative flex flex-col overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface text-left outline-none focus-visible:ring-2 focus-visible:ring-padel"
       aria-label={`${court.name}, ${theme.label}. ${free.length} turnos libres`}
@@ -60,8 +93,15 @@ export function CourtCard({ court, slots, live, onSelect }: Props) {
       {/* Cabecera con color del deporte */}
       <div className={cn("relative h-24 overflow-hidden bg-gradient-to-br", theme.gradient)}>
         <CourtPattern sport={court.sport} />
+        <motion.span
+          variants={shineVariants}
+          className="pointer-events-none absolute inset-y-0 w-1/2 -skew-x-12 bg-gradient-to-r from-transparent via-white/45 to-transparent"
+          aria-hidden="true"
+        />
         <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-black/25 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white backdrop-blur">
-          <SportIcon sport={court.sport} size={14} />
+          <motion.span variants={iconVariants} className="inline-flex">
+            <SportIcon sport={court.sport} size={14} />
+          </motion.span>
           {theme.label}
         </div>
         {meta && (
@@ -72,9 +112,7 @@ export function CourtCard({ court, slots, live, onSelect }: Props) {
         )}
         <motion.div
           className="absolute bottom-2.5 right-3 grid h-9 w-9 place-items-center rounded-full bg-white text-ink"
-          initial={false}
-          animate={{ rotate: 0 }}
-          whileHover={{ rotate: 45 }}
+          variants={arrowVariants}
         >
           <ArrowUpRight size={18} />
         </motion.div>
@@ -126,7 +164,7 @@ export function CourtCard({ court, slots, live, onSelect }: Props) {
           </div>
           <div className="text-right">
             <p className={cn("text-sm font-bold", free.length ? theme.textDeep : "text-blocked")}>
-              {free.length ? `${free.length} turnos libres` : live ? "Sin turnos hoy" : "Completo"}
+              {free.length ? `${free.length} ${free.length === 1 ? "turno libre" : "turnos libres"}` : live ? "Sin turnos hoy" : "Completo"}
             </p>
             {next && <p className="text-[11px] text-muted">Próximo: {formatHour(next.hour)}</p>}
           </div>

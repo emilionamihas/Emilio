@@ -62,12 +62,13 @@ export interface ManageCourtState {
   setHydrated: () => void;
 }
 
-const STORAGE_KEY = "managecourt-store";
+// Clave nueva para la versión en soles: no reutiliza datos viejos guardados en pesos
+const STORAGE_KEY = "managecourt-pe";
 
 function conflictMessage(c: ReturnType<typeof findConflict>): string {
   if (!c) return "";
   if (c.block) return c.block.reason === "maintenance" ? "Ese horario está en mantenimiento." : "Ese horario está bloqueado por un torneo.";
-  if (c.booking?.status === "pending") return "Alguien acaba de solicitar ese horario. Elegí otro.";
+  if (c.booking?.status === "pending") return "Alguien acaba de solicitar ese horario. Elige otro.";
   return "Ese horario ya está reservado.";
 }
 
@@ -85,7 +86,7 @@ export const useStore = create<ManageCourtState>()(
         const { bookings, blocks, courts } = get();
         const court = courts.find((c) => c.id === input.courtId);
         if (!court) return { ok: false, error: "Cancha inexistente." };
-        if (input.endHour <= input.startHour) return { ok: false, error: "Elegí al menos un turno." };
+        if (input.endHour <= input.startHour) return { ok: false, error: "Elige al menos un turno." };
         const conflict = findConflict(bookings, blocks, input.courtId, input.date, input.startHour, input.endHour);
         if (conflict) return { ok: false, error: conflictMessage(conflict) };
         const now = new Date().toISOString();
@@ -155,7 +156,7 @@ export const useStore = create<ManageCourtState>()(
           phone: input.phone.trim(),
           paymentMethod: input.paymentMethod,
           paymentStatus: input.paymentStatus,
-          depositAmount: input.paymentStatus === "deposit" ? Math.min(input.depositAmount ?? amount / 2, amount) : 0,
+          depositAmount: input.paymentStatus === "deposit" ? Math.min(input.depositAmount ?? Math.round(amount / 2), amount) : 0,
           id: makeId("bkg"),
           amount,
           status: "confirmed",
@@ -227,7 +228,7 @@ export const useStore = create<ManageCourtState>()(
             ok: false,
             error: conflict.block
               ? "Ya existe un bloqueo en ese rango."
-              : "Hay reservas en ese rango. Movelas o cancelalas antes de bloquear.",
+              : "Hay reservas en ese rango. Muévelas o cancélalas antes de bloquear.",
           };
         }
         const block: Block = { ...input, id: makeId("blk"), createdAt: new Date().toISOString() };

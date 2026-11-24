@@ -49,7 +49,7 @@ export function ComplexMap() {
       <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="font-display text-3xl font-black tracking-tight">Mapa del complejo</h1>
-          <p className="text-sm text-muted">Tocá una cancha para ver su estado y reservarla.</p>
+          <p className="text-sm text-muted">Toca una cancha para ver su estado y reservarla.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {(["free", "playing", "pending", "maintenance"] as const).map((s) => (
@@ -164,8 +164,8 @@ export function ComplexMap() {
                 exit={{ opacity: 0 }}
                 className="rounded-3xl border border-dashed border-line p-6 text-center text-sm text-muted"
               >
-                <p className="font-semibold text-fg">Seleccioná una cancha</p>
-                <p className="mt-1">Mové el control horario para ver la ocupación en otro momento del día.</p>
+                <p className="font-semibold text-fg">Selecciona una cancha</p>
+                <p className="mt-1">Mueve el control horario para ver la ocupación en otro momento del día.</p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -338,6 +338,20 @@ function MapCourt({
         />
       )}
       {status === "playing" && <Players x={x} y={y} w={w} h={h} />}
+      {status === "free" && (
+        <motion.rect
+          x={x - 4}
+          y={y - 4}
+          width={w + 8}
+          height={h + 8}
+          rx="13"
+          fill="none"
+          stroke="#10b981"
+          strokeWidth="3"
+          animate={{ opacity: [0, 0.85, 0], strokeWidth: [2, 6, 2] }}
+          transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+        />
+      )}
       {selected && (
         <motion.rect
           layoutId="map-selected"

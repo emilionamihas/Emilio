@@ -89,15 +89,16 @@ export const SURFACE_LABEL: Record<Surface, string> = {
 };
 
 export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
+  yape: "Yape",
+  plin: "Plin",
   efectivo: "Efectivo en cancha",
   transferencia: "Transferencia",
-  mercadopago: "Mercado Pago",
   tarjeta: "Tarjeta",
 };
 
 export const PAYMENT_STATUS_LABEL: Record<PaymentStatus, string> = {
   paid: "Pagado",
-  deposit: "Seña / Anticipo",
+  deposit: "Adelanto",
   unpaid: "Pendiente en cancha",
 };
 

@@ -1,6 +1,6 @@
 # ManageCourt
 
-PWA para reservar y gestionar un complejo deportivo con canchas de Fútbol, Básquet, Tenis y Pádel.
+PWA para reservar y gestionar un complejo deportivo con canchas de Fútbol, Básquet, Tenis y Pádel. Configurada para Perú: precios en soles (S/), pagos por Yape, Plin, transferencia o efectivo, y teléfonos +51.
 
 Next.js 16 (App Router) · TypeScript · Tailwind CSS 4 · Framer Motion · Lucide · Zustand.
 
@@ -11,7 +11,10 @@ npm install
 npm run dev        # http://localhost:3000
 npm run build      # compilación de producción (incluye chequeo de TypeScript)
 npm run start
+npm run build:artifact   # genera dist-artifact/index.html: la app entera en una sola página
 ```
+
+`build:artifact` usa los mismos componentes que la app Next.js; solo cambia el enrutador (por `#ancla`) y no registra el service worker. Sirve para publicar una demo navegable sin servidor.
 
 ## Qué hay
 
@@ -41,7 +44,8 @@ lib/
   store.ts           estado global (Zustand + persist) y todas las mutaciones
   slots.ts           reglas: conflictos, estado de turnos, ocupación
   pricing.ts         tarifa diurna / nocturna (desde las 19:00)
-  data/              canchas y generador de datos de prueba
+  data/              canchas (tarifas en S/) y generador de datos de prueba
+artifact/            entrada y adaptadores de next/link y next/navigation para el build de una sola página
 supabase/schema.sql  tablas espejo de los tipos, con restricción anti-solapamiento
 public/              manifest.json, sw.js, íconos
 ```

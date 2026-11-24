@@ -52,14 +52,20 @@ export function PendingInbox() {
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="relative grid h-12 w-12 place-items-center rounded-2xl bg-pending text-ink">
+          <motion.div
+            key={pending.length}
+            className="relative grid h-12 w-12 place-items-center rounded-2xl bg-pending text-ink"
+            initial={{ rotate: 0 }}
+            animate={{ rotate: [0, -14, 12, -6, 0], scale: [1, 1.12, 1] }}
+            transition={{ duration: 0.6 }}
+          >
             <Inbox size={22} />
             {pending.length > 0 && (
               <span className="absolute -right-1.5 -top-1.5">
                 <PulseDot color="#f59e0b" className="h-3.5 w-3.5" />
               </span>
             )}
-          </div>
+          </motion.div>
           <div>
             <h2 id="inbox-title" className="font-display text-xl font-black tracking-tight">
               Solicitudes por aprobar
@@ -106,7 +112,7 @@ export function PendingInbox() {
           >
             <AnimatedCheck size={64} />
             <p className="mt-3 font-semibold">Bandeja al día</p>
-            <p className="text-sm text-muted">Las nuevas solicitudes aparecen acá al instante.</p>
+            <p className="text-sm text-muted">Las nuevas solicitudes aparecen aquí al instante.</p>
           </motion.div>
         )}
       </AnimatePresence>

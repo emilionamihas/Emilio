@@ -46,7 +46,21 @@
   color-scheme: light;
 }
 
-.dark {
+/* Oscuro: elección en la app (.dark), tema del visor (data-theme) o del sistema.
+   .light marca una elección explícita de claro y gana sobre los dos últimos. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not(.light) {
+    --bg: #070b16;
+    --surface: #0f1526;
+    --surface-2: #161e34;
+    --border: #222c45;
+    --fg: #eef2fb;
+    --muted: #8f9ab3;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]:not(.light),
+:root.dark {
   --bg: #070b16;
   --surface: #0f1526;
   --surface-2: #161e34;
@@ -69,6 +83,16 @@ html,
 body {
   background: var(--bg);
   color: var(--fg);
+}
+
+/* Franja bajo la barra de estado del teléfono, del color de la página */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto;
+  height: env(safe-area-inset-top, 0px);
+  z-index: 35;
+  background: var(--bg);
 }
 
 body {

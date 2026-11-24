@@ -1,6 +1,8 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { Confetti } from "@/components/ui/Celebration";
 import { CircleX, Hourglass, ShieldCheck } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { LogoMark } from "@/components/brand/Logo";
@@ -30,23 +32,47 @@ interface PassProps {
   compact?: boolean;
   /** Color del fondo donde se apoya el pase (para las muescas de perforación) */
   cutout?: "surface" | "bg";
+  /** Entrada con giro 3D (al emitir el pase) */
+  flip?: boolean;
 }
 
-export function DigitalPass({ booking, court, compact = false, cutout = "surface" }: PassProps) {
+export function DigitalPass({ booking, court, compact = false, cutout = "surface", flip = false }: PassProps) {
   const theme = SPORTS[court.sport];
   const status = STATUS[booking.status];
   const Icon = status.icon;
   const valid = booking.status === "confirmed";
   const voided = booking.status === "rejected" || booking.status === "cancelled";
 
+  // Celebra cuando el gestor aprueba mientras el pase está en pantalla
+  const prev = useRef(booking.status);
+  const [burst, setBurst] = useState(0);
+  useEffect(() => {
+    if (prev.current === "pending" && booking.status === "confirmed") setBurst((n) => n + 1);
+    prev.current = booking.status;
+  }, [booking.status]);
+
   return (
     <motion.article
       layout
+      initial={flip ? { rotateY: -95, opacity: 0, scale: 0.9 } : false}
+      animate={burst ? { rotateY: 0, opacity: 1, scale: [1, 1.05, 1] } : { rotateY: 0, opacity: 1, scale: 1 }}
+      transition={{ type: "spring", stiffness: 140, damping: 16 }}
+      style={{ transformPerspective: 1100 }}
+      key={burst ? `b${burst}` : "pass"}
       className="relative mx-auto w-full max-w-sm overflow-hidden rounded-[1.6rem] bg-ink text-white shadow-[0_30px_60px_-30px_rgb(11_16_32/0.8)]"
       aria-label={`Pase digital ${booking.passCode}`}
     >
+      {burst > 0 && <Confetti key={burst} pieces={34} />}
       {/* Encabezado de marca */}
-      <div className={cn("relative bg-gradient-to-br px-5 pb-5 pt-4 court-lines", theme.gradient)}>
+      <div className={cn("relative overflow-hidden bg-gradient-to-br px-5 pb-5 pt-4 court-lines", theme.gradient)}>
+        {/* Reflejo holográfico que recorre el pase */}
+        <motion.span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 w-1/3 -skew-x-12 bg-gradient-to-r from-transparent via-white/35 to-transparent"
+          initial={{ x: "-150%" }}
+          animate={{ x: ["-150%", "450%"] }}
+          transition={{ duration: 1.4, repeat: Infinity, repeatDelay: 2.6, ease: "easeInOut" }}
+        />
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-2">
             <LogoMark size={28} />
@@ -122,8 +148,8 @@ export function DigitalPass({ booking, court, compact = false, cutout = "surface
             </AnimatePresence>
             <p className="mt-1 text-xs leading-relaxed text-white/60">
               {booking.status === "pending" && "El complejo revisa tu pedido. El QR se activa cuando lo aprueben."}
-              {valid && "Mostrá este código en recepción al llegar."}
-              {voided && "Este pase ya no es válido. Podés pedir otro horario."}
+              {valid && "Muestra este código en recepción al llegar."}
+              {voided && "Este pase ya no es válido. Puedes pedir otro horario."}
             </p>
             {compact && <p className="mt-2 font-mono text-xs tracking-wider text-white/80">{booking.passCode}</p>}
           </div>

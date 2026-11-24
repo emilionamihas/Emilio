@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     template: "%s · ManageCourt",
   },
   description:
-    "Reservá canchas de Fútbol, Básquet, Tenis y Pádel en segundos. Gestión integral del complejo deportivo con ManageCourt.",
+    "Reserva canchas de Fútbol, Básquet, Tenis y Pádel en segundos. Gestión integral del complejo deportivo con ManageCourt.",
   applicationName: "ManageCourt",
   manifest: "/manifest.json",
   appleWebApp: {
@@ -39,7 +39,7 @@ const themeScript = `(function(){try{var t=localStorage.getItem('mc-theme');var 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     // suppressHydrationWarning: el script de tema modifica la clase de <html> antes de hidratar
-    <html lang="es-AR" suppressHydrationWarning>
+    <html lang="es-PE" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

@@ -125,7 +125,7 @@ export function MasterAgenda() {
         <li className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-futbol" /> Confirmada (color del deporte)</li>
         <li className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-pending" /> Pendiente de aprobación</li>
         <li className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-blocked/70" /> Mantenimiento / Torneo</li>
-        <li className="flex items-center gap-1.5"><Banknote size={13} /> Pagado · <CircleDollarSign size={13} /> Seña · <Hourglass size={13} /> Pendiente en cancha</li>
+        <li className="flex items-center gap-1.5"><Banknote size={13} /> Pagado · <CircleDollarSign size={13} /> Adelanto · <Hourglass size={13} /> Pendiente en cancha</li>
       </ul>
 
       {/* Grilla multi-cancha */}
@@ -274,7 +274,7 @@ export function MasterAgenda() {
       </div>
 
       <p className="flex items-center gap-1.5 text-xs text-muted">
-        <Lock size={13} /> Tocá un hueco para crear una reserva o un bloqueo; tocá una reserva para cobrar, moverla o cancelarla.
+        <Lock size={13} /> Toca un espacio libre para crear una reserva o un bloqueo; toca una reserva para cobrar, moverla o cancelarla.
       </p>
 
       <AgendaSheet target={target} onClose={() => setTarget(null)} />

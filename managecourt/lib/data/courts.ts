@@ -2,31 +2,31 @@ import type { Court } from "../types";
 
 /**
  * Canchas del complejo. Coordenadas del croquis en un viewBox de 1000 x 640.
- * Tarifas en ARS por hora.
+ * Tarifas en soles (S/) por hora.
  */
 export const COURTS: Court[] = [
   {
     id: "fut-1",
-    name: "La Bombonera",
+    name: "El Potrero",
     sport: "futbol",
     surface: "cesped-sintetico",
     covered: false,
     format: "Fútbol 5",
     capacity: 10,
-    dayRate: 48000,
-    nightRate: 62000,
+    dayRate: 90,
+    nightRate: 120,
     map: { x: 30, y: 30, w: 330, h: 215 },
   },
   {
     id: "fut-2",
-    name: "El Monumental",
+    name: "La Gran Cancha",
     sport: "futbol",
     surface: "cesped-sintetico",
     covered: false,
     format: "Fútbol 7",
     capacity: 14,
-    dayRate: 75000,
-    nightRate: 95000,
+    dayRate: 140,
+    nightRate: 180,
     map: { x: 30, y: 265, w: 330, h: 235 },
   },
   {
@@ -37,8 +37,8 @@ export const COURTS: Court[] = [
     covered: true,
     format: "5 vs 5",
     capacity: 10,
-    dayRate: 32000,
-    nightRate: 40000,
+    dayRate: 70,
+    nightRate: 90,
     map: { x: 390, y: 30, w: 240, h: 140 },
   },
   {
@@ -49,8 +49,8 @@ export const COURTS: Court[] = [
     covered: false,
     format: "3 vs 3 / 5 vs 5",
     capacity: 10,
-    dayRate: 24000,
-    nightRate: 30000,
+    dayRate: 50,
+    nightRate: 65,
     map: { x: 390, y: 185, w: 240, h: 140 },
   },
   {
@@ -61,8 +61,8 @@ export const COURTS: Court[] = [
     covered: false,
     format: "Singles / Dobles",
     capacity: 4,
-    dayRate: 22000,
-    nightRate: 28000,
+    dayRate: 55,
+    nightRate: 70,
     map: { x: 660, y: 30, w: 95, h: 215 },
   },
   {
@@ -73,8 +73,8 @@ export const COURTS: Court[] = [
     covered: false,
     format: "Singles / Dobles",
     capacity: 4,
-    dayRate: 22000,
-    nightRate: 28000,
+    dayRate: 55,
+    nightRate: 70,
     map: { x: 770, y: 30, w: 95, h: 215 },
   },
   {
@@ -85,8 +85,8 @@ export const COURTS: Court[] = [
     covered: false,
     format: "Singles / Dobles",
     capacity: 4,
-    dayRate: 18000,
-    nightRate: 24000,
+    dayRate: 45,
+    nightRate: 60,
     map: { x: 880, y: 30, w: 95, h: 215 },
   },
   {
@@ -97,8 +97,8 @@ export const COURTS: Court[] = [
     covered: true,
     format: "Dobles",
     capacity: 4,
-    dayRate: 26000,
-    nightRate: 34000,
+    dayRate: 80,
+    nightRate: 100,
     map: { x: 390, y: 345, w: 112, h: 72 },
   },
   {
@@ -109,8 +109,8 @@ export const COURTS: Court[] = [
     covered: true,
     format: "Dobles",
     capacity: 4,
-    dayRate: 26000,
-    nightRate: 34000,
+    dayRate: 80,
+    nightRate: 100,
     map: { x: 518, y: 345, w: 112, h: 72 },
   },
   {
@@ -121,8 +121,8 @@ export const COURTS: Court[] = [
     covered: false,
     format: "Dobles",
     capacity: 4,
-    dayRate: 22000,
-    nightRate: 29000,
+    dayRate: 60,
+    nightRate: 80,
     map: { x: 390, y: 428, w: 112, h: 72 },
   },
   {
@@ -133,8 +133,8 @@ export const COURTS: Court[] = [
     covered: false,
     format: "Dobles",
     capacity: 4,
-    dayRate: 22000,
-    nightRate: 29000,
+    dayRate: 60,
+    nightRate: 80,
     map: { x: 518, y: 428, w: 112, h: 72 },
   },
 ];

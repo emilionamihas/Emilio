@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, Banknote, CreditCard, Landmark, Moon, Smartphone, Sun, Ticket } from "lucide-react";
+import { ArrowLeft, Banknote, Landmark, Moon, QrCode, Smartphone, Sun, Ticket } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AnimatedCheck, Confetti } from "@/components/ui/Celebration";
@@ -24,10 +24,10 @@ import { SlotPicker, type Range } from "./SlotPicker";
 type Step = "slots" | "form" | "done";
 
 const METHODS: { id: PaymentMethod; icon: React.ReactNode }[] = [
-  { id: "efectivo", icon: <Banknote size={18} /> },
+  { id: "yape", icon: <Smartphone size={18} /> },
+  { id: "plin", icon: <QrCode size={18} /> },
   { id: "transferencia", icon: <Landmark size={18} /> },
-  { id: "mercadopago", icon: <Smartphone size={18} /> },
-  { id: "tarjeta", icon: <CreditCard size={18} /> },
+  { id: "efectivo", icon: <Banknote size={18} /> },
 ];
 
 interface Props {
@@ -69,7 +69,7 @@ function BookingFlow({ court, initialDate, onClose }: { court: Court; initialDat
   const [step, setStep] = useState<Step>("slots");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [method, setMethod] = useState<PaymentMethod>("transferencia");
+  const [method, setMethod] = useState<PaymentMethod>("yape");
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<Booking | null>(null);
 
@@ -83,7 +83,7 @@ function BookingFlow({ court, initialDate, onClose }: { court: Court; initialDat
     if (!stillFree) {
       setRange(null);
       setStep("slots");
-      toast({ tone: "error", title: "Ese horario acaba de ocuparse", description: "Elegí otro turno disponible." });
+      toast({ tone: "error", title: "Ese horario acaba de ocuparse", description: "Elige otro turno disponible." });
     }
   }, [slots, range, step]);
 
@@ -97,7 +97,7 @@ function BookingFlow({ court, initialDate, onClose }: { court: Court; initialDat
     e.preventDefault();
     if (!range) return;
     if (!formValid) {
-      setError("Completá tu nombre y un WhatsApp válido.");
+      setError("Completa tu nombre y un WhatsApp válido.");
       return;
     }
     const res = requestBooking({
@@ -149,7 +149,7 @@ function BookingFlow({ court, initialDate, onClose }: { court: Court; initialDat
                     exit={{ opacity: 0, y: -6 }}
                     className="text-xs text-muted"
                   >
-                    {range ? `${formatRange(range.start, range.end)} · ${range.end - range.start} h` : "Tocá un horario (hasta 3 h seguidas)"}
+                    {range ? `${formatRange(range.start, range.end)} · ${range.end - range.start} h` : "Toca un horario (hasta 3 h seguidas)"}
                   </motion.p>
                 </AnimatePresence>
                 <p className="font-display text-2xl font-black">
@@ -188,7 +188,7 @@ function BookingFlow({ court, initialDate, onClose }: { court: Court; initialDat
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoComplete="name"
-              placeholder="Ej. Lucía Fernández"
+              placeholder="Ej. Lucía Quispe"
               className="h-12 w-full rounded-2xl border border-line bg-surface-2 px-4 text-base outline-none transition focus:border-padel focus:bg-surface"
             />
           </Field>
@@ -199,7 +199,7 @@ function BookingFlow({ court, initialDate, onClose }: { court: Court; initialDat
               type="tel"
               inputMode="tel"
               autoComplete="tel"
-              placeholder="+54 9 11 5555-1234"
+              placeholder="+51 987 654 321"
               className="h-12 w-full rounded-2xl border border-line bg-surface-2 px-4 text-base outline-none transition focus:border-padel focus:bg-surface"
             />
           </Field>
@@ -270,11 +270,11 @@ function BookingFlow({ court, initialDate, onClose }: { court: Court; initialDat
               ¡Solicitud enviada!
             </motion.h3>
             <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.65 }} className="mt-1 max-w-xs text-sm text-muted">
-              Te avisamos por WhatsApp apenas el complejo apruebe tu reserva.
+              Te avisaremos por WhatsApp apenas el complejo apruebe tu reserva.
             </motion.p>
           </div>
           <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.75, type: "spring", stiffness: 200, damping: 22 }}>
-            <DigitalPass booking={liveBooking} court={court} />
+            <DigitalPass booking={liveBooking} court={court} flip />
           </motion.div>
           <div className="grid grid-cols-2 gap-2">
             <Button variant="secondary" onClick={onClose}>Listo</Button>

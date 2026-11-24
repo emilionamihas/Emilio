@@ -28,7 +28,7 @@ export interface Court {
   /** Formato de juego, ej. "Fútbol 5" */
   format: string;
   capacity: number;
-  /** Tarifa por hora antes de encender la iluminación */
+  /** Tarifa por hora en soles (S/) antes de encender la iluminación */
   dayRate: number;
   /** Tarifa por hora con iluminación (desde NIGHT_FROM_HOUR) */
   nightRate: number;
@@ -40,7 +40,7 @@ export type BookingStatus = "pending" | "confirmed" | "rejected" | "cancelled";
 
 export type PaymentStatus = "paid" | "deposit" | "unpaid";
 
-export type PaymentMethod = "efectivo" | "transferencia" | "mercadopago" | "tarjeta";
+export type PaymentMethod = "yape" | "plin" | "efectivo" | "transferencia" | "tarjeta";
 
 export type BookingSource = "online" | "manual";
 
@@ -59,7 +59,7 @@ export interface Booking {
   paymentStatus: PaymentStatus;
   /** Importe total calculado al reservar */
   amount: number;
-  /** Seña/anticipo recibido (si paymentStatus = deposit) */
+  /** Adelanto recibido (si paymentStatus = deposit) */
   depositAmount: number;
   status: BookingStatus;
   source: BookingSource;

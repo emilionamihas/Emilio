@@ -48,6 +48,14 @@ export function RequestCard({ booking, court, decision, onDecide, now }: Props) 
       exit="exit"
       className="relative overflow-hidden rounded-3xl border border-line bg-surface"
     >
+      {isNew && !decision && (
+        <motion.span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 rounded-3xl ring-2 ring-pending"
+          animate={{ opacity: [0, 0.9, 0] }}
+          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+        />
+      )}
       {/* Flash de decisión */}
       {decision && (
         <motion.div

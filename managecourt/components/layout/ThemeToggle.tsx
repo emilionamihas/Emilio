@@ -23,6 +23,7 @@ export function ThemeToggle({ className, withLabel = false }: { className?: stri
   const toggle = useCallback(() => {
     const next = !document.documentElement.classList.contains("dark");
     document.documentElement.classList.toggle("dark", next);
+    document.documentElement.classList.toggle("light", !next);
     try {
       localStorage.setItem(THEME_KEY, next ? "dark" : "light");
     } catch {}

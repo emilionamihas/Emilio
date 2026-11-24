@@ -1,6 +1,7 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
+import { useState } from "react";
 import { Hourglass, Lock, Moon, Wrench } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatHour } from "@/lib/dates";
@@ -58,13 +59,15 @@ interface Props {
 }
 
 export function SlotPicker({ slots, range, onChange, accent, accentOn }: Props) {
+  // Onda que nace donde se tocó el turno
+  const [ripple, setRipple] = useState<{ hour: number; x: number; y: number; key: number } | null>(null);
   // Los turnos ya jugados no aportan nada al cliente: se ocultan
   const visible = slots.filter((s) => s.state !== "past");
   const hidden = slots.length - visible.length;
   if (visible.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-line py-10 text-center text-sm text-muted">
-        No quedan turnos para este día. Elegí otra fecha.
+        No quedan turnos para este día. Elige otra fecha.
       </div>
     );
   }
@@ -72,7 +75,7 @@ export function SlotPicker({ slots, range, onChange, accent, accentOn }: Props) 
     <div>
       {hidden > 0 && (
         <p className="mb-2 text-[11px] text-muted">
-          {hidden} turnos anteriores ya pasaron · mostrando desde {formatHour(visible[0].hour)}
+          {hidden === 1 ? "1 turno anterior ya pasó" : `${hidden} turnos anteriores ya pasaron`} · mostrando desde {formatHour(visible[0].hour)}
         </p>
       )}
       <motion.div
@@ -92,7 +95,13 @@ export function SlotPicker({ slots, range, onChange, accent, accentOn }: Props) 
               variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}
               whileTap={interactive ? { scale: 0.93 } : undefined}
               disabled={!interactive}
-              onClick={() => onChange(nextRange(range, slot.hour, slots))}
+              onClick={(e) => {
+                const r = e.currentTarget.getBoundingClientRect();
+                const x = e.clientX ? e.clientX - r.left : r.width / 2;
+                const y = e.clientY ? e.clientY - r.top : r.height / 2;
+                setRipple({ hour: slot.hour, x, y, key: Date.now() });
+                onChange(nextRange(range, slot.hour, slots));
+              }}
               aria-pressed={selected}
               aria-label={`${formatHour(slot.hour)}: ${labelFor(state)}`}
               className={cn(
@@ -102,6 +111,20 @@ export function SlotPicker({ slots, range, onChange, accent, accentOn }: Props) 
               )}
               style={selected ? { color: accentOn } : undefined}
             >
+              <AnimatePresence>
+                {ripple?.hour === slot.hour && (
+                  <motion.span
+                    key={ripple.key}
+                    className="pointer-events-none absolute z-10 h-10 w-10 rounded-full"
+                    style={{ left: ripple.x - 20, top: ripple.y - 20, backgroundColor: selected ? "rgba(255,255,255,0.5)" : accent }}
+                    initial={{ scale: 0, opacity: 0.45 }}
+                    animate={{ scale: 5, opacity: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.6, ease: "easeOut" }}
+                    onAnimationComplete={() => setRipple(null)}
+                  />
+                )}
+              </AnimatePresence>
               {selected && (
                 <motion.span
                   layoutId="slot-selected-bg"

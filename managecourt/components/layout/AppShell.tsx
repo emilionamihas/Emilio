@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { MotionConfig, motion } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogoMark } from "@/components/brand/Logo";
@@ -14,11 +14,12 @@ import { ServiceWorker } from "./ServiceWorker";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   return (
-    <>
+    // Respeta “reducir movimiento” del sistema en todas las animaciones
+    <MotionConfig reducedMotion="user">
       <Sidebar />
 
       {/* Cabecera móvil */}
-      <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-line bg-bg/85 px-4 backdrop-blur-xl lg:hidden">
+      <header className="sticky top-[env(safe-area-inset-top,0px)] z-30 flex h-14 items-center justify-between border-b border-line bg-bg/85 px-4 backdrop-blur-xl lg:hidden">
         <Link href="/" className="flex items-center gap-2" aria-label="ManageCourt, inicio">
           <LogoMark size={30} />
           <span className="font-display text-[1.05rem] font-black italic tracking-tight">
@@ -34,9 +35,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {/* Solo transición de entrada: en App Router una salida mostraría ya el contenido nuevo */}
             <motion.div
               key={pathname}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.24, ease: "easeOut" }}
+              initial={{ opacity: 0, y: 18, scale: 0.985, filter: "blur(6px)" }}
+              animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+              transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
             >
               {children}
             </motion.div>
@@ -47,6 +48,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <BottomTabBar />
       <Toaster />
       <ServiceWorker />
-    </>
+    </MotionConfig>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { PageSkeleton } from "@/components/ui/Skeleton";
+import { AnimatePresence } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { Splash } from "@/components/ui/Splash";
 import { STORE_STORAGE_KEY, useStore } from "@/lib/store";
 import { toast } from "@/lib/toast";
 
@@ -14,6 +15,18 @@ import { toast } from "@/lib/toast";
 export function StoreGate({ children }: { children: React.ReactNode }) {
   const hydrated = useStore((s) => s.hydrated);
   const knownPending = useRef<Set<string> | null>(null);
+  // La intro se ve completa una vez por sesión; después solo mientras hidrata
+  const [introDone, setIntroDone] = useState(false);
+
+  useEffect(() => {
+    let seen = false;
+    try {
+      seen = sessionStorage.getItem("mc-intro") === "1";
+      sessionStorage.setItem("mc-intro", "1");
+    } catch {}
+    const t = setTimeout(() => setIntroDone(true), seen ? 0 : 1500);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,6 +72,10 @@ export function StoreGate({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  if (!hydrated) return <PageSkeleton />;
-  return <>{children}</>;
+  return (
+    <>
+      <AnimatePresence>{(!hydrated || !introDone) && <Splash />}</AnimatePresence>
+      {hydrated && children}
+    </>
+  );
 }

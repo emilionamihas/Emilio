@@ -16,6 +16,7 @@ import { BookingSheet } from "./BookingSheet";
 import { CourtCard } from "./CourtCard";
 import { CourtFilters, type CoverFilter } from "./CourtFilters";
 import { DateStrip } from "./DateStrip";
+import { HeroAmbient, RotatingSport } from "./HeroMotion";
 import { SportTabs, type SportFilter } from "./SportTabs";
 
 export function BookingPortal() {
@@ -54,7 +55,7 @@ export function BookingPortal() {
   const hour = now.getHours();
   const freeNow = courts.filter((c) => courtStatusAt(c, today, hour, bookings, blocks).status === "free").length;
   const isToday = date === today;
-  const timeLabel = now.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+  const timeLabel = now.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" });
 
   return (
     <div className="space-y-5 lg:space-y-6">
@@ -72,24 +73,41 @@ export function BookingPortal() {
           animate={{ scale: [1.1, 1, 1.1] }}
           transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
         />
-        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <HeroAmbient />
+        <div className="relative flex flex-col gap-5 pb-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-white/60">
+            <motion.p
+              className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-white/60"
+              initial={{ opacity: 0, x: -12 }}
+              animate={{ opacity: 1, x: 0 }}
+            >
               <PulseDot color="#d4ff3a" /> En vivo · {timeLabel}
-            </p>
+            </motion.p>
             <h1 className="mt-3 font-display text-3xl font-black leading-[1.05] tracking-tight sm:text-4xl lg:text-5xl">
-              Reservá tu cancha
-              <br />
-              <span className="text-volt">en 30 segundos.</span>
+              <motion.span
+                className="block"
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.05 }}
+              >
+                Reserva tu cancha de
+              </motion.span>
+              <RotatingSport />
             </h1>
-            <p className="mt-3 max-w-md text-sm text-white/65">
-              Fútbol, Básquet, Tenis y Pádel. Elegí horario, pedí tu turno y recibí tu pase digital con QR.
-            </p>
+            <motion.p
+              className="mt-3 max-w-md text-sm text-white/65"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.35 }}
+            >
+              Elige tu horario, pide tu turno en 30 segundos y recibe tu pase digital con QR.
+            </motion.p>
           </div>
           <div className="grid grid-cols-3 gap-2 sm:gap-3">
-            <Stat value={freeNow} label="Libres ahora" color="#10b981" />
-            <Stat value={courts.length} label="Canchas" color="#2563eb" />
+            <Stat i={0} value={freeNow} label="Libres ahora" color="#10b981" />
+            <Stat i={1} value={courts.length} label="Canchas" color="#2563eb" />
             <Stat
+              i={2}
               value={hour >= NIGHT_FROM_HOUR ? 1 : 0}
               label={hour >= NIGHT_FROM_HOUR ? "Luces ON" : `Noche ${NIGHT_FROM_HOUR}h`}
               color="#d4ff3a"
@@ -167,14 +185,20 @@ export function BookingPortal() {
   );
 }
 
-function Stat({ value, label, color, icon }: { value: number; label: string; color: string; icon?: React.ReactNode }) {
+function Stat({ i, value, label, color, icon }: { i: number; value: number; label: string; color: string; icon?: React.ReactNode }) {
   return (
-    <div className="min-w-[92px] rounded-2xl bg-white/8 p-3 backdrop-blur sm:min-w-[110px]">
+    <motion.div
+      className="min-w-[92px] rounded-2xl bg-white/8 p-3 backdrop-blur sm:min-w-[110px]"
+      initial={{ opacity: 0, y: 20, scale: 0.85 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      whileHover={{ y: -4, backgroundColor: "rgba(255,255,255,0.14)" }}
+      transition={{ delay: 0.25 + i * 0.1, type: "spring", stiffness: 300, damping: 20 }}
+    >
       <p className="font-display text-2xl font-black leading-none" style={{ color }}>
         {icon ?? <AnimatedNumber value={value} />}
       </p>
       <p className="mt-1.5 text-[11px] font-semibold text-white/60">{label}</p>
-    </div>
+    </motion.div>
   );
 }
 

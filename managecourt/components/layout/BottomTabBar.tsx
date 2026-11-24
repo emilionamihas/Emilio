@@ -22,7 +22,7 @@ export function BottomTabBar() {
           const active = isActivePath(pathname, item.href);
           const Icon = item.icon;
           return (
-            <li key={item.href}>
+            <motion.li key={item.href} whileTap={{ scale: 0.86 }} transition={{ type: "spring", stiffness: 500, damping: 20 }}>
               <Link
                 href={item.href}
                 className={cn(
@@ -52,7 +52,7 @@ export function BottomTabBar() {
                 </motion.span>
                 <span className="relative">{item.label}</span>
               </Link>
-            </li>
+            </motion.li>
           );
         })}
       </ul>

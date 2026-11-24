@@ -86,7 +86,7 @@ function CreateForm({ initial, onDone }: { initial: Extract<AgendaTarget, { kind
   const [end, setEnd] = useState(Math.min(initial.hour + 1, CLOSE_HOUR));
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [method, setMethod] = useState<PaymentMethod>("efectivo");
+  const [method, setMethod] = useState<PaymentMethod>("yape");
   const [payStatus, setPayStatus] = useState<PaymentStatus>("unpaid");
   const [deposit, setDeposit] = useState<number | "">("");
   const [reason, setReason] = useState<BlockReason>("maintenance");
@@ -191,7 +191,7 @@ function CreateForm({ initial, onDone }: { initial: Extract<AgendaTarget, { kind
                 <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre y apellido" className={inputCls} />
               </Labeled>
               <Labeled label="WhatsApp" className="col-span-2 sm:col-span-1">
-                <input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" placeholder="+54 9 11…" className={inputCls} />
+                <input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" placeholder="+51 9…" className={inputCls} />
               </Labeled>
               <Labeled label="Método de pago" className="col-span-2">
                 <select value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)} className={inputCls}>
@@ -511,13 +511,13 @@ function PaymentEditor({
       <AnimatePresence initial={false}>
         {status === "deposit" && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-            <Labeled label={`Monto de la seña (sugerido ${formatMoney(Math.round(total / 2))})`}>
+            <Labeled label={`Monto del adelanto (sugerido ${formatMoney(Math.round(total / 2))})`}>
               <input
                 type="number"
                 inputMode="numeric"
                 min={0}
                 max={total}
-                step={1000}
+                step={10}
                 value={deposit}
                 placeholder={String(Math.round(total / 2))}
                 onChange={(e) => onDeposit(e.target.value === "" ? "" : Math.max(0, Math.min(total, Number(e.target.value))))}

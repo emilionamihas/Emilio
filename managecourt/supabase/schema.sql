@@ -5,7 +5,7 @@ create type sport as enum ('futbol', 'basquet', 'tenis', 'padel');
 create type surface as enum ('cesped-sintetico', 'parquet', 'polvo-ladrillo', 'cemento', 'cesped-padel');
 create type booking_status as enum ('pending', 'confirmed', 'rejected', 'cancelled');
 create type payment_status as enum ('paid', 'deposit', 'unpaid');
-create type payment_method as enum ('efectivo', 'transferencia', 'mercadopago', 'tarjeta');
+create type payment_method as enum ('yape', 'plin', 'efectivo', 'transferencia', 'tarjeta');
 create type booking_source as enum ('online', 'manual');
 create type block_reason as enum ('maintenance', 'tournament');
 
@@ -17,8 +17,8 @@ create table courts (
   covered     boolean not null default false,
   format      text not null,
   capacity    int not null,
-  day_rate    int not null,           -- ARS por hora
-  night_rate  int not null,           -- ARS por hora con iluminación
+  day_rate    int not null,           -- soles (S/) por hora
+  night_rate  int not null,           -- soles (S/) por hora con iluminación
   map         jsonb not null          -- { x, y, w, h } del croquis
 );
 
@@ -32,7 +32,7 @@ create table bookings (
   phone           text not null,
   payment_method  payment_method not null,
   payment_status  payment_status not null default 'unpaid',
-  amount          int not null,
+  amount          int not null,       -- soles (S/)
   deposit_amount  int not null default 0,
   status          booking_status not null default 'pending',
   source          booking_source not null default 'online',

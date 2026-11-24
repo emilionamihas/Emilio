@@ -9,12 +9,12 @@ interface Props {
   className?: string;
 }
 
-/** Número que interpola suavemente al cambiar (contadores, métricas). */
+/** Número que cuenta desde 0 al aparecer e interpola suavemente al cambiar. */
 export function AnimatedNumber({ value, format = (n) => String(Math.round(n)), className }: Props) {
-  const mv = useMotionValue(value);
+  const mv = useMotionValue(0);
   const text = useTransform(mv, (v) => format(v));
   useEffect(() => {
-    const controls = animate(mv, value, { duration: 0.8, ease: [0.22, 1, 0.36, 1] });
+    const controls = animate(mv, value, { duration: 1.1, ease: [0.22, 1, 0.36, 1] });
     return () => controls.stop();
   }, [mv, value]);
   return <motion.span className={className}>{text}</motion.span>;

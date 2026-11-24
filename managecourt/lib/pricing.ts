@@ -31,19 +31,20 @@ export function priceRange(court: Court, startHour: number, endHour: number): Pr
   return { dayHours, nightHours, dayTotal, nightTotal, total: dayTotal + nightTotal };
 }
 
-const ars = new Intl.NumberFormat("es-AR", {
+/** Soles peruanos: S/ 120 (las tarifas son enteras, sin céntimos) */
+const pen = new Intl.NumberFormat("es-PE", {
   style: "currency",
-  currency: "ARS",
+  currency: "PEN",
+  minimumFractionDigits: 0,
   maximumFractionDigits: 0,
 });
 
 export function formatMoney(n: number): string {
-  return ars.format(Math.round(n));
+  return pen.format(Math.round(n));
 }
 
-/** Formato compacto para tarjetas: $45k */
+/** Formato compacto para la grilla de turnos: S/ 120 · S/ 12.5k */
 export function formatMoneyShort(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1).replace(".", ",")}M`;
-  if (n >= 1_000) return `$${Math.round(n / 1_000)}k`;
-  return `$${n}`;
+  if (n >= 10_000) return `S/ ${(n / 1_000).toFixed(1)}k`;
+  return `S/ ${Math.round(n)}`;
 }
