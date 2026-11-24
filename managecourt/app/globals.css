@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+/* Modo oscuro por clase (.dark en <html>), controlado por ThemeToggle */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ───────────── Sistema de diseño ManageCourt ───────────── */
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Arial Black", "Helvetica Neue", ui-sans-serif, system-ui, sans-serif;
+
+  /* Colores por deporte */
+  --color-futbol: #10b981;
+  --color-futbol-soft: #d1fae5;
+  --color-futbol-deep: #047857;
+  --color-basquet: #f97316;
+  --color-basquet-soft: #ffedd5;
+  --color-basquet-deep: #c2410c;
+  --color-tenis: #c6e83a;
+  --color-tenis-soft: #f3fbd0;
+  --color-tenis-deep: #4d7c0f;
+  --color-padel: #2563eb;
+  --color-padel-soft: #dbeafe;
+  --color-padel-deep: #1d4ed8;
+
+  /* Estados de reserva */
+  --color-pending: #f59e0b;
+  --color-booked: #64748b;
+  --color-blocked: #e11d48;
+
+  /* Marca */
+  --color-ink: #0b1020;
+  --color-ink-2: #121a30;
+  --color-volt: #d4ff3a;
+
+  --radius-card: 1.25rem;
+  --shadow-lift: 0 18px 40px -18px rgb(11 16 32 / 0.35);
+}
+
+:root {
+  --bg: #f4f6fa;
+  --surface: #ffffff;
+  --surface-2: #eef1f6;
+  --border: #e2e7ef;
+  --fg: #0b1020;
+  --muted: #5b6478;
+  color-scheme: light;
+}
+
+.dark {
+  --bg: #070b16;
+  --surface: #0f1526;
+  --surface-2: #161e34;
+  --border: #222c45;
+  --fg: #eef2fb;
+  --muted: #8f9ab3;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--border);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+/* Scroll horizontal táctil sin barra visible */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Fondo de “cancha” sutil para encabezados */
+.court-lines {
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.06) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* Áreas seguras de iOS para la tab bar */
+.pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom), 0.5rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
